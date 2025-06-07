@@ -1,0 +1,112 @@
+.main {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  background: #f7f7f9;
+}
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2rem;
+}
+.pageTitle {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #222;
+}
+.pageSubtitle {
+  color: #888;
+  font-size: 1rem;
+  margin-top: 0.2rem;
+}
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.select {
+  padding: 0.5rem 1.2rem;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  font-size: 1rem;
+  background: #fff;
+  color: #222;
+}
+.exportBtn {
+  background: none;
+  border: none;
+  color: #f24503;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.exportBtn:hover {
+  background: #fff5ed;
+}
+.tableWrapper {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  padding: 2rem 1.5rem 1.5rem 1.5rem;
+}
+.tableTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 1.2rem;
+}
+.month {
+  color: #f24503;
+  font-weight: 700;
+}
+.tableContainer {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+  background: #fff;
+}
+.table th, .table td {
+  padding: 0.75rem 0.7rem;
+  text-align: center;
+  border-bottom: 1px solid #f0f0f0;
+}
+.table th {
+  color: #888;
+  font-weight: 600;
+  background: #fafafa;
+  font-size: 1rem;
+}
+.table td {
+  color: #222;
+  font-weight: 500;
+}
+.totalCol {
+  color: #f24503;
+  font-weight: 700;
+  background: #fff5ed;
+}
+.monthlyTotalRow td {
+  background: #fff5ed;
+  color: #f24503;
+  font-weight: 700;
+  border-bottom: none;
+}
+@media (max-width: 900px) {
+  .main {
+    padding: 1rem 0.5rem;
+  }
+  .tableWrapper {
+    padding: 1rem 0.5rem;
+  }
+  .topBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+} 

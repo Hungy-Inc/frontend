@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -58,6 +58,15 @@ const socialIcons = [
 
 export default function Home() {
   const router = useRouter();
+  const [activeSection, setActiveSection] = useState('hero');
+
+  const scrollToSection = (sectionId: string) => {
+    setActiveSection(sectionId);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className="min-h-screen font-sans bg-[#fff8f3] relative overflow-x-hidden">
@@ -65,7 +74,7 @@ export default function Home() {
       <div className="relative z-10">
 
         {/* Hero Section with Pattern and Gradient */}
-        <section className="w-full flex flex-col items-center justify-center text-center pt-10 pb-16 relative overflow-hidden" style={{minHeight: '420px'}}>
+        <section id="hero" className="w-full flex flex-col items-center justify-center text-center pt-10 pb-16 relative overflow-hidden" style={{minHeight: '420px'}}>
           {/* Pattern and Gradient Background */}
           <div className="absolute inset-0 z-0">
             <Image
@@ -87,9 +96,9 @@ export default function Home() {
             <span className="text-2xl font-extrabold text-orange-500 tracking-tight">HÜNGY</span>
             <div className="flex-1 flex flex-col items-center">
               <div className="flex justify-center gap-12 mb-2">
-                <Link href="#" className="text-lg font-medium text-black hover:text-orange-500 transition">Product</Link>
-                <Link href="#" className="text-lg font-medium text-black hover:text-orange-500 transition">Benefits</Link>
-                <Link href="#" className="text-lg font-medium text-black hover:text-orange-500 transition">Contact</Link>
+                <button onClick={() => scrollToSection('approach')} className="text-lg font-medium text-black hover:text-orange-500 transition">Product</button>
+                <button onClick={() => scrollToSection('benefits')} className="text-lg font-medium text-black hover:text-orange-500 transition">Benefits</button>
+                <button onClick={() => scrollToSection('benefits')} className="text-lg font-medium text-black hover:text-orange-500 transition">More Info</button>
               </div>
               <span className="inline-block bg-white/80 px-6 py-2 mt-4 mb-4 rounded-full text-black font-medium shadow">Helping you, help the Community</span>
             </div>
@@ -104,16 +113,16 @@ export default function Home() {
               <Link href="#" className="flex items-center gap-2 w-full md:w-auto bg-[#ff9800] hover:bg-[#ff9800] text-white font-semibold rounded-lg py-4 px-8 text-lg mt-0 transition focus:outline-none focus:ring-2 focus:ring-orange-300 shadow disabled:opacity-60 disabled:cursor-not-allowed">
                 <ArrowIcon /> Contact Us
               </Link>
-              <Link href="#" className="flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-semibold shadow hover:bg-gray-900 transition">
+              <button onClick={() => scrollToSection('benefits')} className="flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-semibold shadow hover:bg-gray-900 transition">
                 <StarIcon /> More Info
-              </Link>
+              </button>
             </div>
             <p className="text-base italic text-black/50 mt-4">Trusted by kitchens, built for impact — track, manage, and serve with zero hassle.</p>
           </div>
         </section>
 
         {/* Why We Shine Section */}
-        <section className="w-full flex flex-col items-center py-12" style={{ background: '#fff3e6' }}>
+        <section id="benefits" className={`w-full flex flex-col items-center py-12 transition-opacity duration-500 ${activeSection === 'benefits' ? 'opacity-100' : 'opacity-50'}`} style={{ background: '#fff3e6' }}>
           <div className="w-[90vw] max-w-6xl">
             <h2 className="text-4xl font-extrabold mb-4 text-center" style={{fontFamily:'Poppins,Inter,sans-serif'}}>Why We Shine ?</h2>
             <p className="text-lg text-black/80 mb-10">Empowering food banks, community kitchens, and nonprofits to work smarter—not harder. Hungy's platform transforms your daily logistics and volunteer management with powerful tools built just for hunger relief operations.</p>
@@ -187,7 +196,7 @@ export default function Home() {
         </section>
 
         {/* Our Approach Section */}
-        <section className="w-full flex flex-col items-center py-12 bg-white">
+        <section id="approach" className={`w-full flex flex-col items-center py-12 bg-white transition-opacity duration-500 ${activeSection === 'approach' ? 'opacity-100' : 'opacity-50'}`}>
           <div className="w-[90vw] max-w-5xl">
             <h2 className="text-4xl font-extrabold mb-4" style={{fontFamily:'Poppins,Inter,sans-serif'}}>Our Approach</h2>
             <p className="text-lg text-black/80 mb-10">From first login to full-scale food distribution tracking, Hungy's setup is simple, intuitive, and built for real-world nonprofit workflows. We streamline operations so your team can focus on meals, not management.</p>

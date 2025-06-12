@@ -41,6 +41,17 @@ export default function ScheduleShiftsPage() {
   const [selectedSlotId, setSelectedSlotId] = useState<string>("");
   const [addDate, setAddDate] = useState<string>("");
 
+  // Add state for editing signup
+  const [editSignupId, setEditSignupId] = useState<number|null>(null);
+  const [editSignupUserId, setEditSignupUserId] = useState<number|null>(null);
+
+  // Add state to track which shift row is being edited and the edited userIds
+  const [editShiftId, setEditShiftId] = useState<number|null>(null);
+  const [editSignupUserIds, setEditSignupUserIds] = useState<{[signupId: string]: number}>({});
+
+  const [showCategoryWarning, setShowCategoryWarning] = useState(false);
+  const [showRecurringWarning, setShowRecurringWarning] = useState(false);
+
   useEffect(() => {
     fetchShifts();
   }, []);
@@ -238,40 +249,29 @@ export default function ScheduleShiftsPage() {
     setEditError("");
   };
 
-  const handleEditSave = async () => {
-    if (!editId) return;
+  // Update handleEditSave to use editSignupUserIds
+  const handleEditSave = async (signupId: number) => {
     setEditing(true);
-    setEditError("");
     try {
       const token = localStorage.getItem("token");
-      
-      // Get the shiftsignup ID from the shift data
-      const shift = shifts.find(s => s.id === editId);
-      if (!shift || !shift.ShiftSignup?.[0]?.id) {
-        throw new Error('Shift signup not found');
-      }
-
-      // Update only the shift signup
-      const signupRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${shift.ShiftSignup[0].id}`, {
+      const userId = editSignupUserIds[signupId];
+      const signupRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signupId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          userId: editData.userId
-        })
+        body: JSON.stringify({ userId })
       });
-
       if (!signupRes.ok) {
         const errorData = await signupRes.json();
         throw new Error(errorData.error || 'Failed to update shift signup');
       }
-
-      setEditId(null);
+      setEditShiftId(null);
+      setEditSignupUserIds({});
       fetchShifts();
     } catch (err: any) {
-      setEditError(err.message || 'Failed to update shift signup');
+      toast.error(err.message || 'Failed to update shift signup');
     } finally {
       setEditing(false);
     }
@@ -444,6 +444,45 @@ export default function ScheduleShiftsPage() {
     }
   };
 
+  // Save all user assignments for a shift row
+  const handleEditSaveAll = async (shift: any) => {
+    setEditing(true);
+    try {
+      const token = localStorage.getItem("token");
+      const updates = Object.entries(editSignupUserIds).map(async ([signupId, userId]) => {
+        const signup = shift.ShiftSignup.find((s: any) => s.id === Number(signupId));
+        if (signup && signup.userId !== userId) {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signupId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ userId })
+          });
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to update shift signup');
+          }
+        }
+      });
+      await Promise.all(updates);
+      setEditShiftId(null);
+      setEditSignupUserIds({});
+      fetchShifts();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update shift signups');
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  // Cancel editing for a row
+  const handleEditCancel = () => {
+    setEditShiftId(null);
+    setEditSignupUserIds({});
+  };
+
   return (
     <main style={{ padding: 32 }}>
       <div style={{ fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Schedule Shifts</div>
@@ -484,6 +523,13 @@ export default function ScheduleShiftsPage() {
             <select
               value={addData.recurringShiftId || ''}
               onChange={e => {
+                if (!addData.shiftCategoryId) {
+                  setShowCategoryWarning(true);
+                  setTimeout(() => setShowCategoryWarning(false), 2000);
+                  // Prevent selection and clear value
+                  setAddData((d: any) => ({ ...d, recurringShiftId: '' }));
+                  return;
+                }
                 setAddData((d: any) => ({ 
                   ...d, 
                   recurringShiftId: e.target.value,
@@ -501,6 +547,12 @@ export default function ScheduleShiftsPage() {
                 height: 38
               }}
               disabled={!addData.shiftCategoryId}
+              onClick={() => {
+                if (!addData.shiftCategoryId) {
+                  setShowCategoryWarning(true);
+                  setTimeout(() => setShowCategoryWarning(false), 2000);
+                }
+              }}
             >
               <option value="">Select Recurring Shift</option>
               {recurringShifts
@@ -543,7 +595,11 @@ export default function ScheduleShiftsPage() {
           </div>
 
           {/* Multi-select Users with slot limit */}
-          <div style={{ minWidth: 300 }}>
+          <div
+            {...(!addData.shiftCategoryId || !addData.recurringShiftId || availableSlots === 0
+              ? { style: { width: '100%', pointerEvents: 'none', opacity: 0.7 } }
+              : { style: { width: '100%' } })}
+          >
             <style>
               {`
                 .rmsc {
@@ -557,36 +613,54 @@ export default function ScheduleShiftsPage() {
                   --rmsc-radius: 5px;
                   --rmsc-h: 38px;
                 }
+                .rmsc[aria-disabled='true'],
+                .rmsc.disabled,
+                .rmsc[aria-disabled='true'] .dropdown-container,
+                .rmsc.disabled .dropdown-container {
+                  background: #f5f5f5 !important;
+                  color: #888 !important;
+                  border: 1px solid #eee !important;
+                  cursor: not-allowed !important;
+                  opacity: 1 !important;
+                }
+                .rmsc[aria-disabled='true'] .dropdown-heading,
+                .rmsc.disabled .dropdown-heading {
+                  color: #888 !important;
+                }
               `}
             </style>
-            <MultiSelect
-              options={availableUsers.map((u: any) => ({ 
-                label: `${u.firstName} ${u.lastName}`, 
-                value: u.id 
-              }))}
-              value={users.filter((u: any) => addData.userIds?.includes(u.id)).map((u: any) => ({ 
-                label: `${u.firstName} ${u.lastName}`, 
-                value: u.id 
-              }))}
-              onChange={(selected: any[]) => {
-                // Limit selection to available slots
-                if (selected.length <= availableSlots) {
-                  setAddData((d: any) => ({ 
-                    ...d, 
-                    userIds: selected.map((opt: any) => opt.value) 
-                  }));
-                }
-              }}
-              labelledBy="Select Users"
-              disabled={!addData.shiftCategoryId || !addData.recurringShiftId || availableSlots === 0}
-              hasSelectAll={false}
-              overrideStrings={{
-                selectSomeItems: availableSlots === 0 ? "No slots available" : `Select Users (${availableSlots} slot${availableSlots !== 1 ? 's' : ''} available)...`,
-                allItemsAreSelected: "All Available Users Selected",
-                selectAll: "Select All",
-                search: "Search Users"
-              }}
-            />
+            <div
+              style={{ width: '100%' }}
+            >
+              <MultiSelect
+                options={availableUsers.map((u: any) => ({ 
+                  label: `${u.firstName} ${u.lastName}`, 
+                  value: u.id 
+                }))}
+                value={users.filter((u: any) => addData.userIds?.includes(u.id)).map((u: any) => ({ 
+                  label: `${u.firstName} ${u.lastName}`, 
+                  value: u.id 
+                }))}
+                onChange={(selected: any[]) => {
+                  // Limit selection to available slots
+                  if (selected.length <= availableSlots) {
+                    setAddData((d: any) => ({ 
+                      ...d, 
+                      userIds: selected.map((opt: any) => opt.value) 
+                    }));
+                  }
+                }}
+                labelledBy="Select Users"
+                disabled={!addData.shiftCategoryId || !addData.recurringShiftId || availableSlots === 0}
+                hasSelectAll={false}
+                overrideStrings={{
+                  selectSomeItems: availableSlots === 0 ? "No slots available" : `Select Users (${availableSlots} slot${availableSlots !== 1 ? 's' : ''} available)...`,
+                  allItemsAreSelected: "All Available Users Selected",
+                  selectAll: "Select All",
+                  search: "Search Users"
+                }}
+              />
+            </div>
             <div style={{ marginTop: 8 }}>
               {availableSlots > 0 && (
                 <div style={{ fontSize: 12, color: '#666' }}>
@@ -628,18 +702,33 @@ export default function ScheduleShiftsPage() {
         })()}
 
         {/* Schedule Button */}
+        {showCategoryWarning && (
+          <div style={{ color: '#e53935', fontWeight: 500, marginBottom: 8, fontSize: 15 }}>
+            Please select a category first.
+          </div>
+        )}
+        {showRecurringWarning && (
+          <div style={{ color: '#e53935', fontWeight: 500, marginBottom: 8, fontSize: 15 }}>
+            Please select a recurring shift first.
+          </div>
+        )}
         <button
           style={{ 
-            background: availableSlots === 0 ? '#ccc' : '#ff9800', 
+            background: (!addData.shiftCategoryId || !addData.recurringShiftId || !addData.userIds?.length || availableSlots === 0) ? '#ccc' : '#ff9800', 
             color: '#fff', 
             fontWeight: 700, 
             border: 'none', 
             borderRadius: 6, 
             padding: '10px 24px', 
             fontSize: 16, 
-            cursor: availableSlots === 0 ? 'not-allowed' : 'pointer' 
+            cursor: (!addData.shiftCategoryId || !addData.recurringShiftId || !addData.userIds?.length || availableSlots === 0) ? 'not-allowed' : 'pointer' 
           }}
-          disabled={!addData.recurringShiftId || !addData.userIds?.length || availableSlots === 0}
+          disabled={
+            !addData.shiftCategoryId ||
+            !addData.recurringShiftId ||
+            !addData.userIds?.length ||
+            availableSlots === 0
+          }
           onClick={handleScheduleShift}
         >
           Schedule Shift
@@ -740,63 +829,142 @@ export default function ScheduleShiftsPage() {
                     }
                     return (
                       <tr key={shift.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <td style={{ padding: 12 }}>
-                          {editId === shift.id ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <select
-                                value={editData.userId || ''}
-                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
-                                  setEditData((prev: { userId: number | null; shiftId: number }) => ({ 
-                                    ...prev, 
-                                    userId: Number(e.target.value) 
-                                  }))
-                                }
-                                style={{ 
-                                  padding: 6, 
-                                  borderRadius: 4, 
-                                  border: '1px solid #eee',
-                                  flex: 1
-                                }}
-                                disabled={editing}
-                              >
-                                <option value="">Select User</option>
-                                {users.map(user => (
-                                  <option key={user.id} value={user.id}>
-                                    {user.firstName} {user.lastName}
-                                  </option>
-                                ))}
-                              </select>
-                              <button 
-                                onClick={handleEditSave} 
-                                style={{ 
-                                  background: 'none', 
-                                  border: 'none', 
-                                  color: '#1db96b', 
-                                  cursor: 'pointer',
-                                  padding: 4
-                                }} 
-                                title="Save" 
-                                disabled={editing}
-                              >
-                                <FaSave />
-                              </button>
-                              <button 
-                                onClick={() => setEditId(null)} 
-                                style={{ 
-                                  background: 'none', 
-                                  border: 'none', 
-                                  color: '#e53935', 
-                                  cursor: 'pointer',
-                                  padding: 4
-                                }} 
-                                title="Cancel" 
-                                disabled={editing}
-                              >
-                                <FaTimes />
-                              </button>
+                        <td style={{ padding: '12px 0 12px 12px' }}>
+                          {Array.isArray(shift.ShiftSignup) && shift.ShiftSignup.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {shift.ShiftSignup.map((signup: any) => (
+                                <div key={signup.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  {editShiftId === shift.id ? (
+                                    <select
+                                      value={editSignupUserIds[signup.id] ?? signup.userId}
+                                      onChange={e => setEditSignupUserIds(prev => ({ ...prev, [signup.id]: Number(e.target.value) }))}
+                                      style={{ padding: 4, borderRadius: 4, border: '1px solid #eee' }}
+                                      disabled={editing}
+                                    >
+                                      <option value="">Select User</option>
+                                      {users.map(user => (
+                                        <option key={user.id} value={user.id}>
+                                          {user.firstName} {user.lastName}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span>{(() => {
+                                      const user = users.find(u => u.id === signup.userId);
+                                      return user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
+                                    })()}</span>
+                                  )}
+                                </div>
+                              ))}
+                              {editShiftId === shift.id && (
+                                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                  <button
+                                    onClick={() => handleEditSaveAll(shift)}
+                                    style={{ background: 'none', border: 'none', color: '#1db96b', cursor: editing ? 'not-allowed' : 'pointer', padding: 4 }}
+                                    title="Save All"
+                                    disabled={editing}
+                                  >
+                                    <FaSave /> Save
+                                  </button>
+                                  <button
+                                    onClick={handleEditCancel}
+                                    style={{ background: 'none', border: 'none', color: '#e53935', cursor: editing ? 'not-allowed' : 'pointer', padding: 4 }}
+                                    title="Cancel"
+                                    disabled={editing}
+                                  >
+                                    <FaTimes /> Cancel
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ) : (
-                            <span>{userNames}</span>
+                            editShiftId === shift.id ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <select
+                                  value={editSignupUserIds['new'] ?? ''}
+                                  onChange={e => setEditSignupUserIds(prev => ({ ...prev, ['new']: Number(e.target.value) }))}
+                                  style={{ padding: 4, borderRadius: 4, border: '1px solid #eee' }}
+                                  disabled={editing}
+                                >
+                                  <option value="">Select User</option>
+                                  {users.map(user => (
+                                    <option key={user.id} value={user.id}>
+                                      {user.firstName} {user.lastName}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={async () => {
+                                    setEditing(true);
+                                    try {
+                                      const userId = editSignupUserIds['new'];
+                                      // Find the first ShiftSignup for this shift (if any)
+                                      const signup = (shift.ShiftSignup && shift.ShiftSignup[0]) ? shift.ShiftSignup[0] : null;
+                                      const token = localStorage.getItem("token");
+                                      if (!signup) {
+                                        // No ShiftSignup exists, so create one (POST)
+                                        // Use shift.startTime/endTime for checkIn/checkOut
+                                        // Use shiftId from shift, userId from selection
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups`, {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            Authorization: `Bearer ${token}`
+                                          },
+                                          body: JSON.stringify({
+                                            userId,
+                                            shiftId: shift.id,
+                                            checkIn: shift.startTime,
+                                            checkOut: shift.endTime,
+                                            // Optionally add mealsServed, etc.
+                                          })
+                                        });
+                                        if (!res.ok) {
+                                          const errorData = await res.json();
+                                          throw new Error(errorData.error || 'Failed to create shift signup');
+                                        }
+                                      } else {
+                                        // If ShiftSignup exists, update it (PUT)
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signup.id}`, {
+                                          method: 'PUT',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            Authorization: `Bearer ${token}`
+                                          },
+                                          body: JSON.stringify({ userId })
+                                        });
+                                        if (!res.ok) {
+                                          const errorData = await res.json();
+                                          throw new Error(errorData.error || 'Failed to update shift signup');
+                                        }
+                                      }
+                                      setEditShiftId(null);
+                                      setEditSignupUserIds({});
+                                      fetchShifts();
+                                    } catch (err: any) {
+                                      toast.error(err.message || 'Failed to update shift signup');
+                                    } finally {
+                                      setEditing(false);
+                                    }
+                                  }}
+                                  style={{ background: 'none', border: 'none', color: '#1db96b', cursor: editing ? 'not-allowed' : 'pointer', padding: 4 }}
+                                  title="Save"
+                                  disabled={editing || !editSignupUserIds['new']}
+                                >
+                                  <FaSave />
+                                </button>
+                                <button
+                                  onClick={handleEditCancel}
+                                  style={{ background: 'none', border: 'none', color: '#e53935', cursor: editing ? 'not-allowed' : 'pointer', padding: 4 }}
+                                  title="Cancel"
+                                  disabled={editing}
+                                >
+                                  <FaTimes />
+                                </button>
+                              </div>
+                            ) : (
+                              <span>N/A</span>
+                            )
                           )}
                         </td>
                         <td style={{ padding: 12 }}>{shift.name}</td>
@@ -805,28 +973,19 @@ export default function ScheduleShiftsPage() {
                         <td style={{ padding: 12 }}>{shift.location}</td>
                         <td style={{ padding: 12, textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                            <button 
-                              onClick={() => handleEdit(shift)} 
-                              style={{ 
-                                background: 'none', 
-                                border: 'none', 
-                                color: '#ff9800', 
-                                cursor: 'pointer',
-                                padding: 4
-                              }} 
-                              title="Edit User"
+                            <button
+                              onClick={() => {
+                                setEditShiftId(shift.id);
+                                setEditSignupUserIds(Object.fromEntries((shift.ShiftSignup || []).map((s: any) => [s.id, s.userId])));
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', padding: 4 }}
+                              title="Edit User(s)"
                             >
                               <FaEdit />
                             </button>
-                            <button 
-                              onClick={() => handleDelete(shift)} 
-                              style={{ 
-                                background: 'none', 
-                                border: 'none', 
-                                color: '#e53935', 
-                                cursor: 'pointer',
-                                padding: 4
-                              }} 
+                            <button
+                              onClick={() => handleDelete(shift)}
+                              style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer', padding: 4 }}
                               title="Delete"
                             >
                               <FaTrash />

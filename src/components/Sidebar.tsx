@@ -5,6 +5,7 @@ import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, F
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 const menu = [
   { icon: <FaHome />, label: 'Dashboard', href: '/dashboard' },
@@ -44,7 +45,10 @@ export default function Sidebar() {
   return (
     <aside className={styles.sidebar}>
       <div>
-        <div className={styles.logo}>HUN<span>G</span>Y</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2rem 1.5rem 1.5rem 1.5rem' }}>
+          <Image src="/assets/hungy-logo.jpg" alt="Hungy Logo" width={32} height={32} />
+          <div className={styles.logo} style={{ padding: 0 }}>HUN<span>G</span>Y</div>
+        </div>
         <nav style={{ flex: 1, overflowY: 'auto' }}>
           {menu.map((item) => (
             <Link

@@ -1,4 +1,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+/* Hungy Color Palette */
+:root {
+  --hungy-orange: #EF5C11;
+  --hungy-gray: #F5F4F2;
+  --hungy-dark-gray: #666666;
+  --hungy-black: #000000;
+}
 
 @tailwind base;
 @tailwind components;
@@ -6,9 +13,11 @@
 
 @layer base {
   body {
-    @apply bg-[#fff8f3] text-black;
+    background: var(--hungy-gray);
+    color: var(--hungy-black);
     margin: 0;
     padding: 0;
+    font-family: "Poppins", sans-serif;
   }
 }
 
@@ -18,19 +27,34 @@
   }
 
   .btn-primary {
-    @apply bg-primary text-white px-6 py-2 rounded-full hover:bg-[#d93c00] transition-colors;
+    background: var(--hungy-orange);
+    color: #fff;
+    @apply px-6 py-2 rounded-full transition-colors;
+  }
+
+  .btn-primary:hover {
+    background: var(--hungy-dark-gray);
   }
 
   .btn-secondary {
-    @apply border-2 border-gray-300 text-gray-700 px-6 py-2 rounded-full hover:border-gray-400 transition-colors;
+    border: 2px solid var(--hungy-dark-gray);
+    color: var(--hungy-dark-gray);
+    @apply px-6 py-2 rounded-full transition-colors;
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--hungy-orange);
+    color: var(--hungy-orange);
   }
 
   .section-title {
-    @apply text-4xl font-bold text-center text-dark-text mb-16;
+    color: var(--hungy-dark-gray);
+    @apply text-4xl font-bold text-center mb-16;
   }
 
   .card {
-    @apply bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow;
+    background: #fff;
+    @apply rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow;
   }
 }
 
@@ -43,7 +67,11 @@
 
 /* Header Styles */
 header {
-  @apply bg-white shadow-md sticky top-0 z-50;
+  background: #fff;
+  box-shadow: 0 2px 8px var(--hungy-gray);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .navbar {
@@ -55,7 +83,8 @@ header {
 }
 
 .logo h1 {
-  @apply text-primary text-2xl font-bold ml-2;
+  color: var(--hungy-orange);
+  @apply text-2xl font-bold ml-2;
 }
 
 .logo h1 span {
@@ -77,12 +106,13 @@ header {
 }
 
 .nav-links a {
-  @apply text-text no-underline font-medium transition-colors;
+  color: var(--hungy-dark-gray);
+  @apply no-underline font-medium transition-colors;
 }
 
 .nav-links a:hover,
 .nav-links a.active {
-  @apply text-primary;
+  color: var(--hungy-orange);
 }
 
 .user-dropdown {
@@ -90,7 +120,8 @@ header {
 }
 
 .user-dropdown .avatar {
-  @apply w-8 h-8 bg-accent rounded-full flex items-center justify-center text-white font-semibold;
+  background: var(--hungy-dark-gray);
+  color: #fff;
 }
 
 /* Main Content Styles */
@@ -99,11 +130,11 @@ header {
 }
 
 .location {
-  @apply text-xl text-dark-text;
+  color: var(--hungy-dark-gray);
 }
 
 .date-time {
-  @apply text-sm text-text;
+  color: var(--hungy-dark-gray);
 }
 
 .quick-actions {
@@ -111,11 +142,14 @@ header {
 }
 
 .quick-actions button {
-  @apply bg-primary text-white border-none rounded px-4 py-2 cursor-pointer font-medium transition-colors;
+  background: var(--hungy-orange);
+  color: #fff;
+  border: none;
+  @apply rounded px-4 py-2 cursor-pointer font-medium transition-colors;
 }
 
 .quick-actions button:hover {
-  @apply bg-[#d93c00];
+  background: var(--hungy-dark-gray);
 }
 
 /* Stat Cards */
@@ -124,15 +158,16 @@ header {
 }
 
 .stat-card {
-  @apply bg-white rounded-lg p-4 shadow-sm;
+  background: #fff;
+  @apply rounded-lg p-4 shadow-sm;
 }
 
 .stat-card h3 {
-  @apply text-sm text-text mb-2;
+  color: var(--hungy-dark-gray);
 }
 
 .stat-card .value {
-  @apply text-2xl font-semibold text-dark-text;
+  color: var(--hungy-orange);
 }
 
 /* Dashboard Grid */
@@ -146,19 +181,21 @@ header {
 }
 
 .sidebar-item {
-  @apply bg-white rounded-lg p-4 shadow-sm cursor-pointer transition-all;
+  background: #fff;
+  @apply rounded-lg p-4 shadow-sm cursor-pointer transition-all;
 }
 
 .sidebar-item:hover {
-  @apply -translate-y-0.5 shadow-md;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--hungy-gray);
 }
 
 .sidebar-item.active {
-  @apply border-l-4 border-primary;
+  border-left: 4px solid var(--hungy-orange);
 }
 
 .sidebar-item h3 {
-  @apply text-primary;
+  color: var(--hungy-orange);
 }
 
 /* Content Area */
@@ -167,7 +204,8 @@ header {
 }
 
 .section {
-  @apply bg-white rounded-lg p-6 shadow-sm;
+  background: #fff;
+  @apply rounded-lg p-6 shadow-sm;
 }
 
 /* Table Styles */
@@ -181,15 +219,12 @@ header {
 
 .data-table th,
 .data-table td {
-  @apply p-4 text-left border-b border-gray-200;
+  color: var(--hungy-dark-gray);
+  border-bottom: 1px solid var(--hungy-gray);
 }
 
 .data-table th {
-  @apply font-semibold text-dark-text bg-gray-50;
-}
-
-.data-table td {
-  @apply text-text;
+  background: var(--hungy-gray);
 }
 
 .status-badge {
@@ -197,7 +232,8 @@ header {
 }
 
 .status-badge.completed {
-  @apply bg-green-100 text-green-800;
+  background: var(--hungy-orange);
+  color: #fff;
 }
 
 .analytics-grid {
@@ -209,7 +245,8 @@ header {
 }
 
 .chart-placeholder {
-  @apply w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400;
+  background: var(--hungy-gray);
+  color: var(--hungy-dark-gray);
 }
 
 /* Responsive Styles */

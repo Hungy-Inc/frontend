@@ -99,11 +99,20 @@ export default function ProfilePage() {
     setSaveError('');
   };
 
+  const isNameValid = /^[A-Za-z ]+$/.test(editedFields.name.trim());
+  const isPhoneValid = /^[0-9]+$/.test(editedFields.phone.trim());
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedFields.email.trim());
+  const allFieldsFilled = editedFields.name.trim() && editedFields.email.trim() && editedFields.phone.trim();
+  const canSave = isNameValid && isPhoneValid && isEmailValid && allFieldsFilled;
+
   const handleSave = async () => {
+    if (!canSave) {
+      setSaveError('Please fill all fields correctly. Name: letters only, Phone: numbers only, Email: valid format.');
+      return;
+    }
     try {
       const token = localStorage.getItem("token");
       if (!token || !profile) return;
-
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${profile.id}`, {
         method: 'PUT',
         headers: {
@@ -111,23 +120,20 @@ export default function ProfilePage() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          name: editedFields.name,
-          email: editedFields.email,
-          phone: editedFields.phone
+          name: editedFields.name.trim() || profile.name,
+          email: editedFields.email.trim() || profile.email,
+          phone: editedFields.phone.trim() || profile.phone
         })
       });
-
       if (!response.ok) {
         throw new Error('Failed to update profile');
       }
-
       setProfile(prev => prev ? {
         ...prev,
         name: editedFields.name,
         email: editedFields.email,
         phone: editedFields.phone
       } : null);
-
       setIsEditing(false);
       setSaveError('');
     } catch (err) {
@@ -193,15 +199,17 @@ export default function ProfilePage() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  background: '#ff9800',
+                  background: canSave ? '#ff9800' : '#ccc',
                   color: '#fff',
                   border: 'none',
                   padding: '8px 16px',
                   borderRadius: 6,
-                  cursor: 'pointer',
+                  cursor: canSave ? 'pointer' : 'not-allowed',
                   fontWeight: 500,
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  opacity: canSave ? 1 : 0.7
                 }}
+                disabled={!canSave}
               >
                 <FaSave size={16} />
                 Save Changes
@@ -263,6 +271,9 @@ export default function ProfilePage() {
                     fontSize: '1rem'
                   }}
                 />
+                {isEditing && !isNameValid && (
+                  <div style={{ color: 'red', fontSize: 13 }}>Name must contain only letters and spaces.</div>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#666' }}>Email</label>
@@ -278,6 +289,9 @@ export default function ProfilePage() {
                     fontSize: '1rem'
                   }}
                 />
+                {isEditing && !isEmailValid && (
+                  <div style={{ color: 'red', fontSize: 13 }}>Email must be in a valid format.</div>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#666' }}>Phone</label>
@@ -293,6 +307,9 @@ export default function ProfilePage() {
                     fontSize: '1rem'
                   }}
                 />
+                {isEditing && !isPhoneValid && (
+                  <div style={{ color: 'red', fontSize: 13 }}>Phone must contain only numbers.</div>
+                )}
               </div>
             </div>
           ) : (

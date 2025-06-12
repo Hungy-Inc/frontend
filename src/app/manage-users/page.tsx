@@ -27,6 +27,8 @@ export default function ManageUsersPage() {
   const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [addUserError, setAddUserError] = useState('');
+  const [addTouched, setAddTouched] = useState<{[key: string]: boolean}>({});
 
   const fetchUsers = async () => {
     try {
@@ -92,11 +94,21 @@ export default function ManageUsersPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      const [firstName, ...lastArr] = (editData.name || '').split(' ');
-      const lastName = lastArr.join(' ');
+      let firstName = '';
+      let lastName = '';
+      if (editData.name) {
+        const nameParts = editData.name.trim().split(' ');
+        if (nameParts.length === 1) {
+          firstName = nameParts[0];
+          lastName = '';
+        } else {
+          firstName = nameParts[0];
+          lastName = nameParts.slice(1).join(' ');
+        }
+      }
       const body = {
-        firstName: firstName || '',
-        lastName: lastName || '',
+        firstName,
+        lastName,
         email: editData.email,
         role: editData.role
       };
@@ -140,7 +152,21 @@ export default function ManageUsersPage() {
   };
 
   const isEmail = (email: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-  const isValid = addData.firstName.trim() && addData.lastName.trim() && isEmail(addData.email) && addData.phone.trim() && addData.password.trim() && addData.confirmPassword.trim() && addData.role && addData.password === addData.confirmPassword;
+
+  function validatePassword(pw: string) {
+    // 8-32 chars, at least one letter, one number, one special char, no spaces
+    return /^([A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+){8,32}$/.test(pw) &&
+      /[A-Za-z]/.test(pw) &&
+      /\d/.test(pw) &&
+      /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(pw) &&
+      !/\s/.test(pw);
+  }
+
+  const isAddFirstNameValid = addData.firstName.trim().length > 0;
+  const isAddEmailValid = isEmail(addData.email);
+  const isAddPasswordValid = validatePassword(addData.password);
+  const isAddConfirmPasswordValid = addData.password === addData.confirmPassword && addData.confirmPassword.length > 0;
+  const isAddFormValid = isAddFirstNameValid && isAddEmailValid && isAddPasswordValid && isAddConfirmPasswordValid && addData.role;
 
   const addUser = async () => {
     setAdding(true);
@@ -301,13 +327,26 @@ export default function ManageUsersPage() {
       {/* Add User Modal */}
       {showAdd && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.15)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 10, padding: 32, minWidth: 320, boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
+          <div style={{ background: '#fff', borderRadius: 10, padding: 32, width: 320, minWidth: 320, maxWidth: 320, boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
             <button onClick={() => setShowAdd(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}><FaTimes /></button>
             <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Add User</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input placeholder="First Name" value={addData.firstName} onChange={e => handleAddChange('firstName', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
+              <input placeholder="First Name" value={addData.firstName} 
+                onChange={e => {
+                  const val = e.target.value.replace(/[^A-Za-z]/g, '');
+                  handleAddChange('firstName', val);
+                }}
+                onBlur={() => setAddTouched(t => ({ ...t, firstName: true }))}
+                onFocus={() => setAddTouched(t => ({ ...t, firstName: true }))}
+                style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
+              {addTouched.firstName && !isAddFirstNameValid && <div style={{ color: 'red', fontSize: 13 }}>First name is required and must contain only letters.</div>}
               <input placeholder="Last Name" value={addData.lastName} onChange={e => handleAddChange('lastName', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
-              <input placeholder="Email" value={addData.email} onChange={e => handleAddChange('email', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
+              <input placeholder="Email" value={addData.email} 
+                onChange={e => handleAddChange('email', e.target.value)}
+                onBlur={() => setAddTouched(t => ({ ...t, email: true }))}
+                onFocus={() => setAddTouched(t => ({ ...t, email: true }))}
+                style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
+              {addTouched.email && !isAddEmailValid && <div style={{ color: 'red', fontSize: 13 }}>Enter a valid email address.</div>}
               <input placeholder="Phone" value={addData.phone} onChange={e => handleAddChange('phone', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
               <div style={{ position: 'relative' }}>
                 <input
@@ -315,6 +354,8 @@ export default function ManageUsersPage() {
                   type={showPassword ? "text" : "password"}
                   value={addData.password}
                   onChange={e => handleAddChange('password', e.target.value)}
+                  onBlur={() => setAddTouched(t => ({ ...t, password: true }))}
+                  onFocus={() => setAddTouched(t => ({ ...t, password: true }))}
                   style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', width: '100%' }}
                   disabled={adding}
                 />
@@ -325,16 +366,23 @@ export default function ManageUsersPage() {
                   {showPassword ? <FaEye /> : <FaEyeSlash />}
                 </span>
               </div>
+              {addTouched.password && !isAddPasswordValid && (
+                <div style={{ color: 'red', fontSize: 13, wordBreak: 'break-word', maxWidth: 280, margin: '0 auto' }}>
+                  Password must be 8-32 characters, contain letters, numbers, a special character, and no spaces.
+                </div>
+              )}
               <div style={{ position: 'relative', marginBottom: 0 }}>
                 <input
                   placeholder="Confirm Password"
                   type={showConfirmPassword ? "text" : "password"}
                   value={addData.confirmPassword}
                   onChange={e => handleAddChange('confirmPassword', e.target.value)}
+                  onBlur={() => setAddTouched(t => ({ ...t, confirmPassword: true }))}
+                  onFocus={() => setAddTouched(t => ({ ...t, confirmPassword: true }))}
                   style={{
                     padding: 8,
                     borderRadius: 5,
-                    border: addData.confirmPassword.length > 0 && addData.password !== addData.confirmPassword ? '1.5px solid #e53935' : '1px solid #eee',
+                    border: '1px solid #eee',
                     width: '100%'
                   }}
                   disabled={adding}
@@ -345,14 +393,15 @@ export default function ManageUsersPage() {
                 >
                   {showConfirmPassword ? <FaEye /> : <FaEyeSlash />}
                 </span>
-                {addData.confirmPassword.length > 0 && addData.password !== addData.confirmPassword && (
+                {addTouched.confirmPassword && !isAddConfirmPasswordValid && (
                   <div style={{ color: 'red', fontSize: 13, marginTop: 2, textAlign: 'center' }}>Passwords do not match</div>
                 )}
               </div>
               <select value={addData.role} onChange={e => handleAddChange('role', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding}>
                 {roles.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
-              <button onClick={addUser} style={{ background: isValid ? '#ff9800' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: isValid ? 'pointer' : 'not-allowed', opacity: adding ? 0.7 : 1 }} disabled={adding || !isValid}>
+              {addUserError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{addUserError}</div>}
+              <button onClick={addUser} style={{ background: isAddFormValid ? '#ff9800' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: isAddFormValid ? 'pointer' : 'not-allowed', opacity: adding ? 0.7 : 1 }} disabled={adding || !isAddFormValid}>
                 {adding ? 'Adding...' : 'Add'}
               </button>
             </div>

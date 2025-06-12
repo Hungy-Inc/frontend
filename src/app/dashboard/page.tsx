@@ -6,6 +6,7 @@ import { FiDownload } from 'react-icons/fi';
 import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -198,6 +199,17 @@ export default function Dashboard() {
     fetchInventoryData();
   }, [period, year, unit]);
 
+  useEffect(() => {
+    // Redirect to login if not authenticated
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      if (!token || !user) {
+        router.push('/login');
+      }
+    }
+  }, []);
+
   // Unit conversion
   const convertWeight = (weight: number) => {
     if (unit === 'Pounds (lb)') return (weight * 2.20462).toFixed(2);
@@ -267,8 +279,8 @@ export default function Dashboard() {
   };
 
   return (
-    <>
-      <main className="dashboard-main" style={{ background: '#F7F7F9', minHeight: '100vh', padding: 24 }}>
+    <main className="min-h-screen bg-[#fff8f3]">
+      <div className="dashboard-main" style={{ background: '#F7F7F9', minHeight: '100vh', padding: 24 }}>
         {/* Dashboard Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
@@ -484,7 +496,7 @@ export default function Dashboard() {
           </div>
           )}
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   );
 } 

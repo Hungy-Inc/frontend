@@ -34,6 +34,7 @@ export default function ManageShiftsPage() {
   });
   const [addRecurringError, setAddRecurringError] = useState('');
   const [addingRecurring, setAddingRecurring] = useState(false);
+  const [addRecurringTouched, setAddRecurringTouched] = useState<{[key: string]: boolean}>({});
 
   const [editRecurringId, setEditRecurringId] = useState<number|null>(null);
   const [editRecurring, setEditRecurring] = useState({
@@ -50,6 +51,8 @@ export default function ManageShiftsPage() {
 
   // Fetch shift categories for dropdown
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterDay, setFilterDay] = useState('');
   useEffect(() => {
     if (tab === 'recurringshifts' || showAddRecurring || editRecurringId) {
       fetchCategoryOptions();
@@ -204,6 +207,9 @@ export default function ManageShiftsPage() {
     setAddRecurringError('');
     try {
       const token = localStorage.getItem("token");
+      const baseDate = '1969-06-10';
+      const startTime = addRecurring.startTime ? `${baseDate}T${addRecurring.startTime}` : '';
+      const endTime = addRecurring.endTime ? `${baseDate}T${addRecurring.endTime}` : '';
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
         method: 'POST',
         headers: {
@@ -212,6 +218,8 @@ export default function ManageShiftsPage() {
         },
         body: JSON.stringify({
           ...addRecurring,
+          startTime,
+          endTime,
           shiftCategoryId: Number(addRecurring.shiftCategoryId),
           dayOfWeek: Number(addRecurring.dayOfWeek),
           slots: Number(addRecurring.slots)
@@ -235,8 +243,8 @@ export default function ManageShiftsPage() {
     setEditRecurring({
       name: shift.name,
       dayOfWeek: shift.dayOfWeek,
-      startTime: shift.startTime ? shift.startTime.slice(0, 16) : '',
-      endTime: shift.endTime ? shift.endTime.slice(0, 16) : '',
+      startTime: shift.startTime ? shift.startTime.slice(11, 16) : '',
+      endTime: shift.endTime ? shift.endTime.slice(11, 16) : '',
       shiftCategoryId: String(shift.shiftCategoryId),
       location: shift.location,
       slots: shift.slots
@@ -249,6 +257,9 @@ export default function ManageShiftsPage() {
     setEditRecurringError('');
     try {
       const token = localStorage.getItem("token");
+      const baseDate = '1969-06-10';
+      const startTime = editRecurring.startTime ? `${baseDate}T${editRecurring.startTime}` : '';
+      const endTime = editRecurring.endTime ? `${baseDate}T${editRecurring.endTime}` : '';
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
         method: 'PUT',
         headers: {
@@ -257,6 +268,8 @@ export default function ManageShiftsPage() {
         },
         body: JSON.stringify({
           ...editRecurring,
+          startTime,
+          endTime,
           shiftCategoryId: Number(editRecurring.shiftCategoryId),
           dayOfWeek: Number(editRecurring.dayOfWeek),
           slots: Number(editRecurring.slots)
@@ -293,6 +306,17 @@ export default function ManageShiftsPage() {
       alert(err.message || 'Failed to delete recurring shift');
     }
   };
+
+  const isRecurringNameValid = /^[A-Za-z]+$/.test(addRecurring.name.trim());
+  const isRecurringDayValid = typeof addRecurring.dayOfWeek === 'number' && addRecurring.dayOfWeek >= 0 && addRecurring.dayOfWeek <= 6;
+  const isRecurringStartTimeValid = !!addRecurring.startTime;
+  const isRecurringEndTimeValid = !!addRecurring.endTime;
+  const isRecurringCategoryValid = !!addRecurring.shiftCategoryId;
+  const isRecurringLocationValid = addRecurring.location.trim().length > 0;
+  const isRecurringSlotsValid = Number(addRecurring.slots) > 0;
+  const isRecurringFormValid = isRecurringNameValid && isRecurringDayValid && isRecurringStartTimeValid && isRecurringEndTimeValid && isRecurringCategoryValid && isRecurringLocationValid && isRecurringSlotsValid;
+
+  const isCategoryNameValid = /^[A-Za-z0-9]+$/.test(addName.trim());
 
   return (
     <main style={{ padding: 32 }}>
@@ -382,7 +406,7 @@ export default function ManageShiftsPage() {
                     <input placeholder="Name" value={addName} onChange={e => setAddName(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                     <input placeholder="Icon (optional)" value={addIcon} onChange={e => setAddIcon(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                     {addError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{addError}</div>}
-                    <button onClick={handleAddCategory} style={{ background: '#ff9800', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: adding ? 'not-allowed' : 'pointer', opacity: adding ? 0.7 : 1 }} disabled={adding || !addName.trim()}>
+                    <button onClick={handleAddCategory} style={{ background: isCategoryNameValid ? '#ff9800' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: adding ? 'not-allowed' : isCategoryNameValid ? 'pointer' : 'not-allowed', opacity: adding ? 0.7 : 1 }} disabled={adding || !isCategoryNameValid}>
                       {adding ? 'Adding...' : 'Add'}
                     </button>
                   </div>
@@ -410,8 +434,22 @@ export default function ManageShiftsPage() {
         )}
         {tab === 'recurringshifts' && (
           <>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-              <button onClick={() => setShowAddRecurring(true)} style={{ background: 'none', border: 'none', color: '#ff9800', fontSize: 28, cursor: 'pointer' }} title="Add Recurring Shift">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', minWidth: 180 }}>
+                  <option value="">All Categories</option>
+                  {categoryOptions.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>
+                  ))}
+                </select>
+                <select value={filterDay} onChange={e => setFilterDay(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', minWidth: 180 }}>
+                  <option value="">All Days</option>
+                  {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                    <option key={i} value={i}>{day}</option>
+                  ))}
+                </select>
+              </div>
+              <button onClick={() => setShowAddRecurring(true)} style={{ background: 'none', border: 'none', color: '#ff9800', fontSize: 28, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Add Recurring Shift">
                 <FaPlusCircle />
               </button>
             </div>
@@ -436,28 +474,31 @@ export default function ManageShiftsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recurringShifts.map(shift => (
-                    <tr key={shift.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '12px 0 12px 12px', whiteSpace: 'nowrap' }}>
-                        {shift.ShiftCategory?.icon || <span style={{ color: '#ccc' }}>-</span>}
-                        <span style={{ marginLeft: 0 }}>{shift.ShiftCategory?.name || '-'}</span>
-                      </td>
-                      <td style={{ padding: '12px 0' }}>{shift.name}</td>
-                      <td style={{ padding: 12 }}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek]}</td>
-                      <td style={{ padding: 12 }}>{new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                      <td style={{ padding: 12 }}>{new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                      <td style={{ padding: 12 }}>{shift.location}</td>
-                      <td style={{ padding: 12 }}>{shift.slots}</td>
-                      <td style={{ padding: 12, textAlign: 'center' }}>
-                        <button style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} title="Edit" onClick={() => handleEditRecurring(shift)}>
-                          <FaEdit />
-                        </button>
-                        <button style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer' }} title="Delete" onClick={() => handleDeleteRecurring(shift)}>
-                          <FaTrash />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {recurringShifts
+                    .filter(shift => !filterCategory || String(shift.shiftCategoryId) === filterCategory)
+                    .filter(shift => filterDay === '' || String(shift.dayOfWeek) === filterDay)
+                    .map(shift => (
+                      <tr key={shift.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                        <td style={{ padding: '12px 0 12px 12px', whiteSpace: 'nowrap' }}>
+                          {shift.ShiftCategory?.icon || <span style={{ color: '#ccc' }}>-</span>}
+                          <span style={{ marginLeft: 0 }}>{shift.ShiftCategory?.name || '-'}</span>
+                        </td>
+                        <td style={{ padding: '12px 0' }}>{shift.name}</td>
+                        <td style={{ padding: 12 }}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek]}</td>
+                        <td style={{ padding: 12 }}>{new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ padding: 12 }}>{new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ padding: 12 }}>{shift.location}</td>
+                        <td style={{ padding: 12 }}>{shift.slots}</td>
+                        <td style={{ padding: 12, textAlign: 'center' }}>
+                          <button style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} title="Edit" onClick={() => handleEditRecurring(shift)}>
+                            <FaEdit />
+                          </button>
+                          <button style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer' }} title="Delete" onClick={() => handleDeleteRecurring(shift)}>
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             )}
@@ -468,20 +509,27 @@ export default function ManageShiftsPage() {
                   <button onClick={() => setShowAddRecurring(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}>×</button>
                   <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Add Recurring Shift</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <input placeholder="Name" value={addRecurring.name} onChange={e => setAddRecurring(r => ({ ...r, name: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    <select value={addRecurring.dayOfWeek} onChange={e => setAddRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
+                    <input placeholder="Name" value={addRecurring.name} onChange={e => setAddRecurring(r => ({ ...r, name: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, name: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, name: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    {addRecurringTouched.name && !isRecurringNameValid && <div style={{ color: 'red', fontSize: 13 }}>Name is required.</div>}
+                    <select value={addRecurring.dayOfWeek} onChange={e => setAddRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
                       {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
                     </select>
-                    <input type="datetime-local" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    <input type="datetime-local" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    <select value={addRecurring.shiftCategoryId} onChange={e => setAddRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
+                    {addRecurringTouched.dayOfWeek && !isRecurringDayValid && <div style={{ color: 'red', fontSize: 13 }}>Day is required.</div>}
+                    <input type="time" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    {addRecurringTouched.startTime && !isRecurringStartTimeValid && <div style={{ color: 'red', fontSize: 13 }}>Start time is required.</div>}
+                    <input type="time" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    {addRecurringTouched.endTime && !isRecurringEndTimeValid && <div style={{ color: 'red', fontSize: 13 }}>End time is required.</div>}
+                    <select value={addRecurring.shiftCategoryId} onChange={e => setAddRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, shiftCategoryId: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, shiftCategoryId: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
                       <option value="">Select Category</option>
                       {categoryOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>)}
                     </select>
-                    <input placeholder="Location" value={addRecurring.location} onChange={e => setAddRecurring(r => ({ ...r, location: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    <input type="number" min={1} placeholder="Slots" value={addRecurring.slots} onChange={e => setAddRecurring(r => ({ ...r, slots: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    {addRecurringTouched.shiftCategoryId && !isRecurringCategoryValid && <div style={{ color: 'red', fontSize: 13 }}>Category is required.</div>}
+                    <input placeholder="Location" value={addRecurring.location} onChange={e => setAddRecurring(r => ({ ...r, location: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, location: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, location: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    {addRecurringTouched.location && !isRecurringLocationValid && <div style={{ color: 'red', fontSize: 13 }}>Location is required.</div>}
+                    <input type="number" min={1} placeholder="Slots" value={addRecurring.slots} onChange={e => setAddRecurring(r => ({ ...r, slots: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    {addRecurringTouched.slots && !isRecurringSlotsValid && <div style={{ color: 'red', fontSize: 13 }}>Slots must be at least 1.</div>}
                     {addRecurringError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{addRecurringError}</div>}
-                    <button onClick={handleAddRecurringShift} style={{ background: '#ff9800', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: addingRecurring ? 'not-allowed' : 'pointer', opacity: addingRecurring ? 0.7 : 1 }} disabled={addingRecurring || !addRecurring.name.trim() || !addRecurring.startTime || !addRecurring.endTime || !addRecurring.shiftCategoryId || !addRecurring.location || !addRecurring.slots}>
+                    <button onClick={handleAddRecurringShift} style={{ background: isRecurringFormValid ? '#EF5C11' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: isRecurringFormValid ? 'pointer' : 'not-allowed', opacity: addingRecurring ? 0.7 : 1 }} disabled={addingRecurring || !isRecurringFormValid}>
                       {addingRecurring ? 'Adding...' : 'Add'}
                     </button>
                   </div>
@@ -499,8 +547,8 @@ export default function ManageShiftsPage() {
                     <select value={editRecurring.dayOfWeek} onChange={e => setEditRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
                       {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
                     </select>
-                    <input type="datetime-local" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    <input type="datetime-local" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    <input type="time" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    <input type="time" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                     <select value={editRecurring.shiftCategoryId} onChange={e => setEditRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
                       <option value="">Select Category</option>
                       {categoryOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>)}

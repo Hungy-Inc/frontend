@@ -72,7 +72,15 @@ export default function KitchenDetailsPage() {
     }
   };
 
+  const isOrgNameValid = /^[A-Za-z]+$/.test(editData.name.trim());
+  const isAddressValid = editData.address.trim().length > 0;
+  const canUpdate = isOrgNameValid && isAddressValid;
+
   const handleUpdate = async () => {
+    if (!canUpdate) {
+      toast.error('Organization name must contain only letters and numbers, and address cannot be empty.');
+      return;
+    }
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}`, {
@@ -81,14 +89,15 @@ export default function KitchenDetailsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(editData)
+        body: JSON.stringify({
+          name: editData.name.trim() || organization.name,
+          address: editData.address.trim() || organization.address
+        })
       });
-
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to update organization");
       }
-
       const updatedOrg = await res.json();
       setOrganization(updatedOrg);
       setIsEditing(false);
@@ -143,6 +152,9 @@ export default function KitchenDetailsPage() {
                 ) : (
                   <div style={{ fontSize: 16 }}>{organization?.name || 'N/A'}</div>
                 )}
+                {isEditing && !isOrgNameValid && (
+                  <div style={{ color: 'red', fontSize: 13 }}>Organization name must contain only letters and numbers.</div>
+                )}
               </div>
 
               <div>
@@ -162,15 +174,17 @@ export default function KitchenDetailsPage() {
                 <button
                   onClick={handleUpdate}
                   style={{
-                    background: '#2196f3',
+                    background: canUpdate ? '#2196f3' : '#ccc',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 6,
                     padding: '10px 24px',
                     fontSize: 16,
-                    cursor: 'pointer',
-                    alignSelf: 'flex-start'
+                    cursor: canUpdate ? 'pointer' : 'not-allowed',
+                    alignSelf: 'flex-start',
+                    opacity: canUpdate ? 1 : 0.7
                   }}
+                  disabled={!canUpdate}
                 >
                   Update Details
                 </button>

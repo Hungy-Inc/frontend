@@ -35,7 +35,7 @@
 .exportBtn {
   background: none;
   border: none;
-  color: #f24503;
+  color: #ff9800;
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -59,7 +59,7 @@
   margin-bottom: 1.2rem;
 }
 .month {
-  color: #f24503;
+  color: #ff9800;
   font-weight: 700;
 }
 .tableContainer {
@@ -87,13 +87,13 @@
   font-weight: 500;
 }
 .totalCol {
-  color: #f24503;
+  color: #ff9800;
   font-weight: 700;
   background: #fff5ed;
 }
 .monthlyTotalRow td {
   background: #fff5ed;
-  color: #f24503;
+  color: #ff9800;
   font-weight: 700;
   border-bottom: none;
 }

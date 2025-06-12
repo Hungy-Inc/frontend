@@ -1,22 +1,25 @@
 'use client';
 
 import styles from './Sidebar.module.css';
-import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen } from 'react-icons/fa';
+import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils } from 'react-icons/fa';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const menu = [
-  { icon: <FaHome />, label: 'Dashboard', href: '/' },
+  { icon: <FaHome />, label: 'Dashboard', href: '/dashboard' },
   { icon: <FaUserFriends />, label: 'Volunteers', href: '/volunteers' },
   { icon: <FaChartBar />, label: 'Incoming Stats', href: '/incoming-stats' },
   { icon: <FaExchangeAlt />, label: 'Outgoing Stats', href: '/outgoing-stats' },
   { icon: <FaBoxOpen />, label: 'Inventory', href: '/inventory' },
+  { icon: <FaUserFriends />, label: 'Manage Users', href: '/manage-users' },
+  { icon: <FaClock />, label: 'Manage Shifts', href: '/manage-shifts' },
+  { icon: <FaCalendarAlt />, label: 'Schedule Shifts', href: '/schedule-shifts' },
+  { icon: <FaUtensils />, label: 'Kitchen Details', href: '/kitchen-details' },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  if (pathname === '/login') return null;
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('');
   useEffect(() => {
@@ -37,29 +40,34 @@ export default function Sidebar() {
       }
     }
   }, []);
+  if (pathname === '/login') return null;
   return (
     <aside className={styles.sidebar}>
       <div>
         <div className={styles.logo}>HUN<span>G</span>Y</div>
-        <nav>
-          <ul className={styles.menu}>
-            {menu.map((item) => (
-              <li key={item.label} className={pathname === item.href ? styles.active : ''}>
-                <Link href={item.href} className={styles.menuLink}>
-                  <span className={styles.icon}>{item.icon}</span>
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+        <nav style={{ flex: 1, overflowY: 'auto' }}>
+          {menu.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 16px',
+                color: pathname === item.href ? '#ff9800' : '#666',
+                textDecoration: 'none',
+                fontWeight: pathname === item.href ? 600 : 400,
+                background: pathname === item.href ? '#fff5ed' : 'transparent',
+                borderRadius: 6,
+                marginBottom: 4
+              }}
+            >
+              <span className={styles.icon}>{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
         </nav>
-      </div>
-      <div className={styles.userInfo}>
-        <div className={styles.avatar}></div>
-        <div>
-          <div className={styles.userName}>{userName}</div>
-          <div className={styles.userEmail}>{userEmail}</div>
-        </div>
       </div>
     </aside>
   );

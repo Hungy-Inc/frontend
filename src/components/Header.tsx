@@ -1,31 +1,159 @@
-import Link from 'next/link'
+"use client";
+
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { FaUserCircle, FaSignOutAlt, FaUser, FaChevronDown } from 'react-icons/fa';
 
 export default function Header() {
+  const router = useRouter();
+  const [orgName, setOrgName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchOrgName = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const userStr = localStorage.getItem("user");
+        if (!token || !userStr) {
+          router.push('/login');
+          return;
+        }
+
+        try {
+          const user = JSON.parse(userStr);
+          setUserEmail(user.email || '');
+          if (user.organizationId) {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${user.organizationId}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error();
+            const data = await response.json();
+            setOrgName(data.name);
+          }
+        } catch (err) {
+          console.error('Error parsing user data:', err);
+          router.push('/login');
+        }
+      } catch (err) {
+        console.error('Error fetching organization:', err);
+      }
+    };
+
+    fetchOrgName();
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    router.push('/');
+  };
+
+  const handleProfile = () => {
+    router.push('/profile');
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const dropdown = document.getElementById('profile-dropdown');
+      const trigger = document.getElementById('profile-trigger');
+      if (dropdown && trigger && !dropdown.contains(event.target as Node) && !trigger.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
-    <header>
-      <div className="container">
-        <div className="navbar">
-          <div className="logo">
-            <h1>
-              Hungy<span className="relative">
-                <span className="absolute w-1 h-1 bg-[#f24503] rounded-full top-0 left-0.5"></span>
-                <span className="absolute w-1 h-1 bg-[#f24503] rounded-full top-0 left-2"></span>
-              </span>
-            </h1>
+    <header style={{
+      background: '#fff',
+      padding: '1rem 2rem',
+      borderBottom: '1px solid #eee',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      position: 'sticky',
+      top: 0,
+      zIndex: 100
+    }}>
+      <div style={{ fontWeight: 800, fontSize: 24, color: '#666', letterSpacing: 1, textTransform: 'uppercase' }}>
+        {orgName || 'Organization'}
+      </div>
+      <div style={{ position: 'relative' }}>
+        <button
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          style={{
+            background: isDropdownOpen ? '#fff5ed' : 'transparent',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 6,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            color: isDropdownOpen ? '#ff9800' : '#333',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <span style={{ fontWeight: 500 }}>{userEmail}</span>
+          <FaChevronDown size={12} />
+        </button>
+        {isDropdownOpen && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            background: '#fff',
+            borderRadius: 8,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            padding: '8px 0',
+            minWidth: 160,
+            zIndex: 1000
+          }}>
+            <button
+              onClick={() => {
+                setIsDropdownOpen(false);
+                router.push('/profile');
+              }}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '8px 16px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#000',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.color = '#ff9800'}
+              onMouseOut={(e) => e.currentTarget.style.color = '#000'}
+            >
+              Profile
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '8px 16px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#000',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.color = '#ff9800'}
+              onMouseOut={(e) => e.currentTarget.style.color = '#000'}
+            >
+              Logout
+            </button>
           </div>
-
-          <nav className="nav-links">
-            <Link href="/dashboard" className="active">Dashboard</Link>
-            <Link href="/analytics">Analytics</Link>
-            <Link href="/reports">Reports</Link>
-          </nav>
-
-          <div className="user-dropdown">
-            <div className="avatar">A</div>
-            <span>Admin</span>
-          </div>
-        </div>
+        )}
       </div>
     </header>
-  )
+  );
 } 

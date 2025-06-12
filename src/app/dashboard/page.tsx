@@ -268,28 +268,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Top Header Bar */}
-      <div style={{
-        width: '100%',
-        background: '#fff',
-        boxShadow: '0 2px 10px var(--shadow)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 20px',
-        marginBottom: 20,
-        position: 'sticky',
-        top: 0,
-        zIndex: 100
-      }}>
-        <div style={{ fontWeight: 800, fontSize: 24, color: 'var(--primary)', letterSpacing: 1, textTransform: 'uppercase' }}>
-          {orgName || 'Organization'}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontWeight: 600, fontSize: 16, color: '#222' }}>{userName}</span>
-          <button onClick={handleLogout} style={{ background: 'var(--primary)', color: 'white', fontWeight: 600, border: 'none', borderRadius: 5, padding: '0.45rem 0.9rem', fontSize: '0.97rem', cursor: 'pointer' }}>Logout</button>
-        </div>
-      </div>
       <main className="dashboard-main" style={{ background: '#F7F7F9', minHeight: '100vh', padding: 24 }}>
         {/* Dashboard Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
@@ -320,7 +298,7 @@ export default function Dashboard() {
               <div style={{ fontWeight: 700, fontSize: 18 }}>Incoming Stats</div>
               <button
                 className="export-btn"
-                style={{ color: '#f24503', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                 onClick={() => {
                   const month = getMonthNumber(period);
                   const url = `${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats/export?month=${month}&year=${year}&unit=${unit}`;
@@ -372,7 +350,7 @@ export default function Dashboard() {
               <div style={{ fontWeight: 700, fontSize: 18 }}>Volunteer Management</div>
               <button
                 className="export-btn"
-                style={{ color: '#f24503', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                 onClick={() => {
                   const month = getMonthNumber(period);
                   const url = `${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/summary/export-dashboard?month=${month}&year=${year}`;
@@ -423,7 +401,7 @@ export default function Dashboard() {
             <div style={{ fontWeight: 700, fontSize: 18 }}>Outgoing Stats</div>
             <button
               className="export-btn"
-              style={{ color: '#f24503', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+              style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
               onClick={() => {
                 const month = getMonthNumber(period);
                 const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${month}&year=${year}`;
@@ -462,7 +440,7 @@ export default function Dashboard() {
             <div style={{ fontWeight: 700, fontSize: 18 }}>Inventory Snapshot</div>
             <button
               className="export-btn"
-              style={{ color: '#f24503', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+              style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
               onClick={() => {
                 const month = getMonthNumber(period);
                 const url = `${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories/export-dashboard?month=${month}&year=${year}&unit=${unit}`;

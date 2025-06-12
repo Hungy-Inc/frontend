@@ -30,7 +30,7 @@ export default function LoginPage() {
           const user = jwtDecode(data.token);
           localStorage.setItem('user', JSON.stringify(user));
         }
-        router.push('/');
+        router.push('/dashboard');
       }
     } catch (err) {
       setError('Network error. Please try again.');
@@ -44,7 +44,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 10px var(--shadow)', padding: '2rem', minWidth: 320, maxWidth: 360, width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <h1 style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '2rem', letterSpacing: 1 }}>HÜNGY</h1>
-          <div style={{ color: 'var(--dark-text)', fontWeight: 600, fontSize: '1.1rem', marginTop: 8 }}>Admin Login</div>
+          <div className="text-dark-text" style={{ fontWeight: 600, fontSize: '1.1rem', marginTop: 8 }}>Admin Login</div>
         </div>
         <div style={{ marginBottom: '1rem' }}>
           <label htmlFor="email" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>Email</label>
@@ -75,7 +75,11 @@ export default function LoginPage() {
           />
         </div>
         {error && <div style={{ color: 'var(--primary)', marginBottom: 12, fontSize: '0.95rem' }}>{error}</div>}
-        <button type="submit" style={{ width: '100%', background: 'var(--primary)', color: 'white', fontWeight: 600, border: 'none', borderRadius: 6, padding: '0.75rem', fontSize: '1rem', cursor: 'pointer', marginTop: 8 }} disabled={loading}>
+        <button
+          type="submit"
+          className="w-full bg-[#ff9800] hover:bg-[#ff9800] text-white font-semibold rounded-lg py-3 text-lg mt-2 transition focus:outline-none focus:ring-2 focus:ring-orange-300 disabled:opacity-60 disabled:cursor-not-allowed"
+          disabled={loading}
+        >
           {loading ? 'Logging in...' : 'Login'}
         </button>
       </form>

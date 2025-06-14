@@ -37,7 +37,7 @@ const getYearOptions = () => {
 };
 
 export default function IncomingStatsPage() {
-  const [selectedMonth, setSelectedMonth] = useState(months[0].value);
+  const [selectedMonth, setSelectedMonth] = useState(0);
   const [selectedUnit, setSelectedUnit] = useState(units[0]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // Default to current year
   const [donors, setDonors] = useState<string[]>([]);
@@ -94,6 +94,12 @@ export default function IncomingStatsPage() {
     return weight.toFixed(2);
   };
 
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
   const handleExport = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -128,6 +134,59 @@ export default function IncomingStatsPage() {
     }
   };
 
+  // Helper to aggregate data by month if 'All Months' is selected
+  const getDisplayData = () => {
+    if (selectedMonth !== 0) {
+      // Calculate row totals for each row
+      const dataWithTotals = tableData.map(row => {
+        const rowTotal = donors.reduce((sum, donor) => {
+          const value = typeof row[donor] === 'number' ? Number(row[donor]) : 0;
+          return sum + value;
+        }, 0);
+        return { ...row, Total: rowTotal };
+      });
+      return { columns: ['Date', ...donors, 'Total'], data: dataWithTotals, firstCol: 'Date' };
+    }
+    // Aggregate by month
+    const monthMap: { [month: number]: any } = {};
+    // Initialize all months
+    for (let m = 1; m <= 12; m++) {
+      monthMap[m] = { Month: months[m].label };
+      donors.forEach(donor => {
+        monthMap[m][donor] = 0;
+      });
+      monthMap[m]['Total'] = 0;
+    }
+    tableData.forEach(row => {
+      const d = new Date(row['date'] as string);
+      if (isNaN(d.getTime())) return;
+      const m = d.getMonth() + 1;
+      let rowTotal = 0;
+      donors.forEach(donor => {
+        if (typeof row[donor] === 'number') {
+          const value = Number(row[donor]);
+          monthMap[m][donor] += value;
+          rowTotal += value;
+        }
+      });
+      monthMap[m]['Total'] += rowTotal;
+    });
+    // Build display data for all months
+    const displayData = Object.values(monthMap);
+    const newColumns = ['Month', ...donors, 'Total'];
+    return { columns: newColumns, data: displayData, firstCol: 'Month' };
+  };
+  const { columns: displayColumns, data: displayData, firstCol } = getDisplayData();
+
+  // Calculate column totals
+  const calculateColumnTotal = (col: string) => {
+    if (col === firstCol) return '';
+    return convertWeight(displayData.reduce((sum, row) => {
+      const value = typeof row[col] === 'number' ? Number(row[col]) : 0;
+      return sum + value;
+    }, 0));
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -135,6 +194,9 @@ export default function IncomingStatsPage() {
   if (error) {
     return <div>Error: {error}</div>;
   }
+
+  // Check if there's no data for the selected month
+  const hasNoData = selectedMonth !== 0 && tableData.length === 0;
 
   return (
     <main className={styles.main}>
@@ -185,37 +247,45 @@ export default function IncomingStatsPage() {
             {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
           </span>
         </div>
-        <div className={styles.tableContainer}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Date</th>
-                {donors.map(d => <th key={d}>{d}</th>)}
-                <th className={styles.totalCol}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tableData.map((row, i) => (
-                <tr key={row.date}>
-                  <td>{new Date(row.date).toLocaleDateString()}</td>
-                  {donors.map(d => (
-                    <td key={d}>{convertWeight(row[d] as number)}</td>
-                  ))}
-                  <td className={styles.totalCol}>{convertWeight(rowTotals[i])}</td>
+        {hasNoData ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            No donations found for {months[selectedMonth].label} {selectedYear}
+          </div>
+        ) : (
+          <div className={styles.tableContainer}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  {displayColumns.map(col => <th key={col} className={col === 'Total' ? styles.totalCol : ''}>{col}</th>)}
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className={styles.monthlyTotalRow}>
-                <td>Monthly Total</td>
-                {donors.map(d => (
-                  <td key={d}>{convertWeight(totals[d])}</td>
+              </thead>
+              <tbody>
+                {displayData.map((row, i) => (
+                  <tr key={i}>
+                    {displayColumns.map((col, idx) => (
+                      <td
+                        key={col}
+                        className={idx === displayColumns.length - 1 ? styles.totalCol : ''}
+                      >
+                        {col === firstCol
+                          ? (firstCol === 'Date' ? formatDate(row['date'] as string) : row[col])
+                          : convertWeight(row[col] as number)}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-                <td className={styles.totalCol}>{convertWeight(grandTotal)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                <tr className={styles.monthlyTotalRow}>
+                  <td style={{ fontWeight: 700 }}>{firstCol === 'Month' ? 'Yearly Total' : 'Monthly Total'}</td>
+                  {displayColumns.slice(1).map((col) => (
+                    <td key={col} className={col === 'Total' ? styles.totalCol : ''}>
+                      {calculateColumnTotal(col)}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </main>
   );

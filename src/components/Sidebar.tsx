@@ -9,7 +9,7 @@ import Image from 'next/image';
 
 const menu = [
   { icon: <FaHome />, label: 'Dashboard', href: '/dashboard' },
-  { icon: <FaUserFriends />, label: 'Volunteers', href: '/volunteers' },
+  { icon: <FaUserFriends />, label: 'Volunteer Hours', href: '/volunteers' },
   { icon: <FaChartBar />, label: 'Incoming Stats', href: '/incoming-stats' },
   { icon: <FaExchangeAlt />, label: 'Outgoing Stats', href: '/outgoing-stats' },
   { icon: <FaBoxOpen />, label: 'Inventory', href: '/inventory' },

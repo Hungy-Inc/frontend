@@ -95,6 +95,35 @@ export default function VolunteersPage() {
     }
   };
 
+  // Helper to aggregate data by month if 'All Months' is selected
+  const getDisplayData = () => {
+    if (selectedMonth !== 0) return { columns, data: tableData, firstCol: 'Date' };
+    // Aggregate by month
+    const monthMap: { [month: number]: any } = {};
+    // Initialize all months
+    for (let m = 1; m <= 12; m++) {
+      monthMap[m] = { Month: months[m].label };
+      columns.forEach(col => {
+        if (col !== 'Date') monthMap[m][col] = 0;
+      });
+    }
+    tableData.forEach(row => {
+      const d = new Date(row['Date'] as string || row['date'] as string);
+      if (isNaN(d.getTime())) return;
+      const m = d.getMonth() + 1;
+      columns.forEach(col => {
+        if (col !== 'Date' && typeof row[col] === 'number') {
+          monthMap[m][col] += Number(row[col]);
+        }
+      });
+    });
+    // Build display data for all months
+    const displayData = Object.values(monthMap);
+    const newColumns = ['Month', ...columns.filter(col => col !== 'Date')];
+    return { columns: newColumns, data: displayData, firstCol: 'Month' };
+  };
+  const { columns: displayColumns, data: displayData, firstCol } = getDisplayData();
+
   return (
     <main className={styles.main}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -143,19 +172,32 @@ export default function VolunteersPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {columns.map(col => <th key={col}>{col}</th>)}
+                  {displayColumns.map(col => <th key={col}>{col}</th>)}
                 </tr>
               </thead>
               <tbody>
-                {tableData.map((row, i) => (
+                {displayData.map((row, i) => (
                   <tr key={i}>
-                    {columns.map(col => (
-                      <td key={col}>
-                        {col === 'Date' ? formatDate(row[col] as string) : row[col] !== undefined ? row[col] : ''}
+                    {displayColumns.map((col, idx) => (
+                      <td
+                        key={col}
+                        className={idx === displayColumns.length - 1 ? styles.totalCol : ''}
+                      >
+                        {col === firstCol
+                          ? (firstCol === 'Month' ? row[col] : formatDate(row[col] as string))
+                          : row[col] !== undefined ? row[col] : ''}
                       </td>
                     ))}
                   </tr>
                 ))}
+                {/* Total hours row */}
+                <tr className={styles.monthlyTotalRow} style={{ fontWeight: 700 }}>
+                  {displayColumns.map((col, idx) => {
+                    if (col === firstCol) return <td key={col} className={styles.totalCol}>Total Hours</td>;
+                    const total = displayData.reduce((sum, row) => sum + (typeof row[col] === 'number' ? Number(row[col]) : 0), 0);
+                    return <td key={col} className={idx === displayColumns.length - 1 ? styles.totalCol : ''}>{total.toFixed(2)}</td>;
+                  })}
+                </tr>
               </tbody>
             </table>
           )}

@@ -2,6 +2,7 @@
 import styles from '../incoming-stats/IncomingStats.module.css';
 import React, { useEffect, useState } from 'react';
 
+
 const months = [
   { value: 0, label: 'All Months' },
   { value: 1, label: 'January' },
@@ -30,7 +31,9 @@ function getYearOptions() {
 }
 
 export default function InventoryPage() {
-  const [inventoryData, setInventoryData] = useState<{ name: string; weight: number }[]>([]);
+  const [donors, setDonors] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [tableData, setTableData] = useState<{ [donor: string]: { [cat: string]: number } }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(0);
@@ -43,23 +46,49 @@ export default function InventoryPage() {
         setLoading(true);
         setError('');
         const token = localStorage.getItem('token');
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        // Fetch donors
+        const donorsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donors`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!response.ok) throw new Error('Failed to fetch inventory data');
-        const data = await response.json();
-        setInventoryData(data);
+        if (!donorsRes.ok) throw new Error('Failed to fetch donors');
+        const donorsData = await donorsRes.json();
+        const donorNames = donorsData.map((d: any) => d.name);
+        setDonors(donorNames);
+        // Fetch categories and their weights for the selected month/year
+        const monthParam = selectedMonth === 0 ? 'all' : selectedMonth;
+        const catsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories/filtered?month=${monthParam}&year=${selectedYear}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!catsRes.ok) throw new Error('Failed to fetch inventory categories');
+        const catsData = await catsRes.json();
+        const catNames = catsData.map((c: any) => c.name);
+        setCategories(catNames);
+        // Build table: donor rows, category columns
+        const table: { [donor: string]: { [cat: string]: number } } = {};
+        donorNames.forEach((donor: string) => {
+          table[donor] = {};
+          catNames.forEach((cat: string) => {
+            table[donor][cat] = 0;
+          });
+        });
+        // For now, we don't have donor-specific weights, so we'll use the category weights
+        catsData.forEach((c: any) => {
+          donorNames.forEach((donor: string) => {
+            table[donor][c.name] = c.weight;
+          });
+        });
+        setTableData(table);
       } catch (err) {
-        setInventoryData([]);
+        setDonors([]);
+        setCategories([]);
+        setTableData({});
         setError('Failed to load inventory data.');
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [selectedMonth, selectedYear, selectedUnit]);
 
   const convertWeight = (weight: number) => {
     if (selectedUnit === 'Pounds (lb)') {
@@ -75,18 +104,44 @@ export default function InventoryPage() {
     return null;
   };
 
-  const filteredData = inventoryData.filter(item => {
-    const d = getItemDate(item);
-    if (!d) return false;
-    const monthMatch = selectedMonth === 0 || d.getMonth() + 1 === selectedMonth;
-    const yearMatch = d.getFullYear() === selectedYear;
-    return monthMatch && yearMatch;
-  });
+  const handleExportExcel = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('No authentication token found');
+        return;
+      }
+      const params = new URLSearchParams({
+        month: selectedMonth.toString(),
+        year: selectedYear.toString(),
+        unit: selectedUnit
+      });
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/export-table?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to export data');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inventory-${selectedYear}-${selectedMonth}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Export failed. Please try again.');
+    }
+  };
 
   return (
     <main className={styles.main}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-        <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Current Inventory by Category</div>
+        <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Current Inventory by Donor and Category</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <select
             className={styles.select}
@@ -118,54 +173,53 @@ export default function InventoryPage() {
               <option key={u} value={u}>{u}</option>
             ))}
           </select>
-          <button style={{ background: 'none', color: '#FF5A1F', fontWeight: 700, border: 'none', fontSize: '1.1rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
-            onClick={async () => {
-              try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories/export`, {
-                  headers: {
-                    'Authorization': `Bearer ${token}`
-                  }
-                });
-                if (!response.ok) throw new Error('Failed to export inventory data');
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'inventory.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-              } catch (err) {
-                alert('Export failed. Please try again.');
-              }
-            }}
+          <button
+            onClick={handleExportExcel}
+            className={styles.exportBtn}
           >
-            Export Excel
+            Export to Excel
           </button>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 24 }}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: 'center' }}>Loading...</div>
-        ) : error ? (
-          <div style={{ padding: 32, textAlign: 'center', color: 'red' }}>{error}</div>
-        ) : filteredData.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center' }}>No inventory data found.</div>
-        ) : (
-          filteredData.map((item) => {
-            const displayWeight = convertWeight(item.weight);
-            const unitLabel = selectedUnit === 'Pounds (lb)' ? 'lbs' : 'kg';
-            return (
-              <div key={item.name} style={{ background: '#FDF1E7', borderRadius: 14, padding: '1.2rem 1rem 1rem 1rem', minWidth: 140, minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', boxShadow: '0 2px 8px #f3e3d2' }}>
-                <div style={{ color: '#1DB96B', fontWeight: 700, fontSize: '1.05rem', marginBottom: 6 }}>{item.name}</div>
-                <div style={{ color: '#181818', fontWeight: 700, fontSize: '1.5rem', marginBottom: 2 }}>{displayWeight} {unitLabel}</div>
-                <div style={{ color: '#6B6B6B', fontWeight: 500, fontSize: '0.95rem' }}>in storage</div>
-              </div>
-            );
-          })
-        )}
+      <div className={styles.tableWrapper}>
+        <div className={styles.tableTitle}>Inventory by Donor and Category</div>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
+          {loading ? (
+            <div style={{ padding: 32, textAlign: 'center' }}>Loading...</div>
+          ) : error ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'red' }}>{error}</div>
+          ) : donors.length === 0 || categories.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center' }}>No inventory data found.</div>
+          ) : (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Donor</th>
+                  {categories.map(cat => <th key={cat}>{cat}</th>)}
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {donors.map((donor: string) => (
+                  <tr key={donor}>
+                    <td>{donor}</td>
+                    {categories.map((cat: string) => (
+                      <td key={cat}>{selectedUnit === 'Pounds (lb)' ? (tableData[donor][cat] * 2.20462).toFixed(2) : tableData[donor][cat].toFixed(2)}</td>
+                    ))}
+                    <td className={styles.totalCol}>{selectedUnit === 'Pounds (lb)' ? (Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0) * 2.20462).toFixed(2) : Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+                <tr className={styles.monthlyTotalRow}>
+                  <td>Total</td>
+                  {categories.map((cat: string) => (
+                    <td key={cat}>{selectedUnit === 'Pounds (lb)' ? (donors.reduce((sum, donor) => sum + tableData[donor][cat], 0) * 2.20462).toFixed(2) : donors.reduce((sum, donor) => sum + tableData[donor][cat], 0).toFixed(2)}</td>
+                  ))}
+                  <td className={styles.totalCol}>{selectedUnit === 'Pounds (lb)' ? (donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0) * 2.20462).toFixed(2) : donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0).toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </main>
   );

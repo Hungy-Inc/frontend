@@ -68,6 +68,26 @@ export default function Dashboard() {
   const [orgName, setOrgName] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
 
+  // Fetch recurring shifts for mapping shift times to names
+  const [recurringShifts, setRecurringShifts] = useState<any[]>([]);
+  useEffect(() => {
+    const fetchRecurringShifts = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch recurring shifts');
+        const data = await res.json();
+        setRecurringShifts(data);
+      } catch {
+        setRecurringShifts([]);
+      }
+    };
+    fetchRecurringShifts();
+  }, []);
+
   useEffect(() => {
     // Get user from localStorage
     const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -218,7 +238,7 @@ export default function Dashboard() {
 
   // Volunteer summary
   const totalVolunteers = volunteers.length;
-  const totalHours = volunteers.reduce((sum, v) => sum + v.hours, 0);
+  const totalHours = Number(volunteers.reduce((sum, v) => sum + v.hours, 0).toFixed(2));
 
   // Outgoing stats dynamic calculation
   const monthIdx = (() => {
@@ -278,6 +298,10 @@ export default function Dashboard() {
     }
   };
 
+  // Debug: Log outgoing stats data
+  console.log('outTable:', outTable);
+  console.log('filteredOutTable:', filteredOutTable);
+
   return (
     <main className="min-h-screen bg-[#fff8f3]">
       <div className="dashboard-main" style={{ background: '#F7F7F9', minHeight: '100vh', padding: 24 }}>
@@ -304,8 +328,8 @@ export default function Dashboard() {
         </div>
         {/* Top Row */}
         <div style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
-          {/* Incoming Stats */}
-          <div style={{ flex: 2, background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
+          {/* Incoming Stats - left half */}
+          <div style={{ flex: 1, background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontWeight: 700, fontSize: 18 }}>Incoming Stats</div>
               <button
@@ -356,7 +380,7 @@ export default function Dashboard() {
               </table>
             )}
           </div>
-          {/* Volunteer Management */}
+          {/* Volunteer Management - right half */}
           <div style={{ flex: 1, background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontWeight: 700, fontSize: 18 }}>Volunteer Management</div>
@@ -373,11 +397,14 @@ export default function Dashboard() {
               </button>
             </div>
             <div style={{ display: 'flex', gap: 24, marginBottom: 8 }}>
-              <div style={{ color: '#f24503', fontWeight: 700, fontSize: 24 }}>{volLoading ? '...' : totalVolunteers}</div>
-              <div style={{ color: '#888', fontSize: 13, alignSelf: 'center' }}>Active Volunteers</div>
-              <div style={{ color: '#E0E0E0', borderLeft: '1.5px solid #E0E0E0', height: 28, margin: '0 12px' }}></div>
-              <div style={{ color: '#1DB96B', fontWeight: 700, fontSize: 24 }}>{volLoading ? '...' : totalHours}</div>
-              <div style={{ color: '#888', fontSize: 13, alignSelf: 'center' }}>Total Hours</div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <div style={{ color: '#f24503', fontWeight: 700, fontSize: 24 }}>{volLoading ? '...' : totalVolunteers}</div>
+                <div style={{ color: '#888', fontSize: 13 }}>Active Volunteers</div>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <div style={{ color: '#1DB96B', fontWeight: 700, fontSize: 24 }}>{volLoading ? '...' : totalHours}</div>
+                <div style={{ color: '#888', fontSize: 13 }}>Total Hours</div>
+              </div>
             </div>
             {volError ? (
               <div style={{ color: 'red', padding: 8 }}>{volError}</div>
@@ -407,10 +434,97 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        {/* Outgoing Stats & Summary */}
+        {/* Outgoing Stats Section */}
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24, marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 18 }}>Outgoing Stats</div>
+            <button
+              className="export-btn"
+              style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+              onClick={() => {
+                const month = getMonthNumber(period);
+                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${month}&year=${year}`;
+                downloadExcel(url, `outgoing-stats-${year}-${month}.xlsx`);
+              }}
+            >
+              <FiDownload /> Export to Excel
+            </button>
+          </div>
+          {outError ? (
+            <div style={{ color: 'red', padding: 8 }}>{outError}</div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+              {(() => {
+                const categories = outColumns.filter(col => col !== 'Date');
+                const rows = [];
+                for (let i = 0; i < categories.length; i += 3) {
+                  rows.push(categories.slice(i, i + 3));
+                }
+                return rows.map((rowCategories, rowIdx) => (
+                  <div key={rowIdx} style={{ display: 'flex', gap: 24, width: '100%', marginBottom: 24 }}>
+                    {rowCategories.map(category => {
+                      // Get all recurring shift names for this category
+                      const shiftNames = Array.from(new Set(
+                        recurringShifts
+                          .filter(rs => rs.ShiftCategory && rs.ShiftCategory.name === category)
+                          .map(rs => rs.name)
+                      ));
+                      // For each shift name, sum the meals for all dates where the recurring shift name matches
+                      const rows = shiftNames.map(shiftName => {
+                        // For each row in filteredOutTable, sum meals where the recurring shift name matches for this category
+                        const totalMeals = filteredOutTable.reduce((sum, row) => {
+                          // For this row, try to find a recurring shift for this category and shift name
+                          const matches = recurringShifts.filter(rs =>
+                            rs.name === shiftName &&
+                            rs.ShiftCategory && rs.ShiftCategory.name === category
+                          );
+                          if (matches.length > 0) {
+                            return sum + (row[category] ? Number(row[category]) : 0);
+                          }
+                          return sum;
+                        }, 0);
+                        return {
+                          shiftName,
+                          meals: totalMeals
+                        };
+                      });
+                      const total = rows.reduce((sum, r) => sum + r.meals, 0);
+                      return (
+                        <div key={category} style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 220 }}>
+                          <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 8 }}>{category}</div>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'transparent' }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
+                                <th style={{ textAlign: 'right', padding: '6px 8px' }}>Meals</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map(r => (
+                                <tr key={r.shiftName}>
+                                  <td style={{ padding: '6px 8px', textAlign: 'left' }}>{r.shiftName}</td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'right' }}>{r.meals}</td>
+                                </tr>
+                              ))}
+                              <tr style={{ fontWeight: 700, background: '#fafafa' }}>
+                                <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{total}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+        </div>
+        {/* Outgoing Stats & Summary */}
+        <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24, marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 18 }}>Summary</div>
             <button
               className="export-btn"
               style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
@@ -438,10 +552,6 @@ export default function Dashboard() {
           )}
           {/* Summary Row */}
           <div style={{ display: 'flex', background: '#FFF5ED', borderRadius: 10, padding: 16, alignItems: 'center', gap: 24, fontWeight: 700, fontSize: 16, color: '#f24503', marginBottom: 8 }}>
-            <div>Summary</div>
-            {Object.entries(categoryTotals).map(([category, total]) => (
-              <div key={category} style={{ color: '#181818' }}>{category} <span style={{ marginLeft: 4 }}>{total}</span></div>
-            ))}
             <div style={{ color: '#f24503', fontSize: 22 }}>Total Distributed {totalDistributed}</div>
             <div style={{ color: '#f24503', fontSize: 18, marginLeft: 'auto' }}>Equivalent Value ${equivalentValue.toLocaleString()}</div>
           </div>
@@ -465,18 +575,29 @@ export default function Dashboard() {
           {invError ? (
             <div style={{ color: 'red', padding: 8 }}>{invError}</div>
           ) : (
-          <div style={{ display: 'flex', gap: 32 }}>
-            {/* Pie Chart */}
-            <div style={{ width: 180, height: 180 }}>
-              <Pie data={pieData} />
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            {/* Pie Chart and Legend - left half */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 24, minWidth: 0 }}>
+              <div style={{ width: '100%', maxWidth: 260, height: 260 }}>
+                <Pie data={pieData} options={{ plugins: { legend: { display: false } } }} />
+              </div>
+              {/* Custom Legend */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {pieData.labels.map((label, idx) => (
+                  <div key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ display: 'inline-block', width: 18, height: 18, borderRadius: 4, background: pieData.datasets[0].backgroundColor[idx] as string }}></span>
+                    <span style={{ fontSize: 15 }}>{label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            {/* Inventory Table */}
-            <div style={{ flex: 1 }}>
+            {/* Inventory Table - right half */}
+            <div style={{ flex: 1, minWidth: 0 }}>
               <table style={{ width: '100%', fontSize: 15 }}>
                 <thead>
                   <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Category</th>
-                    <th style={{ textAlign: 'right', padding: 8 }}>Current Quantity ({unit === 'Pounds (lb)' ? 'lb' : 'kg'})</th>
+                    <th style={{ textAlign: 'left', padding: '8px 8px 8px 0', width: '60%' }}>Category</th>
+                    <th style={{ textAlign: 'right', padding: '8px 0 8px 8px', width: '40%' }}>Current Quantity ({unit === 'Pounds (lb)' ? 'lb' : 'kg'})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -485,8 +606,8 @@ export default function Dashboard() {
                   ) : (
                     inventoryData.map(item => (
                       <tr key={item.name}>
-                        <td style={{ padding: 8 }}>{item.name}</td>
-                        <td style={{ textAlign: 'right', padding: 8 }}>{convertWeight(item.weight)}</td>
+                        <td style={{ padding: '8px 8px 8px 0' }}>{item.name}</td>
+                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertWeight(item.weight)}</td>
                       </tr>
                     ))
                   )}

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { FaEdit, FaTrash, FaPlusCircle } from "react-icons/fa";
 
 export default function ManageShiftsPage() {
-  const [tab, setTab] = useState<'shiftcategory' | 'recurringshifts'>('shiftcategory');
+  const [tab, setTab] = useState<'shiftcategory' | 'recurringshifts'>('recurringshifts');
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -206,8 +206,19 @@ export default function ManageShiftsPage() {
     setAddingRecurring(true);
     setAddRecurringError('');
     try {
-      const token = localStorage.getItem("token");
+      // Validate that start time is at least 1 hour before end time
       const baseDate = '1969-06-10';
+      if (addRecurring.startTime && addRecurring.endTime) {
+        const start = new Date(`${baseDate}T${addRecurring.startTime}`);
+        const end = new Date(`${baseDate}T${addRecurring.endTime}`);
+        const diffMs = end.getTime() - start.getTime();
+        if (diffMs < 60 * 60 * 1000) {
+          setAddRecurringError('Shift end time must be at least 1 hour after start time.');
+          setAddingRecurring(false);
+          return;
+        }
+      }
+      const token = localStorage.getItem("token");
       const startTime = addRecurring.startTime ? `${baseDate}T${addRecurring.startTime}` : '';
       const endTime = addRecurring.endTime ? `${baseDate}T${addRecurring.endTime}` : '';
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
@@ -256,8 +267,19 @@ export default function ManageShiftsPage() {
     setEditingRecurring(true);
     setEditRecurringError('');
     try {
-      const token = localStorage.getItem("token");
+      // Validate that start time is at least 1 hour before end time
       const baseDate = '1969-06-10';
+      if (editRecurring.startTime && editRecurring.endTime) {
+        const start = new Date(`${baseDate}T${editRecurring.startTime}`);
+        const end = new Date(`${baseDate}T${editRecurring.endTime}`);
+        const diffMs = end.getTime() - start.getTime();
+        if (diffMs < 60 * 60 * 1000) {
+          setEditRecurringError('Shift end time must be at least 1 hour after start time.');
+          setEditingRecurring(false);
+          return;
+        }
+      }
+      const token = localStorage.getItem("token");
       const startTime = editRecurring.startTime ? `${baseDate}T${editRecurring.startTime}` : '';
       const endTime = editRecurring.endTime ? `${baseDate}T${editRecurring.endTime}` : '';
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
@@ -307,7 +329,7 @@ export default function ManageShiftsPage() {
     }
   };
 
-  const isRecurringNameValid = /^[A-Za-z]+$/.test(addRecurring.name.trim());
+  const isRecurringNameValid = /^[A-Za-z\s]+$/.test(addRecurring.name.trim());
   const isRecurringDayValid = typeof addRecurring.dayOfWeek === 'number' && addRecurring.dayOfWeek >= 0 && addRecurring.dayOfWeek <= 6;
   const isRecurringStartTimeValid = !!addRecurring.startTime;
   const isRecurringEndTimeValid = !!addRecurring.endTime;
@@ -323,22 +345,6 @@ export default function ManageShiftsPage() {
       <div style={{ fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Manage Shifts</div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <button
-          onClick={() => setTab('shiftcategory')}
-          style={{
-            padding: '10px 24px',
-            borderRadius: 8,
-            border: 'none',
-            background: tab === 'shiftcategory' ? '#ff9800' : '#eee',
-            color: tab === 'shiftcategory' ? '#fff' : '#888',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: tab === 'shiftcategory' ? '0 2px 8px #ffd699' : 'none',
-            transition: 'all 0.15s'
-          }}
-        >
-          Shift Category
-        </button>
-        <button
           onClick={() => setTab('recurringshifts')}
           style={{
             padding: '10px 24px',
@@ -353,6 +359,22 @@ export default function ManageShiftsPage() {
           }}
         >
           Recurring Shifts
+        </button>
+        <button
+          onClick={() => setTab('shiftcategory')}
+          style={{
+            padding: '10px 24px',
+            borderRadius: 8,
+            border: 'none',
+            background: tab === 'shiftcategory' ? '#ff9800' : '#eee',
+            color: tab === 'shiftcategory' ? '#fff' : '#888',
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: tab === 'shiftcategory' ? '0 2px 8px #ffd699' : 'none',
+            transition: 'all 0.15s'
+          }}
+        >
+          Shift Category
         </button>
       </div>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, minHeight: 200, position: 'relative' }}>

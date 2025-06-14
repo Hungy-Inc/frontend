@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaUsers, FaCalendarAlt, FaBox } from "react-icons/fa";
+import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
 interface OrganizationStats {
@@ -24,6 +24,11 @@ export default function KitchenDetailsPage() {
     name: "",
     address: ""
   });
+  const [addresses, setAddresses] = useState<string[]>([]);
+  const [newAddress, setNewAddress] = useState("");
+  const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [editingAddressIndex, setEditingAddressIndex] = useState<number | null>(null);
+  const [editingAddress, setEditingAddress] = useState("");
 
   useEffect(() => {
     fetchOrganizationDetails();
@@ -55,6 +60,26 @@ export default function KitchenDetailsPage() {
         address: userOrg.address || ""
       });
 
+      // Parse addresses from JSON string or comma-separated string
+      try {
+        let parsedAddresses: string[];
+        if (userOrg.address) {
+          try {
+            // First try parsing as JSON
+            parsedAddresses = JSON.parse(userOrg.address);
+          } catch {
+            // If not JSON, treat as comma-separated string
+            parsedAddresses = userOrg.address.split(',').map((addr: string) => addr.trim()).filter((addr: string) => addr);
+          }
+        } else {
+          parsedAddresses = [];
+        }
+        setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
+      } catch (err) {
+        console.error('Error parsing addresses:', err);
+        setAddresses([]);
+      }
+
       // Fetch organization statistics
       const statsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${userOrg.id}/stats`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -72,13 +97,13 @@ export default function KitchenDetailsPage() {
     }
   };
 
-  const isOrgNameValid = /^[A-Za-z]+$/.test(editData.name.trim());
-  const isAddressValid = editData.address.trim().length > 0;
+  const isOrgNameValid = /^[A-Za-z0-9\s]+$/.test(editData.name.trim());
+  const isAddressValid = addresses.length > 0;
   const canUpdate = isOrgNameValid && isAddressValid;
 
   const handleUpdate = async () => {
     if (!canUpdate) {
-      toast.error('Organization name must contain only letters and numbers, and address cannot be empty.');
+      toast.error('Organization name must contain only letters and spaces, and at least one address is required.');
       return;
     }
     try {
@@ -91,7 +116,7 @@ export default function KitchenDetailsPage() {
         },
         body: JSON.stringify({
           name: editData.name.trim() || organization.name,
-          address: editData.address.trim() || organization.address
+          address: editData.address // Already a JSON string
         })
       });
       if (!res.ok) {
@@ -105,6 +130,56 @@ export default function KitchenDetailsPage() {
     } catch (err: any) {
       toast.error(err.message || "Failed to update organization details");
     }
+  };
+
+  const handleAddAddress = () => {
+    if (newAddress.trim()) {
+      // Add new address to the existing array
+      const updatedAddresses = [...addresses, newAddress.trim()];
+      setAddresses(updatedAddresses);
+      // Update the editData address field with the new JSON string
+      setEditData(prev => ({
+        ...prev,
+        address: JSON.stringify(updatedAddresses)
+      }));
+      setNewAddress("");
+      setIsAddingAddress(false);
+    }
+  };
+
+  const handleRemoveAddress = (index: number) => {
+    const updatedAddresses = addresses.filter((_, i) => i !== index);
+    setAddresses(updatedAddresses);
+    // Update the editData address field with the new JSON string
+    setEditData(prev => ({
+      ...prev,
+      address: JSON.stringify(updatedAddresses)
+    }));
+  };
+
+  const handleStartEditAddress = (index: number) => {
+    setEditingAddressIndex(index);
+    setEditingAddress(addresses[index]);
+  };
+
+  const handleSaveEditAddress = () => {
+    if (editingAddressIndex !== null && editingAddress.trim()) {
+      const updatedAddresses = [...addresses];
+      updatedAddresses[editingAddressIndex] = editingAddress.trim();
+      setAddresses(updatedAddresses);
+      // Update the editData address field with the new JSON string
+      setEditData(prev => ({
+        ...prev,
+        address: JSON.stringify(updatedAddresses)
+      }));
+      setEditingAddressIndex(null);
+      setEditingAddress("");
+    }
+  };
+
+  const handleCancelEditAddress = () => {
+    setEditingAddressIndex(null);
+    setEditingAddress("");
   };
 
   return (
@@ -139,7 +214,7 @@ export default function KitchenDetailsPage() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
               <div>
                 <label style={{ display: 'block', marginBottom: 8, color: '#666' }}>Organization Name</label>
                 {isEditing ? (
@@ -153,20 +228,149 @@ export default function KitchenDetailsPage() {
                   <div style={{ fontSize: 16 }}>{organization?.name || 'N/A'}</div>
                 )}
                 {isEditing && !isOrgNameValid && (
-                  <div style={{ color: 'red', fontSize: 13 }}>Organization name must contain only letters and numbers.</div>
+                  <div style={{ color: 'red', fontSize: 13 }}>Organization name must contain only letters and spaces.</div>
                 )}
               </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: 8, color: '#666' }}>Address</label>
+              <div style={{ marginTop: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, color: '#666' }}>Addresses</label>
                 {isEditing ? (
-                  <textarea
-                    value={editData.address}
-                    onChange={(e) => setEditData(prev => ({ ...prev, address: e.target.value }))}
-                    style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', width: '100%', maxWidth: 400, minHeight: 100 }}
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {addresses.map((address, index) => (
+                      <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {editingAddressIndex === index ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingAddress}
+                              onChange={(e) => setEditingAddress(e.target.value)}
+                              style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }}
+                            />
+                            <button
+                              onClick={handleSaveEditAddress}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#4CAF50',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaSave />
+                            </button>
+                            <button
+                              onClick={handleCancelEditAddress}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ff4444',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ flex: 1, fontSize: 16 }}>{address}</div>
+                            <button
+                              onClick={() => handleStartEditAddress(index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#2196f3',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveAddress(index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ff4444',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                    {isAddingAddress ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="text"
+                          value={newAddress}
+                          onChange={(e) => setNewAddress(e.target.value)}
+                          placeholder="Enter new address"
+                          style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }}
+                        />
+                        <button
+                          onClick={handleAddAddress}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#4CAF50',
+                            cursor: 'pointer',
+                            padding: 4
+                          }}
+                        >
+                          <FaSave />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsAddingAddress(false);
+                            setNewAddress("");
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ff4444',
+                            cursor: 'pointer',
+                            padding: 4
+                          }}
+                        >
+                          <FaTimes />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setIsAddingAddress(true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          background: 'none',
+                          border: '1px dashed #2196f3',
+                          color: '#2196f3',
+                          padding: '8px 16px',
+                          borderRadius: 5,
+                          cursor: 'pointer',
+                          width: 'fit-content'
+                        }}
+                      >
+                        <FaPlus /> Add Address
+                      </button>
+                    )}
+                  </div>
                 ) : (
-                  <div style={{ fontSize: 16 }}>{organization?.address || 'N/A'}</div>
+                  <div style={{ fontSize: 16 }}>
+                    {addresses.length > 0 ? (
+                      addresses.map((address, index) => (
+                        <div key={index} style={{ marginBottom: index < addresses.length - 1 ? 8 : 0 }}>
+                          {address}
+                        </div>
+                      ))
+                    ) : (
+                      'N/A'
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -181,7 +385,7 @@ export default function KitchenDetailsPage() {
                     padding: '10px 24px',
                     fontSize: 16,
                     cursor: canUpdate ? 'pointer' : 'not-allowed',
-                    alignSelf: 'flex-start',
+                    marginTop: 16,
                     opacity: canUpdate ? 1 : 0.7
                   }}
                   disabled={!canUpdate}

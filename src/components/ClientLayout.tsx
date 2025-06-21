@@ -12,12 +12,14 @@ export default function ClientLayout({
   const pathname = usePathname();
   const isHomePage = pathname === '/';
   const isLoginPage = pathname === '/login';
+  const isForgotPasswordPage = pathname === '/forgot-password';
+  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#f7f7f9" }}>
-      {!isHomePage && !isLoginPage && <Sidebar />}
+      {shouldShowSidebarAndHeader && <Sidebar />}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {!isHomePage && !isLoginPage && <Header />}
+        {shouldShowSidebarAndHeader && <Header />}
         <main style={{ flex: 1 }}>{children}</main>
       </div>
     </div>

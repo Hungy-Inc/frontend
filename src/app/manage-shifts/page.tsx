@@ -53,6 +53,8 @@ export default function ManageShiftsPage() {
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDay, setFilterDay] = useState('');
+  const [filterShiftName, setFilterShiftName] = useState('');
+
   useEffect(() => {
     if (tab === 'recurringshifts' || showAddRecurring || editRecurringId) {
       fetchCategoryOptions();
@@ -340,6 +342,21 @@ export default function ManageShiftsPage() {
 
   const isCategoryNameValid = /^[A-Za-z0-9]+$/.test(addName.trim());
 
+  // Unique shift names for dropdown (case-insensitive, trimmed)
+  const shiftNameOptions = Array.from(
+    recurringShifts
+      .filter(shift => !filterCategory || String(shift.shiftCategoryId) === filterCategory)
+      .reduce((map, shift) => {
+        const normalized = shift.name.trim().toLowerCase();
+        if (!map.has(normalized)) {
+          map.set(normalized, shift.name.trim());
+        }
+        return map;
+      }, new Map<string, string>())
+      .values()
+  ) as string[];
+  shiftNameOptions.sort();
+
   return (
     <main style={{ padding: 32 }}>
       <div style={{ fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Manage Shifts</div>
@@ -470,6 +487,22 @@ export default function ManageShiftsPage() {
                     <option key={i} value={i}>{day}</option>
                   ))}
                 </select>
+                {/* Shift Name Dropdown */}
+                <select
+                  value={filterShiftName}
+                  onChange={e => setFilterShiftName(e.target.value)}
+                  style={{
+                    padding: 8,
+                    borderRadius: 5,
+                    border: '1px solid #eee',
+                    minWidth: 180
+                  }}
+                >
+                  <option value="">All Shifts</option>
+                  {shiftNameOptions.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </div>
               <button onClick={() => setShowAddRecurring(true)} style={{ background: 'none', border: 'none', color: '#ff9800', fontSize: 28, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Add Recurring Shift">
                 <FaPlusCircle />
@@ -499,6 +532,7 @@ export default function ManageShiftsPage() {
                   {recurringShifts
                     .filter(shift => !filterCategory || String(shift.shiftCategoryId) === filterCategory)
                     .filter(shift => filterDay === '' || String(shift.dayOfWeek) === filterDay)
+                    .filter(shift => !filterShiftName || shift.name.trim() === filterShiftName)
                     .map(shift => (
                       <tr key={shift.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                         <td style={{ padding: '12px 0 12px 12px', whiteSpace: 'nowrap' }}>

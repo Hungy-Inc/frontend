@@ -46,38 +46,16 @@ export default function InventoryPage() {
         setLoading(true);
         setError('');
         const token = localStorage.getItem('token');
-        // Fetch donors
-        const donorsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donors`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!donorsRes.ok) throw new Error('Failed to fetch donors');
-        const donorsData = await donorsRes.json();
-        const donorNames = donorsData.map((d: any) => d.name);
-        setDonors(donorNames);
-        // Fetch categories and their weights for the selected month/year
+        // Fetch donor/category table
         const monthParam = selectedMonth === 0 ? 'all' : selectedMonth;
-        const catsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories/filtered?month=${monthParam}&year=${selectedYear}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/donor-category-table?month=${monthParam}&year=${selectedYear}&unit=${selectedUnit}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!catsRes.ok) throw new Error('Failed to fetch inventory categories');
-        const catsData = await catsRes.json();
-        const catNames = catsData.map((c: any) => c.name);
-        setCategories(catNames);
-        // Build table: donor rows, category columns
-        const table: { [donor: string]: { [cat: string]: number } } = {};
-        donorNames.forEach((donor: string) => {
-          table[donor] = {};
-          catNames.forEach((cat: string) => {
-            table[donor][cat] = 0;
-          });
-        });
-        // For now, we don't have donor-specific weights, so we'll use the category weights
-        catsData.forEach((c: any) => {
-          donorNames.forEach((donor: string) => {
-            table[donor][c.name] = c.weight;
-          });
-        });
-        setTableData(table);
+        if (!res.ok) throw new Error('Failed to fetch inventory table');
+        const data = await res.json();
+        setDonors(data.donors);
+        setCategories(data.categories);
+        setTableData(data.table);
       } catch (err) {
         setDonors([]);
         setCategories([]);
@@ -182,7 +160,6 @@ export default function InventoryPage() {
         </div>
       </div>
       <div className={styles.tableWrapper}>
-        <div className={styles.tableTitle}>Inventory by Donor and Category</div>
         <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
           {loading ? (
             <div style={{ padding: 32, textAlign: 'center' }}>Loading...</div>

@@ -97,6 +97,9 @@ export default function ScheduleShiftsPage() {
   const [manageModalShift, setManageModalShift] = useState<any>(null);
   const [manageModalLoading, setManageModalLoading] = useState(false);
 
+  // Add state for shift name filter
+  const [selectedShiftName, setSelectedShiftName] = useState<string>("");
+
   const handleToggleEmployeeDropdown = (shiftId: number) => {
     setOpenEmployeeDropdown(prev => ({
       ...prev,
@@ -596,6 +599,8 @@ export default function ScheduleShiftsPage() {
   const filteredRecurring = recurringShifts.filter((rec: any) => {
     // Category filter
     if (selectedCardCategory && String(rec.shiftCategoryId) !== String(selectedCardCategory)) return false;
+    // Shift name filter - show all shifts with the same name regardless of timing
+    if (selectedShiftName && rec.name !== selectedShiftName) return false;
     // Date filter
     if (dateFilter === 'today') {
       if (rec.dayOfWeek !== todayDay) return false;
@@ -611,6 +616,21 @@ export default function ScheduleShiftsPage() {
     }
     return true;
   });
+
+  // Get unique shift names for the dropdown - only filter by category, not timing, and remove case-insensitive duplicates
+  const shiftNameOptions = Array.from(
+    recurringShifts
+      .filter(rec => !selectedCardCategory || String(rec.shiftCategoryId) === String(selectedCardCategory))
+      .reduce((map, rec) => {
+        const normalized = rec.name.trim().toLowerCase();
+        if (!map.has(normalized)) {
+          map.set(normalized, rec.name.trim());
+        }
+        return map;
+      }, new Map<string, string>())
+      .values()
+  ) as string[];
+  shiftNameOptions.sort();
 
   // Find the selected recurring shift for slot limiting
   const selectedRecurring = filteredRecurring.find((rec: any) => rec.id === selectedRecurringId);
@@ -1413,68 +1433,6 @@ export default function ScheduleShiftsPage() {
         <p style={{ color: '#666', fontSize: 16 }}>Manage and schedule shifts for your organization</p>
       </div>
 
-      {/* Date Filter Section */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                            <button
-            onClick={() => setDateFilter('today')}
-            style={{
-              background: dateFilter === 'today' ? '#ff9800' : '#f5f5f5',
-              color: dateFilter === 'today' ? '#fff' : '#333',
-              border: 'none',
-              borderRadius: 6,
-              padding: '8px 16px',
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
-          >
-            Today
-                </button>
-                            <button
-            onClick={() => setDateFilter('week')}
-            style={{
-              background: dateFilter === 'week' ? '#ff9800' : '#f5f5f5',
-              color: dateFilter === 'week' ? '#fff' : '#333',
-              border: 'none',
-              borderRadius: 6,
-              padding: '8px 16px',
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
-          >
-            This Week
-                            </button>
-          <button
-            onClick={() => setDateFilter('custom')}
-            style={{
-              background: dateFilter === 'custom' ? '#ff9800' : '#f5f5f5',
-              color: dateFilter === 'custom' ? '#fff' : '#333',
-              border: 'none',
-              borderRadius: 6,
-              padding: '8px 16px',
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
-          >
-            Custom Date
-          </button>
-          {dateFilter === 'custom' && (
-                <input
-                  type="date"
-                  value={customDate}
-                  onChange={(e) => setCustomDate(e.target.value)}
-                  min={todayStr}
-                  style={{
-                    padding: 8,
-                    borderRadius: 6,
-                    border: '1px solid #eee',
-                    fontSize: 14
-                  }}
-                />
-          )}
-              </div>
-            </div>
-
       {/* Category and Day Filters */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         {/* Category Tabs */}
@@ -1519,6 +1477,91 @@ export default function ScheduleShiftsPage() {
           ))}
               </div>
             </div>
+
+      
+      {/* Date Filter Section */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Left side - Date filter buttons */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <button
+              onClick={() => setDateFilter('today')}
+              style={{
+                background: dateFilter === 'today' ? '#ff9800' : '#f5f5f5',
+                color: dateFilter === 'today' ? '#fff' : '#333',
+                border: 'none',
+                borderRadius: 6,
+                padding: '8px 16px',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setDateFilter('week')}
+              style={{
+                background: dateFilter === 'week' ? '#ff9800' : '#f5f5f5',
+                color: dateFilter === 'week' ? '#fff' : '#333',
+                border: 'none',
+                borderRadius: 6,
+                padding: '8px 16px',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              This Week
+            </button>
+            <button
+              onClick={() => setDateFilter('custom')}
+              style={{
+                background: dateFilter === 'custom' ? '#ff9800' : '#f5f5f5',
+                color: dateFilter === 'custom' ? '#fff' : '#333',
+                border: 'none',
+                borderRadius: 6,
+                padding: '8px 16px',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              Custom Date
+            </button>
+            {dateFilter === 'custom' && (
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                min={todayStr}
+                style={{
+                  padding: 8,
+                  borderRadius: 6,
+                  border: '1px solid #eee',
+                  fontSize: 14
+                }}
+              />
+            )}
+          </div>
+
+          {/* Right side - Shift Name Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <select
+              value={selectedShiftName}
+              onChange={(e) => setSelectedShiftName(e.target.value)}
+              style={{
+                padding: 8,
+                borderRadius: 5,
+                border: '1px solid #eee',
+                minWidth: 180
+              }}
+            >
+              <option value="">All Shifts</option>
+              {shiftNameOptions.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
       {/* Shifts Display */}
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32 }}>

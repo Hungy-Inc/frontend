@@ -1,13 +1,43 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes } from "react-icons/fa";
+import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes, FaArrowDown, FaArrowUp, FaTrash } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
 interface OrganizationStats {
   totalUsers: number;
   totalShifts: number;
   totalDonations: number;
+}
+
+interface WeighingCategory {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+interface WeighingRecord {
+  id: number;
+  categoryId: number;
+  kilogram: number;
+  pound: number;
+  notes?: string;
+  createdAt: string;
+  WeighingCategory: {
+    id: number;
+    name: string;
+  };
+}
+
+interface WeighingStats {
+  totalWeighings: number;
+  totalCategories: number;
+  recentWeighings: WeighingRecord[];
+  categoryStats: {
+    categoryName: string;
+    totalKilogram: number;
+    totalPound: number;
+  }[];
 }
 
 export default function KitchenDetailsPage() {
@@ -29,9 +59,41 @@ export default function KitchenDetailsPage() {
   const [isAddingAddress, setIsAddingAddress] = useState(false);
   const [editingAddressIndex, setEditingAddressIndex] = useState<number | null>(null);
   const [editingAddress, setEditingAddress] = useState("");
+  const [incomingDollarValue, setIncomingDollarValue] = useState<number>(0);
+  const [isEditingIncomingValue, setIsEditingIncomingValue] = useState(false);
+  const [editingIncomingValue, setEditingIncomingValue] = useState<string>("");
+
+  // Weighing data state
+  const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
+  const [weighingRecords, setWeighingRecords] = useState<WeighingRecord[]>([]);
+  const [weighingStats, setWeighingStats] = useState<WeighingStats | null>(null);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showAddWeighing, setShowAddWeighing] = useState(false);
+  const [editingWeighingId, setEditingWeighingId] = useState<number | null>(null);
+  
+  // Add category form state
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryDescription, setNewCategoryDescription] = useState("");
+  
+  // Add weighing form state
+  const [newWeighingData, setNewWeighingData] = useState({
+    categoryId: "",
+    kilogram: "",
+    pound: "",
+    notes: ""
+  });
+  
+  // Edit weighing form state
+  const [editWeighingData, setEditWeighingData] = useState({
+    categoryId: "",
+    kilogram: "",
+    pound: "",
+    notes: ""
+  });
 
   useEffect(() => {
     fetchOrganizationDetails();
+    fetchWeighingData();
   }, []);
 
   const fetchOrganizationDetails = async () => {
@@ -59,6 +121,12 @@ export default function KitchenDetailsPage() {
         name: userOrg.name || "",
         address: userOrg.address || ""
       });
+      
+      // Load incoming dollar value from organization data
+      const incomingValue = userOrg.incoming_dollar_value || 0;
+      console.log('Organization data:', userOrg);
+      console.log('Incoming dollar value loaded:', incomingValue);
+      setIncomingDollarValue(incomingValue);
 
       // Parse addresses from JSON string or comma-separated string
       try {
@@ -94,6 +162,45 @@ export default function KitchenDetailsPage() {
       toast.error(err.message || "Failed to load organization details");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWeighingData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      // Fetch weighing categories
+      const categoriesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (categoriesRes.ok) {
+        const categories = await categoriesRes.json();
+        setWeighingCategories(categories);
+      }
+
+      // Fetch weighing records
+      const recordsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (recordsRes.ok) {
+        const records = await recordsRes.json();
+        setWeighingRecords(records);
+      }
+
+      // Fetch weighing statistics
+      const statsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        setWeighingStats(stats);
+      }
+    } catch (err: any) {
+      console.error('Error fetching weighing data:', err);
+      toast.error('Failed to load weighing data');
     }
   };
 
@@ -182,6 +289,224 @@ export default function KitchenDetailsPage() {
     setEditingAddress("");
   };
 
+  const handleStartEditIncomingValue = () => {
+    setIsEditingIncomingValue(true);
+    setEditingIncomingValue(incomingDollarValue.toString());
+  };
+
+  const handleSaveIncomingValue = async () => {
+    const value = parseFloat(editingIncomingValue);
+    if (isNaN(value) || value < 0) {
+      toast.error('Please enter a valid positive number');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: organization.name,
+          address: organization.address,
+          incoming_dollar_value: value
+        })
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update incoming dollar value");
+      }
+      
+      const updatedOrg = await res.json();
+      setOrganization(updatedOrg);
+      setIncomingDollarValue(value);
+      setIsEditingIncomingValue(false);
+      setEditingIncomingValue("");
+      toast.success("Incoming dollar value updated successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update incoming dollar value");
+    }
+  };
+
+  const handleCancelEditIncomingValue = () => {
+    setIsEditingIncomingValue(false);
+    setEditingIncomingValue("");
+  };
+
+  // Weighing category functions
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          description: newCategoryDescription.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to add category');
+      }
+
+      const newCategory = await res.json();
+      setWeighingCategories(prev => [...prev, newCategory]);
+      setNewCategoryName("");
+      setNewCategoryDescription("");
+      setShowAddCategory(false);
+      toast.success('Category added successfully');
+      fetchWeighingData(); // Refresh data
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add category');
+    }
+  };
+
+  // Weighing record functions
+  const handleAddWeighing = async () => {
+    if (!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)) {
+      toast.error('Category and at least one weight measurement are required');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          categoryId: parseInt(newWeighingData.categoryId),
+          kilogram: newWeighingData.kilogram ? parseFloat(newWeighingData.kilogram) : undefined,
+          pound: newWeighingData.pound ? parseFloat(newWeighingData.pound) : undefined,
+          notes: newWeighingData.notes.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to add weighing record');
+      }
+
+      const newWeighing = await res.json();
+      setWeighingRecords(prev => [newWeighing, ...prev]);
+      setNewWeighingData({
+        categoryId: "",
+        kilogram: "",
+        pound: "",
+        notes: ""
+      });
+      setShowAddWeighing(false);
+      toast.success('Weighing record added successfully');
+      fetchWeighingData(); // Refresh data
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add weighing record');
+    }
+  };
+
+  const handleEditWeighing = (weighing: WeighingRecord) => {
+    setEditingWeighingId(weighing.id);
+    setEditWeighingData({
+      categoryId: weighing.categoryId.toString(),
+      kilogram: weighing.kilogram.toString(),
+      pound: weighing.pound.toString(),
+      notes: weighing.notes || ""
+    });
+  };
+
+  const handleSaveEditWeighing = async () => {
+    if (!editingWeighingId || !editWeighingData.categoryId || (!editWeighingData.kilogram && !editWeighingData.pound)) {
+      toast.error('Category and at least one weight measurement are required');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing/${editingWeighingId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          categoryId: parseInt(editWeighingData.categoryId),
+          kilogram: editWeighingData.kilogram ? parseFloat(editWeighingData.kilogram) : undefined,
+          pound: editWeighingData.pound ? parseFloat(editWeighingData.pound) : undefined,
+          notes: editWeighingData.notes.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update weighing record');
+      }
+
+      const updatedWeighing = await res.json();
+      setWeighingRecords(prev => prev.map(w => w.id === editingWeighingId ? updatedWeighing : w));
+      setEditingWeighingId(null);
+      setEditWeighingData({
+        categoryId: "",
+        kilogram: "",
+        pound: "",
+        notes: ""
+      });
+      toast.success('Weighing record updated successfully');
+      fetchWeighingData(); // Refresh data
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update weighing record');
+    }
+  };
+
+  const handleCancelEditWeighing = () => {
+    setEditingWeighingId(null);
+    setEditWeighingData({
+      categoryId: "",
+      kilogram: "",
+      pound: "",
+      notes: ""
+    });
+  };
+
+  const handleDeleteWeighing = async (weighingId: number) => {
+    if (!window.confirm('Are you sure you want to delete this weighing record?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing/${weighingId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete weighing record');
+      }
+
+      setWeighingRecords(prev => prev.filter(w => w.id !== weighingId));
+      toast.success('Weighing record deleted successfully');
+      fetchWeighingData(); // Refresh data
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete weighing record');
+    }
+  };
+
   return (
     <main style={{ padding: 32 }}>
       <div style={{ fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Kitchen Details</div>
@@ -192,6 +517,34 @@ export default function KitchenDetailsPage() {
         <div style={{ textAlign: 'center', color: 'red' }}>{error}</div>
       ) : (
         <>
+
+          {/* Organization Statistics */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 24, marginBottom: 24 }}>
+            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <FaUsers style={{ color: '#2196f3', fontSize: 24 }} />
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Total Users</h3>
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: '#2196f3' }}>{stats.totalUsers}</div>
+            </div>
+
+            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <FaCalendarAlt style={{ color: '#4caf50', fontSize: 24 }} />
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Total Shifts</h3>
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: '#4caf50' }}>{stats.totalShifts}</div>
+            </div>
+
+            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <FaBox style={{ color: '#ff9800', fontSize: 24 }} />
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Total Donations</h3>
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: '#ff9800' }}>{stats.totalDonations}</div>
+            </div>
+          </div>
+
           {/* Organization Information Card */}
           <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -396,33 +749,572 @@ export default function KitchenDetailsPage() {
             </div>
           </div>
 
-          {/* Organization Statistics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 24 }}>
-            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <FaUsers style={{ color: '#2196f3', fontSize: 24 }} />
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Total Users</h3>
+          {/* Incoming Stats Card */}
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Incoming Stats</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#666' }}>
+                <FaArrowDown />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Incoming</span>
               </div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: '#2196f3' }}>{stats.totalUsers}</div>
             </div>
 
-            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <FaCalendarAlt style={{ color: '#4caf50', fontSize: 24 }} />
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Total Shifts</h3>
+            {/* Incoming Dollar Value Section */}
+            <div style={{ 
+              background: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 24, 
+              marginBottom: 24,
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Incoming Dollar Value</h3>
+                <button
+                  onClick={handleStartEditIncomingValue}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #dee2e6',
+                    color: '#666',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
+                >
+                  <FaEdit />
+                  Edit
+                </button>
               </div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: '#4caf50' }}>{stats.totalShifts}</div>
+              
+              {isEditingIncomingValue ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>$</div>
+                  <input
+                    type="number"
+                    value={editingIncomingValue}
+                    onChange={(e) => setEditingIncomingValue(e.target.value)}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #dee2e6',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      fontSize: 24,
+                      fontWeight: 700,
+                      color: '#333',
+                      width: '200px',
+                      outline: 'none'
+                    }}
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                  />
+                  <button
+                    onClick={handleSaveIncomingValue}
+                    style={{
+                      background: '#28a745',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 14
+                    }}
+                  >
+                    <FaSave />
+                  </button>
+                  <button
+                    onClick={handleCancelEditIncomingValue}
+                    style={{
+                      background: '#dc3545',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 14
+                    }}
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                  ${incomingDollarValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              )}
             </div>
 
-            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <FaBox style={{ color: '#ff9800', fontSize: 24 }} />
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Total Donations</h3>
+           
+          </div>
+
+          {/* Outgoing Stats Card */}
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Outgoing Stats</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#f44336' }}>
+                <FaArrowUp />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Outgoing</span>
               </div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: '#ff9800' }}>{stats.totalDonations}</div>
+            </div>
+
+            {/* Weighing Statistics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 24 }}>
+              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#f44336', marginBottom: 8 }}>
+                  {weighingStats?.totalWeighings || 0}
+                </div>
+                <div style={{ fontSize: 14, color: '#666' }}>Total Weighings</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#e91e63', marginBottom: 8 }}>
+                  {weighingStats?.totalCategories || 0}
+                </div>
+                <div style={{ fontSize: 14, color: '#666' }}>Categories</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#ff5722', marginBottom: 8 }}>
+                  {weighingStats?.categoryStats?.length || 0}
+                </div>
+                <div style={{ fontSize: 14, color: '#666' }}>Active Categories</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#795548', marginBottom: 8 }}>
+                  {weighingRecords.length > 0 ? weighingRecords.length : 0}
+                </div>
+                <div style={{ fontSize: 14, color: '#666' }}>Recent Records</div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+              <button
+                onClick={() => setShowAddCategory(true)}
+                style={{
+                  background: '#4CAF50',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <FaPlus />
+                Add Category
+              </button>
+              <button
+                onClick={() => setShowAddWeighing(true)}
+                style={{
+                  background: '#2196F3',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <FaPlus />
+                Add Weighing
+              </button>
+            </div>
+
+            {/* Recent Weighing Records */}
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Recent Weighing Records</h3>
+              {weighingRecords.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>No weighing records found</div>
+              ) : (
+                <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                  {weighingRecords.slice(0, 10).map((weighing) => (
+                    <div
+                      key={weighing.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        border: '1px solid #eee',
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        background: editingWeighingId === weighing.id ? '#fff8f3' : '#fff'
+                      }}
+                    >
+                      {editingWeighingId === weighing.id ? (
+                        // Edit mode
+                        <div style={{ display: 'flex', flex: 1, gap: 12, alignItems: 'center' }}>
+                          <select
+                            value={editWeighingData.categoryId}
+                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, categoryId: e.target.value }))}
+                            style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', minWidth: 120 }}
+                          >
+                            {weighingCategories.map(cat => (
+                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="kg"
+                            value={editWeighingData.kilogram}
+                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, kilogram: e.target.value }))}
+                            style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', width: 80 }}
+                          />
+                          <input
+                            type="number"
+                            placeholder="lb"
+                            value={editWeighingData.pound}
+                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, pound: e.target.value }))}
+                            style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', width: 80 }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Notes"
+                            value={editWeighingData.notes}
+                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, notes: e.target.value }))}
+                            style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', flex: 1 }}
+                          />
+                          <button
+                            onClick={handleSaveEditWeighing}
+                            style={{
+                              background: '#4CAF50',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 4,
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: 12
+                            }}
+                          >
+                            <FaSave />
+                          </button>
+                          <button
+                            onClick={handleCancelEditWeighing}
+                            style={{
+                              background: '#f44336',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 4,
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: 12
+                            }}
+                          >
+                            <FaTimes />
+                          </button>
+                        </div>
+                      ) : (
+                        // View mode
+                        <>
+                          <div style={{ display: 'flex', flex: 1, gap: 16, alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.WeighingCategory.name}</span>
+                            <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram.toFixed(2)} kg</span>
+                            <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound.toFixed(2)} lb</span>
+                            <span style={{ color: '#888', fontSize: 14, flex: 1 }}>{weighing.notes}</span>
+                            <span style={{ color: '#999', fontSize: 12 }}>
+                              {new Date(weighing.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleEditWeighing(weighing)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#2196f3',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteWeighing(weighing.id)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#f44336',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Category Statistics */}
+            {weighingStats?.categoryStats && weighingStats.categoryStats.length > 0 && (
+              <div>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Category Totals</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
+                  {weighingStats.categoryStats.map((stat, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: 8,
+                        border: '1px solid #e9ecef'
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>{stat.categoryName}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#666' }}>
+                        <span>{stat.totalKilogram.toFixed(2)} kg</span>
+                        <span>{stat.totalPound.toFixed(2)} lb</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+        
+        </>
+      )}
+
+      {/* Add Category Modal */}
+      {showAddCategory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 24,
+            width: '90%',
+            maxWidth: 400,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Add New Category</h3>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Category Name *</label>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Enter category name"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  fontSize: 14
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Description</label>
+              <textarea
+                value={newCategoryDescription}
+                onChange={(e) => setNewCategoryDescription(e.target.value)}
+                placeholder="Enter description (optional)"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  fontSize: 14,
+                  minHeight: 80,
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowAddCategory(false)}
+                style={{
+                  background: '#f5f5f5',
+                  color: '#666',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: 14
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCategory}
+                disabled={!newCategoryName.trim()}
+                style={{
+                  background: !newCategoryName.trim() ? '#ccc' : '#4CAF50',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: !newCategoryName.trim() ? 'not-allowed' : 'pointer',
+                  fontSize: 14
+                }}
+              >
+                Add Category
+              </button>
             </div>
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Add Weighing Modal */}
+      {showAddWeighing && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 24,
+            width: '90%',
+            maxWidth: 500,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Add New Weighing Record</h3>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Category *</label>
+              <select
+                value={newWeighingData.categoryId}
+                onChange={(e) => setNewWeighingData(prev => ({ ...prev, categoryId: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  fontSize: 14
+                }}
+              >
+                <option value="">Select a category</option>
+                {weighingCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newWeighingData.kilogram}
+                  onChange={(e) => setNewWeighingData(prev => ({ ...prev, kilogram: e.target.value }))}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #ddd',
+                    fontSize: 14
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Weight (lb)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newWeighingData.pound}
+                  onChange={(e) => setNewWeighingData(prev => ({ ...prev, pound: e.target.value }))}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #ddd',
+                    fontSize: 14
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Notes</label>
+              <textarea
+                value={newWeighingData.notes}
+                onChange={(e) => setNewWeighingData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Enter notes (optional)"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  fontSize: 14,
+                  minHeight: 80,
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowAddWeighing(false)}
+                style={{
+                  background: '#f5f5f5',
+                  color: '#666',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: 14
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddWeighing}
+                disabled={!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)}
+                style={{
+                  background: (!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)) ? '#ccc' : '#2196F3',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: (!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)) ? 'not-allowed' : 'pointer',
+                  fontSize: 14
+                }}
+              >
+                Add Weighing
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

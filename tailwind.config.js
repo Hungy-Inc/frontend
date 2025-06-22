@@ -8,6 +8,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      maxWidth: {
+        '7xl': '80rem',
+      },
       colors: {
         primary: '#ff9800',
         'dark-text': '#333333',

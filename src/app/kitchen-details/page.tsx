@@ -12,21 +12,16 @@ interface OrganizationStats {
 
 interface WeighingCategory {
   id: number;
-  name: string;
-  description?: string;
+  category: string;
+  kilogram_kg_: number;
+  pound_lb_: number;
 }
 
 interface WeighingRecord {
   id: number;
-  categoryId: number;
-  kilogram: number;
-  pound: number;
-  notes?: string;
-  createdAt: string;
-  WeighingCategory: {
-    id: number;
-    name: string;
-  };
+  category: string;
+  kilogram_kg_: number;
+  pound_lb_: number;
 }
 
 interface WeighingStats {
@@ -73,22 +68,21 @@ export default function KitchenDetailsPage() {
   
   // Add category form state
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryDescription, setNewCategoryDescription] = useState("");
+  const [newCategoryWeight, setNewCategoryWeight] = useState("");
+  const [newCategoryUnit, setNewCategoryUnit] = useState<"kg" | "lb">("kg");
   
   // Add weighing form state
   const [newWeighingData, setNewWeighingData] = useState({
-    categoryId: "",
-    kilogram: "",
-    pound: "",
-    notes: ""
+    category: "",
+    weight: "",
+    unit: "kg" as "kg" | "lb"
   });
   
   // Edit weighing form state
   const [editWeighingData, setEditWeighingData] = useState({
-    categoryId: "",
-    kilogram: "",
-    pound: "",
-    notes: ""
+    category: "",
+    weight: "",
+    unit: "kg" as "kg" | "lb"
   });
 
   useEffect(() => {
@@ -344,6 +338,11 @@ export default function KitchenDetailsPage() {
       return;
     }
 
+    if (!newCategoryWeight.trim()) {
+      toast.error('Weight is required');
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
@@ -353,8 +352,9 @@ export default function KitchenDetailsPage() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          name: newCategoryName.trim(),
-          description: newCategoryDescription.trim()
+          category: newCategoryName.trim(),
+          weight: parseFloat(newCategoryWeight),
+          unit: newCategoryUnit
         })
       });
 
@@ -366,7 +366,8 @@ export default function KitchenDetailsPage() {
       const newCategory = await res.json();
       setWeighingCategories(prev => [...prev, newCategory]);
       setNewCategoryName("");
-      setNewCategoryDescription("");
+      setNewCategoryWeight("");
+      setNewCategoryUnit("kg");
       setShowAddCategory(false);
       toast.success('Category added successfully');
       fetchWeighingData(); // Refresh data
@@ -377,8 +378,8 @@ export default function KitchenDetailsPage() {
 
   // Weighing record functions
   const handleAddWeighing = async () => {
-    if (!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)) {
-      toast.error('Category and at least one weight measurement are required');
+    if (!newWeighingData.category || !newWeighingData.weight.trim()) {
+      toast.error('Category and weight are required');
       return;
     }
 
@@ -391,10 +392,9 @@ export default function KitchenDetailsPage() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          categoryId: parseInt(newWeighingData.categoryId),
-          kilogram: newWeighingData.kilogram ? parseFloat(newWeighingData.kilogram) : undefined,
-          pound: newWeighingData.pound ? parseFloat(newWeighingData.pound) : undefined,
-          notes: newWeighingData.notes.trim()
+          category: newWeighingData.category,
+          weight: parseFloat(newWeighingData.weight),
+          unit: newWeighingData.unit
         })
       });
 
@@ -406,10 +406,9 @@ export default function KitchenDetailsPage() {
       const newWeighing = await res.json();
       setWeighingRecords(prev => [newWeighing, ...prev]);
       setNewWeighingData({
-        categoryId: "",
-        kilogram: "",
-        pound: "",
-        notes: ""
+        category: "",
+        weight: "",
+        unit: "kg" as "kg" | "lb"
       });
       setShowAddWeighing(false);
       toast.success('Weighing record added successfully');
@@ -422,16 +421,15 @@ export default function KitchenDetailsPage() {
   const handleEditWeighing = (weighing: WeighingRecord) => {
     setEditingWeighingId(weighing.id);
     setEditWeighingData({
-      categoryId: weighing.categoryId.toString(),
-      kilogram: weighing.kilogram.toString(),
-      pound: weighing.pound.toString(),
-      notes: weighing.notes || ""
+      category: weighing.category,
+      weight: weighing.kilogram_kg_.toString(),
+      unit: "kg" as "kg" | "lb"
     });
   };
 
   const handleSaveEditWeighing = async () => {
-    if (!editingWeighingId || !editWeighingData.categoryId || (!editWeighingData.kilogram && !editWeighingData.pound)) {
-      toast.error('Category and at least one weight measurement are required');
+    if (!editingWeighingId || !editWeighingData.category || !editWeighingData.weight.trim()) {
+      toast.error('Category and weight are required');
       return;
     }
 
@@ -444,10 +442,9 @@ export default function KitchenDetailsPage() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          categoryId: parseInt(editWeighingData.categoryId),
-          kilogram: editWeighingData.kilogram ? parseFloat(editWeighingData.kilogram) : undefined,
-          pound: editWeighingData.pound ? parseFloat(editWeighingData.pound) : undefined,
-          notes: editWeighingData.notes.trim()
+          category: editWeighingData.category,
+          weight: parseFloat(editWeighingData.weight),
+          unit: editWeighingData.unit
         })
       });
 
@@ -460,10 +457,9 @@ export default function KitchenDetailsPage() {
       setWeighingRecords(prev => prev.map(w => w.id === editingWeighingId ? updatedWeighing : w));
       setEditingWeighingId(null);
       setEditWeighingData({
-        categoryId: "",
-        kilogram: "",
-        pound: "",
-        notes: ""
+        category: "",
+        weight: "",
+        unit: "kg" as "kg" | "lb"
       });
       toast.success('Weighing record updated successfully');
       fetchWeighingData(); // Refresh data
@@ -475,10 +471,9 @@ export default function KitchenDetailsPage() {
   const handleCancelEditWeighing = () => {
     setEditingWeighingId(null);
     setEditWeighingData({
-      categoryId: "",
-      kilogram: "",
-      pound: "",
-      notes: ""
+      category: "",
+      weight: "",
+      unit: "kg" as "kg" | "lb"
     });
   };
 
@@ -961,35 +956,29 @@ export default function KitchenDetailsPage() {
                         // Edit mode
                         <div style={{ display: 'flex', flex: 1, gap: 12, alignItems: 'center' }}>
                           <select
-                            value={editWeighingData.categoryId}
-                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, categoryId: e.target.value }))}
+                            value={editWeighingData.category}
+                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, category: e.target.value }))}
                             style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', minWidth: 120 }}
                           >
                             {weighingCategories.map(cat => (
-                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                              <option key={cat.id} value={cat.category}>{cat.category}</option>
                             ))}
                           </select>
                           <input
                             type="number"
-                            placeholder="kg"
-                            value={editWeighingData.kilogram}
-                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, kilogram: e.target.value }))}
+                            placeholder="weight"
+                            value={editWeighingData.weight}
+                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, weight: e.target.value }))}
                             style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', width: 80 }}
                           />
-                          <input
-                            type="number"
-                            placeholder="lb"
-                            value={editWeighingData.pound}
-                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, pound: e.target.value }))}
-                            style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', width: 80 }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Notes"
-                            value={editWeighingData.notes}
-                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, notes: e.target.value }))}
-                            style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', flex: 1 }}
-                          />
+                          <select
+                            value={editWeighingData.unit}
+                            onChange={(e) => setEditWeighingData(prev => ({ ...prev, unit: e.target.value as "kg" | "lb" }))}
+                            style={{ padding: 4, borderRadius: 4, border: '1px solid #ddd', minWidth: 80 }}
+                          >
+                            <option value="kg">kg</option>
+                            <option value="lb">lb</option>
+                          </select>
                           <button
                             onClick={handleSaveEditWeighing}
                             style={{
@@ -1023,13 +1012,9 @@ export default function KitchenDetailsPage() {
                         // View mode
                         <>
                           <div style={{ display: 'flex', flex: 1, gap: 16, alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.WeighingCategory.name}</span>
-                            <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram.toFixed(2)} kg</span>
-                            <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound.toFixed(2)} lb</span>
-                            <span style={{ color: '#888', fontSize: 14, flex: 1 }}>{weighing.notes}</span>
-                            <span style={{ color: '#999', fontSize: 12 }}>
-                              {new Date(weighing.createdAt).toLocaleDateString()}
-                            </span>
+                            <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.category}</span>
+                            <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram_kg_.toFixed(2)} kg</span>
+                            <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound_lb_.toFixed(2)} lb</span>
                           </div>
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button
@@ -1136,21 +1121,37 @@ export default function KitchenDetailsPage() {
               />
             </div>
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Description</label>
-              <textarea
-                value={newCategoryDescription}
-                onChange={(e) => setNewCategoryDescription(e.target.value)}
-                placeholder="Enter description (optional)"
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Weight</label>
+              <input
+                type="number"
+                value={newCategoryWeight}
+                onChange={(e) => setNewCategoryWeight(e.target.value)}
+                placeholder="Enter weight"
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   borderRadius: 6,
                   border: '1px solid #ddd',
-                  fontSize: 14,
-                  minHeight: 80,
-                  resize: 'vertical'
+                  fontSize: 14
                 }}
               />
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Unit</label>
+              <select
+                value={newCategoryUnit}
+                onChange={(e) => setNewCategoryUnit(e.target.value as "kg" | "lb")}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  fontSize: 14
+                }}
+              >
+                <option value="kg">kg</option>
+                <option value="lb">lb</option>
+              </select>
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
@@ -1169,14 +1170,14 @@ export default function KitchenDetailsPage() {
               </button>
               <button
                 onClick={handleAddCategory}
-                disabled={!newCategoryName.trim()}
+                disabled={!newCategoryName.trim() || !newCategoryWeight.trim()}
                 style={{
-                  background: !newCategoryName.trim() ? '#ccc' : '#4CAF50',
+                  background: (!newCategoryName.trim() || !newCategoryWeight.trim()) ? '#ccc' : '#4CAF50',
                   color: '#fff',
                   border: 'none',
                   borderRadius: 6,
                   padding: '8px 16px',
-                  cursor: !newCategoryName.trim() ? 'not-allowed' : 'pointer',
+                  cursor: (!newCategoryName.trim() || !newCategoryWeight.trim()) ? 'not-allowed' : 'pointer',
                   fontSize: 14
                 }}
               >
@@ -1213,8 +1214,8 @@ export default function KitchenDetailsPage() {
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Category *</label>
               <select
-                value={newWeighingData.categoryId}
-                onChange={(e) => setNewWeighingData(prev => ({ ...prev, categoryId: e.target.value }))}
+                value={newWeighingData.category}
+                onChange={(e) => setNewWeighingData(prev => ({ ...prev, category: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1225,18 +1226,18 @@ export default function KitchenDetailsPage() {
               >
                 <option value="">Select a category</option>
                 {weighingCategories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  <option key={cat.id} value={cat.category}>{cat.category}</option>
                 ))}
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div>
-                <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Weight (kg)</label>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Weight</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={newWeighingData.kilogram}
-                  onChange={(e) => setNewWeighingData(prev => ({ ...prev, kilogram: e.target.value }))}
+                  value={newWeighingData.weight}
+                  onChange={(e) => setNewWeighingData(prev => ({ ...prev, weight: e.target.value }))}
                   placeholder="0.00"
                   style={{
                     width: '100%',
@@ -1248,13 +1249,10 @@ export default function KitchenDetailsPage() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Weight (lb)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={newWeighingData.pound}
-                  onChange={(e) => setNewWeighingData(prev => ({ ...prev, pound: e.target.value }))}
-                  placeholder="0.00"
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Unit</label>
+                <select
+                  value={newWeighingData.unit}
+                  onChange={(e) => setNewWeighingData(prev => ({ ...prev, unit: e.target.value as "kg" | "lb" }))}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -1262,25 +1260,11 @@ export default function KitchenDetailsPage() {
                     border: '1px solid #ddd',
                     fontSize: 14
                   }}
-                />
+                >
+                  <option value="kg">kg</option>
+                  <option value="lb">lb</option>
+                </select>
               </div>
-            </div>
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Notes</label>
-              <textarea
-                value={newWeighingData.notes}
-                onChange={(e) => setNewWeighingData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Enter notes (optional)"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  border: '1px solid #ddd',
-                  fontSize: 14,
-                  minHeight: 80,
-                  resize: 'vertical'
-                }}
-              />
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
@@ -1299,14 +1283,14 @@ export default function KitchenDetailsPage() {
               </button>
               <button
                 onClick={handleAddWeighing}
-                disabled={!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)}
+                disabled={!newWeighingData.category || !newWeighingData.weight.trim()}
                 style={{
-                  background: (!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)) ? '#ccc' : '#2196F3',
+                  background: (!newWeighingData.category || !newWeighingData.weight.trim()) ? '#ccc' : '#2196F3',
                   color: '#fff',
                   border: 'none',
                   borderRadius: 6,
                   padding: '8px 16px',
-                  cursor: (!newWeighingData.categoryId || (!newWeighingData.kilogram && !newWeighingData.pound)) ? 'not-allowed' : 'pointer',
+                  cursor: (!newWeighingData.category || !newWeighingData.weight.trim()) ? 'not-allowed' : 'pointer',
                   fontSize: 14
                 }}
               >

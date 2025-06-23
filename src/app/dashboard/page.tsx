@@ -26,8 +26,10 @@ export default function Dashboard() {
   const [unit, setUnit] = useState('Kilograms (kg)');
 
   // Incoming stats state
-  const [orgTotals, setOrgTotals] = useState<{ [org: string]: number }>({});
-  const [grandTotal, setGrandTotal] = useState<number>(0);
+  const [orgTotals, setOrgTotals] = useState<{ [org: string]: { weight: number, value: number } }>({});
+  const [grandTotalWeight, setGrandTotalWeight] = useState<number>(0);
+  const [grandTotalValue, setGrandTotalValue] = useState<number>(0);
+  const [incomingDollarValue, setIncomingDollarValue] = useState<number>(0);
   const [loadingIncoming, setLoadingIncoming] = useState(true);
   const [errorIncoming, setErrorIncoming] = useState<string | null>(null);
 
@@ -132,12 +134,16 @@ export default function Dashboard() {
         });
         if (!response.ok) throw new Error('Failed to fetch incoming stats');
         const data = await response.json();
-        setOrgTotals(data.totals || {});
-        setGrandTotal(data.grandTotal || 0);
+        setOrgTotals(data.donorTotals || {});
+        setGrandTotalWeight(data.grandTotalWeight || 0);
+        setGrandTotalValue(data.grandTotalValue || 0);
+        setIncomingDollarValue(data.incomingDollarValue || 0);
       } catch (err) {
         setErrorIncoming(err instanceof Error ? err.message : 'An error occurred');
         setOrgTotals({});
-        setGrandTotal(0);
+        setGrandTotalWeight(0);
+        setGrandTotalValue(0);
+        setIncomingDollarValue(0);
       } finally {
         setLoadingIncoming(false);
       }
@@ -263,12 +269,63 @@ export default function Dashboard() {
   const totalDistributed = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
   const equivalentValue = totalDistributed * 10; // 10 dollars per meal
 
-  // Pie chart data
+  // Custom units state (move these above helpers)
+  const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);
+  const [selectedUnit, setSelectedUnit] = useState<'kg' | 'lb' | string>('kg');
+
+  // Fetch custom units on mount
+  useEffect(() => {
+    const fetchUnits = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setCustomUnits(data || []);
+      } catch {}
+    };
+    fetchUnits();
+  }, []);
+
+  // Helper to get conversion rate for selected unit
+  const getConversionRate = () => {
+    if (selectedUnit === 'kg') return 1;
+    if (selectedUnit === 'lb') return 2.20462;
+    const found = customUnits.find(u => u.category === selectedUnit);
+    return found ? found.kilogram_kg_ : 1;
+  };
+
+  // Helper to get display unit label
+  const getUnitLabel = () => {
+    if (selectedUnit === 'kg') return 'kg';
+    if (selectedUnit === 'lb') return 'lb';
+    return selectedUnit;
+  };
+
+  // Helper to convert weight to selected unit
+  const convertToSelectedUnit = (weightKg: number) => {
+    if (selectedUnit === 'kg') return weightKg;
+    if (selectedUnit === 'lb') return weightKg * 2.20462;
+    const found = customUnits.find(u => u.category === selectedUnit);
+    return found && found.kilogram_kg_ ? weightKg / found.kilogram_kg_ : weightKg;
+  };
+
+  // Helper to get per-unit value for custom unit
+  const getPerUnitValue = () => {
+    if (selectedUnit === 'kg' || selectedUnit === 'lb') return incomingDollarValue;
+    const found = customUnits.find(u => u.category === selectedUnit);
+    return found && found.kilogram_kg_ ? incomingDollarValue * found.kilogram_kg_ : incomingDollarValue;
+  };
+
+  // Pie chart data (use selected unit)
   const pieData = {
     labels: inventoryData.map(item => item.name),
     datasets: [
       {
-        data: inventoryData.map(item => item.weight),
+        data: inventoryData.map(item => convertToSelectedUnit(item.weight)),
         backgroundColor: [
           '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
         ],
@@ -320,9 +377,13 @@ export default function Dashboard() {
             <select value={year} onChange={e => setYear(e.target.value)} style={{ padding: '8px 18px 8px 12px', borderRadius: 8, border: '1px solid #eee', background: '#fff', color: '#222', fontWeight: 500, fontSize: 15, marginRight: 2 }}>
               {yearOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            {/* Unit Filter */}
-            <select value={unit} onChange={e => setUnit(e.target.value)} style={{ padding: '8px 18px 8px 12px', borderRadius: 8, border: '1px solid #eee', background: '#fff', color: '#222', fontWeight: 500, fontSize: 15, marginRight: 2 }}>
-              {unitOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {/* Unit Filter (kg/lb/custom) */}
+            <select value={selectedUnit} onChange={e => setSelectedUnit(e.target.value as any)} style={{ padding: '8px 18px 8px 12px', borderRadius: 8, border: '1px solid #eee', background: '#fff', color: '#222', fontWeight: 500, fontSize: 15, marginRight: 2 }}>
+              <option value="kg">Kilograms (kg)</option>
+              <option value="lb">Pounds (lb)</option>
+              {customUnits.map(u => (
+                <option key={u.category} value={u.category}>{u.category}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -350,8 +411,17 @@ export default function Dashboard() {
                   <FaArrowUp color="#f24503" size={22} />
                 </div>
                 <div>
-                  <div style={{ color: '#f24503', fontWeight: 700, fontSize: 18 }}>{loadingIncoming ? '...' : convertWeight(grandTotal)} {unit === 'Pounds (lb)' ? 'lb' : 'kg'}</div>
+                  <div style={{ color: '#f24503', fontWeight: 700, fontSize: 18 }}>{loadingIncoming ? '...' : (Object.values(orgTotals).reduce((sum, d) => sum + convertToSelectedUnit(d.weight), 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })} {getUnitLabel()}</div>
                   <div style={{ color: '#888', fontSize: 13 }}>Total Amount</div>
+                </div>
+              </div>
+              <div style={{ background: '#E8FFF3', borderRadius: 10, flex: 1, padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ background: '#fff', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FaArrowDown color="#1BC47D" size={22} />
+                </div>
+                <div>
+                  <div style={{ color: '#1BC47D', fontWeight: 700, fontSize: 18 }}>{loadingIncoming ? '...' : `$${(Object.values(orgTotals).reduce((sum, d) => sum + convertToSelectedUnit(d.weight) * getPerUnitValue(), 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}</div>
+                  <div style={{ color: '#888', fontSize: 13 }}>Total Value</div>
                 </div>
               </div>
             </div>
@@ -362,17 +432,19 @@ export default function Dashboard() {
                 <thead>
                   <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
                     <th style={{ textAlign: 'left', padding: 8 }}>ORGANIZATION</th>
-                    <th style={{ textAlign: 'right', padding: 8 }}>AMOUNT ({unit === 'Pounds (lb)' ? 'lb' : 'kg'})</th>
+                    <th style={{ textAlign: 'right', padding: 8 }}>AMOUNT ({getUnitLabel()})</th>
+                    <th style={{ textAlign: 'right', padding: 8 }}>VALUE ($)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingIncoming ? (
-                    <tr><td colSpan={2} style={{ textAlign: 'center', padding: 16 }}>Loading...</td></tr>
+                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: 16 }}>Loading...</td></tr>
                   ) : (
-                    Object.entries(orgTotals).map(([org, amount]) => (
+                    Object.entries(orgTotals).map(([org, data]) => (
                       <tr key={org}>
                         <td style={{ padding: 8 }}>{org}</td>
-                        <td style={{ textAlign: 'right', padding: 8 }}>{convertWeight(amount)}</td>
+                        <td style={{ textAlign: 'right', padding: 8 }}>{convertToSelectedUnit(data.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'right', padding: 8 }}>{`$${(convertToSelectedUnit(data.weight) * getPerUnitValue()).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}</td>
                       </tr>
                     ))
                   )}
@@ -597,7 +669,7 @@ export default function Dashboard() {
                 <thead>
                   <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
                     <th style={{ textAlign: 'left', padding: '8px 8px 8px 0', width: '60%' }}>Category</th>
-                    <th style={{ textAlign: 'right', padding: '8px 0 8px 8px', width: '40%' }}>Current Quantity ({unit === 'Pounds (lb)' ? 'lb' : 'kg'})</th>
+                    <th style={{ textAlign: 'right', padding: '8px 0 8px 8px', width: '40%' }}>Current Quantity ({getUnitLabel()})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -607,7 +679,7 @@ export default function Dashboard() {
                     inventoryData.map(item => (
                       <tr key={item.name}>
                         <td style={{ padding: '8px 8px 8px 0' }}>{item.name}</td>
-                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertWeight(item.weight)}</td>
+                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToSelectedUnit(item.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                       </tr>
                     ))
                   )}

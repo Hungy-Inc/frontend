@@ -19,7 +19,15 @@ const months = [
   { value: 12, label: 'December' }
 ];
 
-const units = ['Kilograms (kg)', 'Pounds (lb)'];
+const baseUnits = ['Kilograms (kg)', 'Pounds (lb)'];
+
+type WeighingCategory = {
+  id: number;
+  category: string;
+  kilogram_kg_: number;
+  pound_lb_: number;
+  noofmeals: number;
+};
 
 function getYearOptions() {
   const currentYear = new Date().getFullYear();
@@ -38,7 +46,31 @@ export default function InventoryPage() {
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedUnit, setSelectedUnit] = useState(units[1]); // Default to Pounds (lb)
+  const [selectedUnit, setSelectedUnit] = useState(baseUnits[1]); // Default to Pounds (lb)
+  const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
+
+  // Fetch weighing categories
+  useEffect(() => {
+    const fetchWeighingCategories = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setWeighingCategories(data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching weighing categories:', err);
+      }
+    };
+    
+    fetchWeighingCategories();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,11 +100,33 @@ export default function InventoryPage() {
     fetchData();
   }, [selectedMonth, selectedYear, selectedUnit]);
 
+  // Helper to convert weight based on selected unit
   const convertWeight = (weight: number) => {
+    if (weight == null || isNaN(weight)) return 0;
+    
+    // Handle base units
     if (selectedUnit === 'Pounds (lb)') {
-      return Math.round(weight * 2.20462);
+      return (weight * 2.20462);
     }
-    return Math.round(weight);
+    if (selectedUnit === 'Kilograms (kg)') {
+      return weight;
+    }
+    
+    // Handle custom weighing categories
+    const category = weighingCategories.find(c => c.category === selectedUnit);
+    if (category && category.kilogram_kg_ > 0) {
+      // Convert kg to custom unit (divide by kg per unit)
+      return weight / category.kilogram_kg_;
+    }
+    
+    return weight;
+  };
+
+  // Helper to get unit label for display
+  const getUnitLabel = () => {
+    if (selectedUnit === 'Kilograms (kg)') return 'kg';
+    if (selectedUnit === 'Pounds (lb)') return 'lbs';
+    return selectedUnit;
   };
 
   // Helper to get month and year from a record (simulate with dummy date for now)
@@ -116,6 +170,9 @@ export default function InventoryPage() {
     }
   };
 
+  // Combine base units with weighing categories for dropdown
+  const allUnits = [...baseUnits, ...weighingCategories.map(c => c.category)];
+
   return (
     <main className={styles.main}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
@@ -147,7 +204,7 @@ export default function InventoryPage() {
             onChange={e => setSelectedUnit(e.target.value)}
             style={{ marginRight: 8 }}
           >
-            {units.map(u => (
+            {allUnits.map(u => (
               <option key={u} value={u}>{u}</option>
             ))}
           </select>
@@ -172,8 +229,10 @@ export default function InventoryPage() {
               <thead>
                 <tr>
                   <th>Donor</th>
-                  {categories.map(cat => <th key={cat}>{cat}</th>)}
-                  <th>Total</th>
+                  {categories.map(cat => (
+                    <th key={cat}>{cat} ({getUnitLabel()})</th>
+                  ))}
+                  <th>Total ({getUnitLabel()})</th>
                 </tr>
               </thead>
               <tbody>
@@ -181,17 +240,23 @@ export default function InventoryPage() {
                   <tr key={donor}>
                     <td>{donor}</td>
                     {categories.map((cat: string) => (
-                      <td key={cat}>{selectedUnit === 'Pounds (lb)' ? (tableData[donor][cat] * 2.20462).toFixed(2) : tableData[donor][cat].toFixed(2)}</td>
+                      <td key={cat}>{convertWeight(tableData[donor][cat]).toFixed(2)}</td>
                     ))}
-                    <td className={styles.totalCol}>{selectedUnit === 'Pounds (lb)' ? (Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0) * 2.20462).toFixed(2) : Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0).toFixed(2)}</td>
+                    <td className={styles.totalCol}>
+                      {convertWeight(Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
+                    </td>
                   </tr>
                 ))}
                 <tr className={styles.monthlyTotalRow}>
                   <td>Total</td>
                   {categories.map((cat: string) => (
-                    <td key={cat}>{selectedUnit === 'Pounds (lb)' ? (donors.reduce((sum, donor) => sum + tableData[donor][cat], 0) * 2.20462).toFixed(2) : donors.reduce((sum, donor) => sum + tableData[donor][cat], 0).toFixed(2)}</td>
+                    <td key={cat}>
+                      {convertWeight(donors.reduce((sum, donor) => sum + tableData[donor][cat], 0)).toFixed(2)}
+                    </td>
                   ))}
-                  <td className={styles.totalCol}>{selectedUnit === 'Pounds (lb)' ? (donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0) * 2.20462).toFixed(2) : donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0).toFixed(2)}</td>
+                  <td className={styles.totalCol}>
+                    {convertWeight(donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
+                  </td>
                 </tr>
               </tbody>
             </table>

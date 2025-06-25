@@ -246,31 +246,8 @@ export default function Dashboard() {
   const totalVolunteers = volunteers.length;
   const totalHours = Number(volunteers.reduce((sum, v) => sum + v.hours, 0).toFixed(2));
 
-  // Outgoing stats dynamic calculation
-  const monthIdx = (() => {
-    if (period === 'All Months') return null;
-    const idx = monthNames.indexOf(period);
-    return idx >= 0 ? idx : null;
-  })();
-  const filteredOutTable = outTable.filter(row => {
-    if (!row['Date']) return false;
-    const d = new Date(row['Date']);
-    if (isNaN(d.getTime())) return false;
-    if (year && d.getFullYear().toString() !== year) return false;
-    if (monthIdx !== null && d.getMonth() !== monthIdx) return false;
-    return true;
-  });
-  // Sum up each category
-  const categoryTotals: Record<string, number> = {};
-  outColumns.forEach(col => {
-    if (col === 'Date') return;
-    categoryTotals[col] = filteredOutTable.reduce((sum, row) => sum + (Number(row[col]) || 0), 0);
-  });
-  const totalDistributed = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
-  const equivalentValue = totalDistributed * 10; // 10 dollars per meal
-
   // Custom units state (move these above helpers)
-  const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);
+  const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number; noofmeals: number }[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<'kg' | 'lb' | string>('kg');
 
   // Fetch custom units on mount
@@ -313,12 +290,49 @@ export default function Dashboard() {
     return found && found.kilogram_kg_ ? weightKg / found.kilogram_kg_ : weightKg;
   };
 
-  // Helper to get per-unit value for custom unit
-  const getPerUnitValue = () => {
-    if (selectedUnit === 'kg' || selectedUnit === 'lb') return incomingDollarValue;
+  // Helper to convert meals based on selected weighing category
+  const convertMealsForCategory = (rawMeals: number) => {
+    if (selectedUnit === 'kg' || selectedUnit === 'lb') return rawMeals;
     const found = customUnits.find(u => u.category === selectedUnit);
-    return found && found.kilogram_kg_ ? incomingDollarValue * found.kilogram_kg_ : incomingDollarValue;
+    if (found && found.noofmeals > 0) {
+      // Convert raw meals to the selected category's units (divide by meals per unit)
+      return Math.round(rawMeals / found.noofmeals);
+    }
+    return rawMeals;
   };
+
+  // Outgoing stats dynamic calculation with meal conversion
+  const monthIdx = (() => {
+    if (period === 'All Months') return null;
+    const idx = monthNames.indexOf(period);
+    return idx >= 0 ? idx : null;
+  })();
+  const filteredOutTable = outTable.filter(row => {
+    if (!row['Date']) return false;
+    const d = new Date(row['Date']);
+    if (isNaN(d.getTime())) return false;
+    if (year && d.getFullYear().toString() !== year) return false;
+    if (monthIdx !== null && d.getMonth() !== monthIdx) return false;
+    return true;
+  });
+  
+  // Sum up each category with meal conversion
+  const categoryTotals: Record<string, number> = {};
+  outColumns.forEach(col => {
+    if (col === 'Date') return;
+    const rawTotal = filteredOutTable.reduce((sum, row) => sum + (Number(row[col]) || 0), 0);
+    categoryTotals[col] = convertMealsForCategory(rawTotal);
+  });
+  const totalDistributed = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
+  
+  // Calculate equivalent value based on actual meals (not converted units)
+  const totalActualMeals = Object.values(categoryTotals).reduce((sum, convertedValue, index) => {
+    const col = outColumns.filter(c => c !== 'Date')[index];
+    if (!col) return sum;
+    const rawTotal = filteredOutTable.reduce((rowSum, row) => rowSum + (Number(row[col]) || 0), 0);
+    return sum + rawTotal;
+  }, 0);
+  const equivalentValue = totalActualMeals * 10; // 10 dollars per actual meal
 
   // Pie chart data (use selected unit)
   const pieData = {
@@ -358,6 +372,8 @@ export default function Dashboard() {
   // Debug: Log outgoing stats data
   console.log('outTable:', outTable);
   console.log('filteredOutTable:', filteredOutTable);
+  console.log('selectedUnit:', selectedUnit);
+  console.log('customUnits:', customUnits);
 
   return (
     <main className="min-h-screen bg-[#fff8f3]">
@@ -405,56 +421,48 @@ export default function Dashboard() {
                 <FiDownload /> Export to Excel
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-              <div style={{ background: '#FFF5ED', borderRadius: 10, flex: 1, padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ background: '#fff', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FaArrowUp color="#f24503" size={22} />
-                </div>
-                <div>
-                  <div style={{ color: '#f24503', fontWeight: 700, fontSize: 18 }}>{loadingIncoming ? '...' : (Object.values(orgTotals).reduce((sum, d) => sum + convertToSelectedUnit(d.weight), 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })} {getUnitLabel()}</div>
-                  <div style={{ color: '#888', fontSize: 13 }}>Total Amount</div>
-                </div>
-              </div>
-              <div style={{ background: '#E8FFF3', borderRadius: 10, flex: 1, padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ background: '#fff', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FaArrowDown color="#1BC47D" size={22} />
-                </div>
-                <div>
-                  <div style={{ color: '#1BC47D', fontWeight: 700, fontSize: 18 }}>{loadingIncoming ? '...' : `$${(Object.values(orgTotals).reduce((sum, d) => sum + convertToSelectedUnit(d.weight) * getPerUnitValue(), 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}</div>
-                  <div style={{ color: '#888', fontSize: 13 }}>Total Value</div>
-                </div>
-              </div>
-            </div>
-            {errorIncoming ? (
+            {loadingIncoming ? (
+              <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+            ) : errorIncoming ? (
               <div style={{ color: 'red', padding: 8 }}>{errorIncoming}</div>
             ) : (
-              <table style={{ width: '100%', fontSize: 15, marginTop: 8 }}>
-                <thead>
-                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                    <th style={{ textAlign: 'left', padding: 8 }}>ORGANIZATION</th>
-                    <th style={{ textAlign: 'right', padding: 8 }}>AMOUNT ({getUnitLabel()})</th>
-                    <th style={{ textAlign: 'right', padding: 8 }}>VALUE ($)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingIncoming ? (
-                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: 16 }}>Loading...</td></tr>
-                  ) : (
-                    Object.entries(orgTotals).map(([org, data]) => (
-                      <tr key={org}>
-                        <td style={{ padding: 8 }}>{org}</td>
-                        <td style={{ textAlign: 'right', padding: 8 }}>{convertToSelectedUnit(data.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                        <td style={{ textAlign: 'right', padding: 8 }}>{`$${(convertToSelectedUnit(data.weight) * getPerUnitValue()).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}</td>
+              <div>
+                {/* Summary Cards */}
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                  <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Weight</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{convertToSelectedUnit(grandTotalWeight).toLocaleString(undefined, { maximumFractionDigits: 2 })} {getUnitLabel()}</div>
+                  </div>
+                  <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Value</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>${grandTotalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                  </div>
+                </div>
+                {/* Donor breakdown table */}
+                <table style={{ width: '100%', fontSize: 15 }}>
+                  <thead>
+                    <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donor</th>
+                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Weight ({getUnitLabel()})</th>
+                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Value ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(orgTotals).map(([donor, totals]) => (
+                      <tr key={donor}>
+                        <td style={{ padding: '8px 8px 8px 0' }}>{donor}</td>
+                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToSelectedUnit(totals.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>${totals.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
           {/* Volunteer Management - right half */}
-          <div style={{ flex: 1, background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ flex: 1, background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontWeight: 700, fontSize: 18 }}>Volunteer Management</div>
               <button
                 className="export-btn"
@@ -462,54 +470,63 @@ export default function Dashboard() {
                 onClick={() => {
                   const month = getMonthNumber(period);
                   const url = `${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/summary/export-dashboard?month=${month}&year=${year}`;
-                  downloadExcel(url, `volunteer-summary-${year}-${month}.xlsx`);
+                  downloadExcel(url, `volunteers-${year}-${month}.xlsx`);
                 }}
               >
                 <FiDownload /> Export to Excel
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 24, marginBottom: 8 }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <div style={{ color: '#f24503', fontWeight: 700, fontSize: 24 }}>{volLoading ? '...' : totalVolunteers}</div>
-                <div style={{ color: '#888', fontSize: 13 }}>Active Volunteers</div>
-              </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <div style={{ color: '#1DB96B', fontWeight: 700, fontSize: 24 }}>{volLoading ? '...' : totalHours}</div>
-                <div style={{ color: '#888', fontSize: 13 }}>Total Hours</div>
-              </div>
-            </div>
-            {volError ? (
+            {volLoading ? (
+              <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+            ) : volError ? (
               <div style={{ color: 'red', padding: 8 }}>{volError}</div>
             ) : (
-              <table style={{ width: '100%', fontSize: 15 }}>
-                <thead>
-                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Volunteer</th>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Role</th>
-                    <th style={{ textAlign: 'right', padding: 8 }}>Hours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {volLoading ? (
-                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: 16 }}>Loading...</td></tr>
-                  ) : (
-                    volunteers.map((v, idx) => (
+              <div>
+                {/* Summary Cards */}
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                  <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Volunteers</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{totalVolunteers}</div>
+                  </div>
+                  <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Hours</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{totalHours}</div>
+                  </div>
+                </div>
+                {/* Volunteer table */}
+                <table style={{ width: '100%', fontSize: 15 }}>
+                  <thead>
+                    <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Name</th>
+                      <th style={{ textAlign: 'left', padding: '8px' }}>Role</th>
+                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {volunteers.slice(0, 8).map((v, idx) => (
                       <tr key={idx}>
-                        <td style={{ padding: 8 }}>{v.name}</td>
-                        <td style={{ padding: 8 }}>{v.role}</td>
-                        <td style={{ textAlign: 'right', padding: 8 }}>{v.hours}</td>
+                        <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
+                        <td style={{ padding: '8px' }}>{v.role}</td>
+                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{v.hours}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
         {/* Outgoing Stats Section */}
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24, marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ fontWeight: 700, fontSize: 18 }}>Outgoing Stats</div>
+            <div style={{ fontWeight: 700, fontSize: 18 }}>
+              Outgoing Stats
+              {selectedUnit !== 'kg' && selectedUnit !== 'lb' && (
+                <span style={{ fontSize: 14, fontWeight: 400, color: '#666', marginLeft: 8 }}>
+                  (Converted to {selectedUnit} meal units)
+                </span>
+              )}
+            </div>
             <button
               className="export-btn"
               style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
@@ -544,7 +561,7 @@ export default function Dashboard() {
                       // For each shift name, sum the meals for all dates where the recurring shift name matches
                       const rows = shiftNames.map(shiftName => {
                         // For each row in filteredOutTable, sum meals where the recurring shift name matches for this category
-                        const totalMeals = filteredOutTable.reduce((sum, row) => {
+                        const rawTotalMeals = filteredOutTable.reduce((sum, row) => {
                           // For this row, try to find a recurring shift for this category and shift name
                           const matches = recurringShifts.filter(rs =>
                             rs.name === shiftName &&
@@ -555,9 +572,10 @@ export default function Dashboard() {
                           }
                           return sum;
                         }, 0);
+                        const convertedMeals = convertMealsForCategory(rawTotalMeals);
                         return {
                           shiftName,
-                          meals: totalMeals
+                          meals: convertedMeals
                         };
                       });
                       const total = rows.reduce((sum, r) => sum + r.meals, 0);
@@ -568,7 +586,9 @@ export default function Dashboard() {
                             <thead>
                               <tr>
                                 <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
-                                <th style={{ textAlign: 'right', padding: '6px 8px' }}>Meals</th>
+                                <th style={{ textAlign: 'right', padding: '6px 8px' }}>
+                                  {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -617,14 +637,21 @@ export default function Dashboard() {
             {Object.entries(categoryTotals).map(([category, total]) => (
               <div key={category} style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                 <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>{category}</div>
-                <div>Total Meals <span style={{ float: 'right', fontWeight: 700 }}>{total}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                  <span style={{ wordBreak: 'break-word', lineHeight: '1.4', flex: '1 1 auto', maxWidth: '70%' }}>
+                    Total {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+                  </span>
+                  <span style={{ fontWeight: 700, flex: '0 0 auto' }}>{total}</span>
+                </div>
               </div>
             ))}
           </div>
           )}
           {/* Summary Row */}
           <div style={{ display: 'flex', background: '#FFF5ED', borderRadius: 10, padding: 16, alignItems: 'center', gap: 24, fontWeight: 700, fontSize: 16, color: '#f24503', marginBottom: 8 }}>
-            <div style={{ color: '#f24503', fontSize: 22 }}>Total Distributed {totalDistributed}</div>
+            <div style={{ color: '#f24503', fontSize: 22 }}>
+              Total Distributed {totalDistributed} {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+            </div>
             <div style={{ color: '#f24503', fontSize: 18, marginLeft: 'auto' }}>Equivalent Value ${equivalentValue.toLocaleString()}</div>
           </div>
         </div>

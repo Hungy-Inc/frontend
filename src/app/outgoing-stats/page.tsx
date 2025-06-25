@@ -22,6 +22,14 @@ type OutgoingRow = {
   [key: string]: string | number;
 };
 
+type WeighingCategory = {
+  id: number;
+  category: string;
+  kilogram_kg_: number;
+  pound_lb_: number;
+  noofmeals: number;
+};
+
 const getYearOptions = () => {
   const currentYear = new Date().getFullYear();
   const years = [];
@@ -38,7 +46,31 @@ export default function OutgoingStatsPage() {
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+  const [selectedUnit, setSelectedUnit] = useState('Meals');
+  const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
+
+  // Fetch weighing categories
+  useEffect(() => {
+    const fetchWeighingCategories = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setWeighingCategories(data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching weighing categories:', err);
+      }
+    };
+    
+    fetchWeighingCategories();
+  }, []);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -102,19 +134,50 @@ export default function OutgoingStatsPage() {
     }
   };
 
-  // Helper to convert weight based on selected unit
-  const convertWeight = (value: number | string) => {
+  // Helper to convert meals based on selected unit
+  const convertMeals = (value: number | string) => {
     if (typeof value !== 'number') return value;
-    return weightUnit === 'lbs' ? (value * 2.20462).toFixed(2) : value.toFixed(2);
+    
+    // Handle base units
+    if (selectedUnit === 'Meals') {
+      return value.toFixed(0);
+    }
+    
+    // Handle custom weighing categories
+    const category = weighingCategories.find(c => c.category === selectedUnit);
+    if (category && category.noofmeals > 0) {
+      // Convert meals to custom unit (divide by meals per unit)
+      return (value / category.noofmeals).toFixed(2);
+    }
+    
+    return value.toFixed(0);
   };
 
-  // Helper to convert weight for calculations (returns number)
-  const convertWeightForCalculation = (value: number | string) => {
+  // Helper to convert meals for calculations (returns number)
+  const convertMealsForCalculation = (value: number | string) => {
     if (typeof value !== 'number') return 0;
-    return weightUnit === 'lbs' ? (value * 2.20462) : value;
+    
+    // Handle base units
+    if (selectedUnit === 'Meals') {
+      return value;
+    }
+    
+    // Handle custom weighing categories
+    const category = weighingCategories.find(c => c.category === selectedUnit);
+    if (category && category.noofmeals > 0) {
+      return value / category.noofmeals;
+    }
+    
+    return value;
   };
 
-  // Modify getDisplayData to handle weight conversion
+  // Helper to get unit label for display
+  const getUnitLabel = () => {
+    if (selectedUnit === 'Meals') return 'meals';
+    return selectedUnit;
+  };
+
+  // Modify getDisplayData to handle meal conversion
   const getDisplayData = () => {
     // Remove 'Collections' column from columns
     const filteredColumns = columns.filter(col => col !== 'Collections');
@@ -123,10 +186,10 @@ export default function OutgoingStatsPage() {
       data: tableData.map(row => {
         const newRow = { ...row };
         delete newRow['Collections'];
-        // Convert weight columns
+        // Convert meal columns
         Object.keys(newRow).forEach(key => {
           if (key !== 'Date' && typeof newRow[key] === 'number') {
-            newRow[key] = convertWeight(newRow[key]);
+            newRow[key] = convertMeals(newRow[key]);
           }
         });
         return newRow;
@@ -153,12 +216,12 @@ export default function OutgoingStatsPage() {
         }
       });
     });
-    // Build display data for all months and convert weights
+    // Build display data for all months and convert meals
     const displayData = Object.values(monthMap).map(monthData => {
       const convertedData = { ...monthData };
       Object.keys(convertedData).forEach(key => {
         if (key !== 'Month' && typeof convertedData[key] === 'number') {
-          convertedData[key] = convertWeight(convertedData[key]);
+          convertedData[key] = convertMeals(convertedData[key]);
         }
       });
       return convertedData;
@@ -178,7 +241,7 @@ export default function OutgoingStatsPage() {
           totals[col] = tableData.reduce((sum, row) => {
             const value = row[col];
             if (typeof value === 'number') {
-              return sum + convertWeightForCalculation(value);
+              return sum + convertMealsForCalculation(value);
             }
             return sum;
           }, 0);
@@ -195,7 +258,7 @@ export default function OutgoingStatsPage() {
           tableData.forEach(row => {
             const d = new Date(row['Date'] as string);
             if (!isNaN(d.getTime()) && typeof row[col] === 'number') {
-              totals[col] += convertWeightForCalculation(row[col]);
+              totals[col] += convertMealsForCalculation(row[col]);
             }
           });
         }
@@ -205,6 +268,10 @@ export default function OutgoingStatsPage() {
   };
 
   const totals = calculateTotals();
+
+  // Combine base units with weighing categories for dropdown
+  const baseUnits = ['Meals'];
+  const allUnits = [...baseUnits, ...weighingCategories.map(c => c.category)];
 
   return (
     <main className={styles.main}>
@@ -238,12 +305,13 @@ export default function OutgoingStatsPage() {
           </select>
           <select
             className={styles.select}
-            value={weightUnit}
-            onChange={e => setWeightUnit(e.target.value as 'kg' | 'lbs')}
+            value={selectedUnit}
+            onChange={e => setSelectedUnit(e.target.value)}
             style={{ minWidth: 100 }}
           >
-            <option value="kg">Kilograms</option>
-            <option value="lbs">Pounds</option>
+            {allUnits.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
           </select>
           <button className={styles.exportBtn} onClick={handleExport} type="button">
             Export to Excel
@@ -262,7 +330,11 @@ export default function OutgoingStatsPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {displayColumns.map(col => <th key={col}>{col}</th>)}
+                  {displayColumns.map(col => (
+                    <th key={col}>
+                      {col} {col !== firstCol ? `(${getUnitLabel()})` : ''}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>

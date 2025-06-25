@@ -19,11 +19,19 @@ const months = [
   { value: 12, label: 'December' }
 ];
 
-const units = ['Kilograms (kg)', 'Pounds (lb)'];
+const baseUnits = ['Kilograms (kg)', 'Pounds (lb)'];
 
 type TableRow = {
   date: string;
   [key: string]: string | number;
+};
+
+type WeighingCategory = {
+  id: number;
+  category: string;
+  kilogram_kg_: number;
+  pound_lb_: number;
+  noofmeals: number;
 };
 
 const getYearOptions = () => {
@@ -38,7 +46,7 @@ const getYearOptions = () => {
 
 export default function IncomingStatsPage() {
   const [selectedMonth, setSelectedMonth] = useState(0);
-  const [selectedUnit, setSelectedUnit] = useState(units[0]);
+  const [selectedUnit, setSelectedUnit] = useState(baseUnits[0]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // Default to current year
   const [donors, setDonors] = useState<string[]>([]);
   const [tableData, setTableData] = useState<TableRow[]>([]);
@@ -47,6 +55,30 @@ export default function IncomingStatsPage() {
   const [grandTotal, setGrandTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
+
+  // Fetch weighing categories
+  useEffect(() => {
+    const fetchWeighingCategories = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setWeighingCategories(data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching weighing categories:', err);
+      }
+    };
+    
+    fetchWeighingCategories();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -71,11 +103,11 @@ export default function IncomingStatsPage() {
         }
 
         const data = await response.json();
-        setDonors(data.donors);
-        setTableData(data.tableData);
-        setTotals(data.totals);
-        setRowTotals(data.rowTotals);
-        setGrandTotal(data.grandTotal);
+        setDonors(data.donors || []);
+        setTableData(data.tableData || []);
+        setTotals(data.totals || {});
+        setRowTotals(data.rowTotals || []);
+        setGrandTotal(data.grandTotal || 0);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -86,18 +118,39 @@ export default function IncomingStatsPage() {
     fetchData();
   }, [selectedMonth, selectedYear]);
 
+  // Helper to convert weight based on selected unit
   const convertWeight = (weight: number) => {
     if (weight == null || isNaN(weight)) return '-';
+    
+    // Handle base units
     if (selectedUnit === 'Pounds (lb)') {
       return (weight * 2.20462).toFixed(2);
     }
+    if (selectedUnit === 'Kilograms (kg)') {
+      return weight.toFixed(2);
+    }
+    
+    // Handle custom weighing categories
+    const category = weighingCategories.find(c => c.category === selectedUnit);
+    if (category && category.kilogram_kg_ > 0) {
+      // Convert kg to custom unit (divide by kg per unit)
+      return (weight / category.kilogram_kg_).toFixed(2);
+    }
+    
     return weight.toFixed(2);
+  };
+
+  // Helper to get unit label for display
+  const getUnitLabel = () => {
+    if (selectedUnit === 'Kilograms (kg)') return 'kg';
+    if (selectedUnit === 'Pounds (lb)') return 'lbs';
+    return selectedUnit;
   };
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const handleExport = async () => {
@@ -136,10 +189,15 @@ export default function IncomingStatsPage() {
 
   // Helper to aggregate data by month if 'All Months' is selected
   const getDisplayData = () => {
+    // Ensure required data exists
+    if (!donors || donors.length === 0) {
+      return { columns: ['Date', 'Total'], data: [], firstCol: 'Date' };
+    }
+
     if (selectedMonth !== 0) {
       // Calculate row totals for each row
-      const dataWithTotals = tableData.map(row => {
-        const rowTotal = donors.reduce((sum, donor) => {
+      const dataWithTotals = tableData.map((row, index) => {
+        const rowTotal = rowTotals[index] || donors.reduce((sum, donor) => {
           const value = typeof row[donor] === 'number' ? Number(row[donor]) : 0;
           return sum + value;
         }, 0);
@@ -147,7 +205,8 @@ export default function IncomingStatsPage() {
       });
       return { columns: ['Date', ...donors, 'Total'], data: dataWithTotals, firstCol: 'Date' };
     }
-    // Aggregate by month
+
+    // Aggregate by month for 'All Months' view
     const monthMap: { [month: number]: any } = {};
     // Initialize all months
     for (let m = 1; m <= 12; m++) {
@@ -157,6 +216,7 @@ export default function IncomingStatsPage() {
       });
       monthMap[m]['Total'] = 0;
     }
+
     tableData.forEach(row => {
       const d = new Date(row['date'] as string);
       if (isNaN(d.getTime())) return;
@@ -171,20 +231,22 @@ export default function IncomingStatsPage() {
       });
       monthMap[m]['Total'] += rowTotal;
     });
+
     // Build display data for all months
     const displayData = Object.values(monthMap);
     const newColumns = ['Month', ...donors, 'Total'];
     return { columns: newColumns, data: displayData, firstCol: 'Month' };
   };
+
   const { columns: displayColumns, data: displayData, firstCol } = getDisplayData();
 
   // Calculate column totals
   const calculateColumnTotal = (col: string) => {
-    if (col === firstCol) return '';
-    return convertWeight(displayData.reduce((sum, row) => {
-      const value = typeof row[col] === 'number' ? Number(row[col]) : 0;
-      return sum + value;
-    }, 0));
+    if (col === firstCol) return firstCol === 'Month' ? 'Yearly Total' : 'Monthly Total';
+    if (col === 'Total') {
+      return convertWeight(grandTotal);
+    }
+    return convertWeight(totals[col] || 0);
   };
 
   if (loading) {
@@ -195,8 +257,11 @@ export default function IncomingStatsPage() {
     return <div>Error: {error}</div>;
   }
 
-  // Check if there's no data for the selected month
-  const hasNoData = selectedMonth !== 0 && tableData.length === 0;
+  // Check if there's no data for the selected period
+  const hasNoData = !tableData || tableData.length === 0;
+
+  // Combine base units with weighing categories for dropdown
+  const allUnits = [...baseUnits, ...weighingCategories.map(c => c.category)];
 
   return (
     <main className={styles.main}>
@@ -234,7 +299,7 @@ export default function IncomingStatsPage() {
             onChange={(e) => setSelectedUnit(e.target.value)}
             style={{ marginRight: 8 }}
           >
-            {units.map(u => (
+            {allUnits.map(u => (
               <option key={u} value={u}>{u}</option>
             ))}
           </select>
@@ -249,14 +314,18 @@ export default function IncomingStatsPage() {
         </div>
         {hasNoData ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-            No donations found for {months[selectedMonth].label} {selectedYear}
+            No donations found for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
           </div>
         ) : (
           <div className={styles.tableContainer}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {displayColumns.map(col => <th key={col} className={col === 'Total' ? styles.totalCol : ''}>{col}</th>)}
+                  {displayColumns.map(col => (
+                    <th key={col} className={col === 'Total' ? styles.totalCol : ''}>
+                      {col} {col !== firstCol && col !== 'Total' ? `(${getUnitLabel()})` : ''}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -269,15 +338,14 @@ export default function IncomingStatsPage() {
                       >
                         {col === firstCol
                           ? (firstCol === 'Date' ? formatDate(row['date'] as string) : row[col])
-                          : convertWeight(row[col] as number)}
+                          : convertWeight(row[col] as number || 0)}
                       </td>
                     ))}
                   </tr>
                 ))}
                 <tr className={styles.monthlyTotalRow}>
-                  <td style={{ fontWeight: 700 }}>{firstCol === 'Month' ? 'Yearly Total' : 'Monthly Total'}</td>
-                  {displayColumns.slice(1).map((col) => (
-                    <td key={col} className={col === 'Total' ? styles.totalCol : ''}>
+                  {displayColumns.map((col) => (
+                    <td key={col} className={col === 'Total' ? styles.totalCol : ''} style={{ fontWeight: 700 }}>
                       {calculateColumnTotal(col)}
                     </td>
                   ))}

@@ -1478,7 +1478,49 @@ export default function ScheduleShiftsPage() {
               </div>
             </div>
 
-      
+    
+
+      {/* Shift Name Tabs */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setSelectedShiftName("")}
+            style={{
+              background: selectedShiftName === "" ? '#ff9800' : '#f5f5f5',
+              color: selectedShiftName === "" ? '#fff' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 18px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              minWidth: 100
+            }}
+          >
+            All Shifts
+          </button>
+          {shiftNameOptions.map(name => (
+            <button
+              key={name}
+              onClick={() => setSelectedShiftName(name)}
+              style={{
+                background: selectedShiftName === name ? '#ff9800' : '#f5f5f5',
+                color: selectedShiftName === name ? '#fff' : '#333',
+                border: 'none',
+                borderRadius: 6,
+                padding: '8px 18px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                minWidth: 100
+              }}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+
+        
       {/* Date Filter Section */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1540,25 +1582,6 @@ export default function ScheduleShiftsPage() {
                 }}
               />
             )}
-          </div>
-
-          {/* Right side - Shift Name Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <select
-              value={selectedShiftName}
-              onChange={(e) => setSelectedShiftName(e.target.value)}
-              style={{
-                padding: 8,
-                borderRadius: 5,
-                border: '1px solid #eee',
-                minWidth: 180
-              }}
-            >
-              <option value="">All Shifts</option>
-              {shiftNameOptions.map(name => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
           </div>
         </div>
       </div>

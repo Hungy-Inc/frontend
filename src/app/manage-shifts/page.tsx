@@ -541,8 +541,8 @@ export default function ManageShiftsPage() {
                         </td>
                         <td style={{ padding: '12px 0' }}>{shift.name}</td>
                         <td style={{ padding: 12 }}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek]}</td>
-                        <td style={{ padding: 12 }}>{new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td style={{ padding: 12 }}>{new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ padding: 12 }}>{shift.startTime ? shift.startTime.slice(11, 16) : ''}</td>
+                        <td style={{ padding: 12 }}>{shift.endTime ? shift.endTime.slice(11, 16) : ''}</td>
                         <td style={{ padding: 12 }}>{shift.location}</td>
                         <td style={{ padding: 12 }}>{shift.slots}</td>
                         <td style={{ padding: 12, textAlign: 'center' }}>

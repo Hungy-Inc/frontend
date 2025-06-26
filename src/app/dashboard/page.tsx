@@ -182,16 +182,15 @@ export default function Dashboard() {
       try {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('No authentication token found');
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats`, {
+        const month = getMonthNumber(period);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats?month=${month}&year=${year}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) throw new Error('Failed to fetch outgoing stats');
         const data = await response.json();
-        setOutColumns(data.columns || []);
-        setOutTable(data.tableData || []);
+        setOutTable(data.data || []);
       } catch (err) {
         setOutError(err instanceof Error ? err.message : 'An error occurred');
-        setOutColumns([]);
         setOutTable([]);
       } finally {
         setOutLoading(false);
@@ -301,38 +300,26 @@ export default function Dashboard() {
     return rawMeals;
   };
 
-  // Outgoing stats dynamic calculation with meal conversion
-  const monthIdx = (() => {
-    if (period === 'All Months') return null;
-    const idx = monthNames.indexOf(period);
-    return idx >= 0 ? idx : null;
-  })();
-  const filteredOutTable = outTable.filter(row => {
-    if (!row['Date']) return false;
-    const d = new Date(row['Date']);
-    if (isNaN(d.getTime())) return false;
-    if (year && d.getFullYear().toString() !== year) return false;
-    if (monthIdx !== null && d.getMonth() !== monthIdx) return false;
-    return true;
-  });
-  
-  // Sum up each category with meal conversion
+  // Outgoing stats summary calculations (category totals and grand total)
   const categoryTotals: Record<string, number> = {};
-  outColumns.forEach(col => {
-    if (col === 'Date') return;
-    const rawTotal = filteredOutTable.reduce((sum, row) => sum + (Number(row[col]) || 0), 0);
-    categoryTotals[col] = convertMealsForCategory(rawTotal);
-  });
+  if (outTable && outTable.length > 0) {
+    outTable.forEach((cat: any) => {
+      categoryTotals[cat.category] = convertMealsForCategory(cat.total);
+    });
+  }
   const totalDistributed = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
-  
+
   // Calculate equivalent value based on actual meals (not converted units)
-  const totalActualMeals = Object.values(categoryTotals).reduce((sum, convertedValue, index) => {
-    const col = outColumns.filter(c => c !== 'Date')[index];
-    if (!col) return sum;
-    const rawTotal = filteredOutTable.reduce((rowSum, row) => rowSum + (Number(row[col]) || 0), 0);
-    return sum + rawTotal;
-  }, 0);
-  const equivalentValue = totalActualMeals * 10; // 10 dollars per actual meal
+  let equivalentValue = 0;
+  if (selectedUnit === 'kg' || selectedUnit === 'lb') {
+    // Use raw meal count
+    equivalentValue = Object.values(outTable || []).reduce((sum, cat: any) => sum + (cat.total || 0), 0) * 10;
+  } else {
+    // Use displayed value * noofmeals
+    const found = customUnits.find(u => u.category === selectedUnit);
+    const noofmeals = found && found.noofmeals > 0 ? found.noofmeals : 1;
+    equivalentValue = Object.values(categoryTotals).reduce((sum, val) => sum + (val * noofmeals), 0) * 10;
+  }
 
   // Pie chart data (use selected unit)
   const pieData = {
@@ -371,7 +358,6 @@ export default function Dashboard() {
 
   // Debug: Log outgoing stats data
   console.log('outTable:', outTable);
-  console.log('filteredOutTable:', filteredOutTable);
   console.log('selectedUnit:', selectedUnit);
   console.log('customUnits:', customUnits);
 
@@ -414,8 +400,8 @@ export default function Dashboard() {
                 style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                 onClick={() => {
                   const month = getMonthNumber(period);
-                  const url = `${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats/export?month=${month}&year=${year}&unit=${unit}`;
-                  downloadExcel(url, `incoming-stats-${year}-${month}.xlsx`);
+                  const url = `${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats/export-dashboard?month=${month}&year=${year}&unit=${selectedUnit}`;
+                  downloadExcel(url, `incoming-dashboard-${year}-${month}.xlsx`);
                 }}
               >
                 <FiDownload /> Export to Excel
@@ -532,7 +518,7 @@ export default function Dashboard() {
               style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
               onClick={() => {
                 const month = getMonthNumber(period);
-                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${month}&year=${year}`;
+                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${month}&year=${year}&unit=${selectedUnit}`;
                 downloadExcel(url, `outgoing-stats-${year}-${month}.xlsx`);
               }}
             >
@@ -544,71 +530,70 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
               {(() => {
-                const categories = outColumns.filter(col => col !== 'Date');
-                const rows = [];
-                for (let i = 0; i < categories.length; i += 3) {
-                  rows.push(categories.slice(i, i + 3));
-                }
-                return rows.map((rowCategories, rowIdx) => (
-                  <div key={rowIdx} style={{ display: 'flex', gap: 24, width: '100%', marginBottom: 24 }}>
-                    {rowCategories.map(category => {
-                      // Get all recurring shift names for this category
-                      const shiftNames = Array.from(new Set(
-                        recurringShifts
-                          .filter(rs => rs.ShiftCategory && rs.ShiftCategory.name === category)
-                          .map(rs => rs.name)
-                      ));
-                      // For each shift name, sum the meals for all dates where the recurring shift name matches
-                      const rows = shiftNames.map(shiftName => {
-                        // For each row in filteredOutTable, sum meals where the recurring shift name matches for this category
-                        const rawTotalMeals = filteredOutTable.reduce((sum, row) => {
-                          // For this row, try to find a recurring shift for this category and shift name
-                          const matches = recurringShifts.filter(rs =>
-                            rs.name === shiftName &&
-                            rs.ShiftCategory && rs.ShiftCategory.name === category
-                          );
-                          if (matches.length > 0) {
-                            return sum + (row[category] ? Number(row[category]) : 0);
-                          }
-                          return sum;
-                        }, 0);
-                        const convertedMeals = convertMealsForCategory(rawTotalMeals);
-                        return {
-                          shiftName,
-                          meals: convertedMeals
-                        };
-                      });
-                      const total = rows.reduce((sum, r) => sum + r.meals, 0);
-                      return (
-                        <div key={category} style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 220 }}>
-                          <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 8 }}>{category}</div>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'transparent' }}>
-                            <thead>
-                              <tr>
-                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
-                                <th style={{ textAlign: 'right', padding: '6px 8px' }}>
-                                  {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
-                                </th>
+                if (!outTable || outTable.length === 0) return null;
+                const half = Math.ceil(outTable.length / 2);
+                const firstRow = outTable.slice(0, half);
+                const secondRow = outTable.slice(half);
+                return [
+                  <div key="row1" style={{ display: 'flex', gap: 24, width: '100%', marginBottom: 24 }}>
+                    {firstRow.map((cat: any) => (
+                      <div key={cat.category} style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 220 }}>
+                        <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 8 }}>{cat.category}</div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'transparent' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
+                              <th style={{ textAlign: 'right', padding: '6px 8px' }}>
+                                {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cat.shifts.map((shift: any) => (
+                              <tr key={shift.shiftName}>
+                                <td style={{ padding: '6px 8px', textAlign: 'left' }}>{shift.shiftName}</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>{convertMealsForCategory(shift.total)}</td>
                               </tr>
-                            </thead>
-                            <tbody>
-                              {rows.map(r => (
-                                <tr key={r.shiftName}>
-                                  <td style={{ padding: '6px 8px', textAlign: 'left' }}>{r.shiftName}</td>
-                                  <td style={{ padding: '6px 8px', textAlign: 'right' }}>{r.meals}</td>
-                                </tr>
-                              ))}
-                              <tr style={{ fontWeight: 700, background: '#fafafa' }}>
-                                <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
-                                <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{total}</td>
+                            ))}
+                            <tr style={{ fontWeight: 700, background: '#fafafa' }}>
+                              <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{convertMealsForCategory(cat.total)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </div>,
+                  <div key="row2" style={{ display: 'flex', gap: 24, width: '100%' }}>
+                    {secondRow.map((cat: any) => (
+                      <div key={cat.category} style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 220 }}>
+                        <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 8 }}>{cat.category}</div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'transparent' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
+                              <th style={{ textAlign: 'right', padding: '6px 8px' }}>
+                                {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cat.shifts.map((shift: any) => (
+                              <tr key={shift.shiftName}>
+                                <td style={{ padding: '6px 8px', textAlign: 'left' }}>{shift.shiftName}</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>{convertMealsForCategory(shift.total)}</td>
                               </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })}
+                            ))}
+                            <tr style={{ fontWeight: 700, background: '#fafafa' }}>
+                              <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{convertMealsForCategory(cat.total)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
                   </div>
-                ));
+                ];
               })()}
             </div>
           )}
@@ -622,7 +607,7 @@ export default function Dashboard() {
               style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
               onClick={() => {
                 const month = getMonthNumber(period);
-                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${month}&year=${year}`;
+                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${month}&year=${year}&unit=${selectedUnit}`;
                 downloadExcel(url, `outgoing-stats-${year}-${month}.xlsx`);
               }}
             >
@@ -664,7 +649,7 @@ export default function Dashboard() {
               style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
               onClick={() => {
                 const month = getMonthNumber(period);
-                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories/export-dashboard?month=${month}&year=${year}&unit=${unit}`;
+                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories/export-dashboard?month=${month}&year=${year}&unit=${selectedUnit}`;
                 downloadExcel(url, `inventory-${year}-${month}.xlsx`);
               }}
             >

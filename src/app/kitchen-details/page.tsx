@@ -304,32 +304,54 @@ export default function KitchenDetailsPage() {
     
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}`, {
-        method: 'PUT',
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+
+      console.log('Saving incoming dollar value:', value);
+      console.log('Organization ID:', organization.id);
+
+      // Use the new dedicated endpoint for updating incoming dollar value only
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/incoming-value`, {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: organization.name,
-          address: organization.address,
           incoming_dollar_value: value
-        })
+        }),
       });
-      
+
+      console.log('Response status:', res.status);
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to update incoming dollar value");
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.error || 'Failed to update incoming dollar value');
+        return;
       }
-      
+
       const updatedOrg = await res.json();
-      setOrganization(updatedOrg);
-      setIncomingDollarValue(value);
+      console.log('Updated organization:', updatedOrg);
+
+      // Update both the organization state and the incoming dollar value display state
+      setOrganization((prev: any) => ({
+        ...prev,
+        incoming_dollar_value: updatedOrg.incoming_dollar_value
+      }));
+      
+      // Update the display value state
+      setIncomingDollarValue(updatedOrg.incoming_dollar_value);
+
       setIsEditingIncomingValue(false);
       setEditingIncomingValue("");
-      toast.success("Incoming dollar value updated successfully");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update incoming dollar value");
+      toast.success('Incoming dollar value updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating incoming dollar value:', error);
+      toast.error('Failed to update incoming dollar value. Please try again.');
     }
   };
 

@@ -1,20 +1,84 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaTrash, FaSave, FaTimes, FaUserPlus, FaEye, FaEyeSlash } from "react-icons/fa";
+import { 
+  FaEdit, 
+  FaTrash, 
+  FaSave, 
+  FaTimes, 
+  FaUserPlus, 
+  FaEye, 
+  FaEyeSlash, 
+  FaCheck, 
+  FaBan, 
+  FaUndo,
+  FaUsers,
+  FaShieldAlt,
+  FaClock,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaSearch,
+  FaFilter,
+  FaUserCog
+} from "react-icons/fa";
 
 interface User {
   id: string;
   name: string;
   email: string;
   role: string;
-  password?: string;
-  organizationId?: string;
   phone?: string;
+  status?: 'PENDING' | 'APPROVED' | 'DENIED';
+  createdAt?: string;
+  approvedAt?: string;
+  approvedBy?: number;
+  approvedByName?: string;
+  deniedAt?: string;
+  deniedBy?: number;
+  deniedByName?: string;
+  denialReason?: string;
+  permissionCount?: number;
+  totalModules?: number;
+  hasPermissions?: boolean;
+}
+
+interface Module {
+  id: number;
+  name: string;
+  description: string;
+}
+
+interface UserPermission {
+  moduleId: number;
+  moduleName: string;
+  moduleDescription: string;
+  canAccess: boolean;
+}
+
+interface UserPermissionData {
+  userId: number;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  permissions: UserPermission[];
 }
 
 const roles = ["VOLUNTEER", "STAFF", "ADMIN"];
+const statusColors = {
+  PENDING: "bg-yellow-100 text-yellow-800",
+  APPROVED: "bg-green-100 text-green-800", 
+  DENIED: "bg-red-100 text-red-800"
+};
+
+const statusIcons = {
+  PENDING: <FaClock className="w-4 h-4" />,
+  APPROVED: <FaCheckCircle className="w-4 h-4" />,
+  DENIED: <FaTimesCircle className="w-4 h-4" />
+};
 
 export default function ManageUsersPage() {
+  const [activeTab, setActiveTab] = useState<'users' | 'permissions'>('users');
+  
+  // User Management State
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,20 +86,40 @@ export default function ManageUsersPage() {
   const [editData, setEditData] = useState<Partial<User>>({});
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [addData, setAddData] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "", confirmPassword: "", role: "VOLUNTEER", organizationId: "" });
+  const [addData, setAddData] = useState({ 
+    firstName: "", 
+    lastName: "", 
+    email: "", 
+    phone: "", 
+    password: "", 
+    confirmPassword: "", 
+    role: "VOLUNTEER"
+  });
   const [adding, setAdding] = useState(false);
-  const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [addUserError, setAddUserError] = useState('');
-  const [addTouched, setAddTouched] = useState<{[key: string]: boolean}>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  
+  // Permission Management State
+  const [permissionUsers, setPermissionUsers] = useState<User[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [selectedUser, setSelectedUser] = useState<number | null>(null);
+  const [userPermissions, setUserPermissions] = useState<UserPermissionData | null>(null);
+  const [permissionLoading, setPermissionLoading] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
 
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  // Fetch users for management
   const fetchUsers = async () => {
     try {
       setLoading(true);
       setError("");
       const token = localStorage.getItem("token");
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
+      const response = await fetch(`${apiUrl}/api/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch users");
@@ -54,28 +138,173 @@ export default function ManageUsersPage() {
     }
   };
 
+  // Fetch users for permission management
+  const fetchPermissionUsers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to fetch permission users");
+      const data = await response.json();
+      // Format for permission management and only show approved users
+      const formattedData = data.map((user: any) => ({
+        ...user,
+        name: `${user.firstName} ${user.lastName}`.trim()
+      }));
+      setPermissionUsers(formattedData.filter((u: any) => u.status === 'APPROVED'));
+    } catch (err) {
+      console.error("Failed to load permission users:", err);
+      setPermissionUsers([]);
+    }
+  };
+
+  // Fetch modules
+  const fetchModules = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/modules`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch modules");
+      }
+      const data = await response.json();
+      setModules(data);
+    } catch (err) {
+      console.error("Failed to load modules:", err);
+      setModules([]);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchPermissionUsers();
+    fetchModules();
   }, []);
 
-  // Fetch organizations for dropdown
-  useEffect(() => {
-    const fetchOrgs = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error();
-        const data = await response.json();
-        setOrganizations(data);
-      } catch {
-        setOrganizations([]);
+  // User approval/denial functions
+  const approveUser = async (userId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/approve`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to approve user");
+      await fetchUsers();
+      await fetchPermissionUsers();
+    } catch (err) {
+      alert("Failed to approve user. Please try again.");
+    }
+  };
+
+  const denyUser = async (userId: string) => {
+    const reason = prompt("Please enter a reason for denial:");
+    if (!reason) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/deny`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ reason })
+      });
+      if (!response.ok) throw new Error("Failed to deny user");
+      await fetchUsers();
+      await fetchPermissionUsers();
+    } catch (err) {
+      alert("Failed to deny user. Please try again.");
+    }
+  };
+
+  const resetUserStatus = async (userId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/reset`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to reset user status");
+      await fetchUsers();
+      await fetchPermissionUsers();
+    } catch (err) {
+      alert("Failed to reset user status. Please try again.");
+    }
+  };
+
+  // Permission management functions
+  const fetchUserPermissions = async (userId: number) => {
+    try {
+      setPermissionLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/permissions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch user permissions");
       }
-    };
-    fetchOrgs();
-  }, []);
+      
+      const data = await response.json();
+      setUserPermissions(data);
+    } catch (err) {
+      console.error("Failed to load user permissions:", err);
+      setUserPermissions(null);
+    } finally {
+      setPermissionLoading(false);
+    }
+  };
 
+  const updateUserPermissions = async () => {
+    if (!userPermissions) return;
+    
+    try {
+      setSavingPermissions(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userPermissions.userId}/permissions`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ 
+          permissions: userPermissions.permissions.map(p => ({
+            moduleId: p.moduleId,
+            canAccess: p.canAccess
+          }))
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to update permissions");
+      }
+      
+      await fetchPermissionUsers();
+      alert("Permissions updated successfully!");
+    } catch (err) {
+      console.error("Failed to update permissions:", err);
+      alert("Failed to update permissions. Please try again.");
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  const togglePermission = (moduleId: number) => {
+    if (!userPermissions) return;
+    
+    setUserPermissions({
+      ...userPermissions,
+      permissions: userPermissions.permissions.map(p => 
+        p.moduleId === moduleId ? { ...p, canAccess: !p.canAccess } : p
+      )
+    });
+  };
+
+  // Existing functions
   const startEdit = (user: User) => {
     setEditId(user.id);
     setEditData({ ...user });
@@ -96,318 +325,689 @@ export default function ManageUsersPage() {
       const token = localStorage.getItem("token");
       let firstName = '';
       let lastName = '';
+      
       if (editData.name) {
         const nameParts = editData.name.trim().split(' ');
-        if (nameParts.length === 1) {
-          firstName = nameParts[0];
-          lastName = '';
-        } else {
-          firstName = nameParts[0];
-          lastName = nameParts.slice(1).join(' ');
-        }
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
       }
-      const body = {
-        firstName,
-        lastName,
-        email: editData.email,
-        role: editData.role
+
+      const updateData = {
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(editData.email && { email: editData.email }),
+        ...(editData.phone && { phone: editData.phone }),
+        ...(editData.role && { role: editData.role }),
       };
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}`, {
-        method: 'PUT',
+
+      const response = await fetch(`${apiUrl}/api/users/${id}`, {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(updateData),
       });
-      if (!response.ok) throw new Error('Failed to update user');
-      const updated = await response.json();
-      setUsers(users => users.map(u => u.id === id ? updated : u));
+
+      if (!response.ok) throw new Error("Failed to update user");
+      
+      await fetchUsers();
       setEditId(null);
       setEditData({});
     } catch (err) {
-      alert('Failed to save changes.');
+      alert("Failed to update user. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   const deleteUser = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetch(`${apiUrl}/api/users/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (!response.ok) throw new Error('Failed to delete user');
-      setUsers(users => users.filter(u => u.id !== id));
+      if (!response.ok) throw new Error("Failed to delete user");
+      await fetchUsers();
     } catch (err) {
-      alert('Failed to delete user.');
+      alert("Failed to delete user. Please try again.");
     }
   };
 
-  const handleAddChange = (field: string, value: string) => {
-    setAddData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const isEmail = (email: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-
-  function validatePassword(pw: string) {
-    // 8-32 chars, at least one letter, one number, one special char, no spaces
-    return /^([A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+){8,32}$/.test(pw) &&
-      /[A-Za-z]/.test(pw) &&
-      /\d/.test(pw) &&
-      /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(pw) &&
-      !/\s/.test(pw);
-  }
-
-  const isAddFirstNameValid = addData.firstName.trim().length > 0;
-  const isAddEmailValid = isEmail(addData.email);
-  const isAddPasswordValid = validatePassword(addData.password);
-  const isAddConfirmPasswordValid = addData.password === addData.confirmPassword && addData.confirmPassword.length > 0;
-  const isAddFormValid = isAddFirstNameValid && isAddEmailValid && isAddPasswordValid && isAddConfirmPasswordValid && addData.role;
-
   const addUser = async () => {
     setAdding(true);
+    setAddUserError('');
     try {
       const token = localStorage.getItem("token");
-      // Get organizationId from localStorage user
-      let organizationId = "";
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          organizationId = user.organizationId ? String(user.organizationId) : "";
-        } catch {}
-      }
-      const { firstName, lastName, email, phone, password, role } = addData;
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
-        method: 'POST',
+      const response = await fetch(`${apiUrl}/api/users`, {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ firstName, lastName, email, phone, password, role, organizationId })
+        body: JSON.stringify(addData),
       });
-      
-      const data = await response.json();
-      
+
       if (!response.ok) {
-        if (data.details) {
-          // Handle validation errors
-          if (typeof data.details === 'object') {
-            const missingFields = Object.entries(data.details)
-              .filter(([_, missing]) => missing)
-              .map(([field]) => field)
-              .join(', ');
-            throw new Error(`Missing required fields: ${missingFields}`);
-          }
-          throw new Error(data.details);
-        }
-        throw new Error(data.error || 'Failed to add user');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to add user");
       }
-      
+
+      await fetchUsers();
       setShowAdd(false);
-      setAddData({ firstName: "", lastName: "", email: "", phone: "", password: "", confirmPassword: "", role: "VOLUNTEER", organizationId: "" });
-      fetchUsers();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to add user.');
+      setAddData({ 
+        firstName: "", 
+        lastName: "", 
+        email: "", 
+        phone: "", 
+        password: "", 
+        confirmPassword: "", 
+        role: "VOLUNTEER"
+      });
+    } catch (err: any) {
+      setAddUserError(err.message || "Failed to add user. Please try again.");
     } finally {
       setAdding(false);
     }
   };
 
+  // Validation functions
+  const isEmail = (email: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+
+  const validatePassword = (pw: string) => {
+    if (pw.length < 8) return "Password must be at least 8 characters";
+    if (!/[A-Z]/.test(pw)) return "Password must contain uppercase letter";
+    if (!/[a-z]/.test(pw)) return "Password must contain lowercase letter";
+    if (!/\d/.test(pw)) return "Password must contain a number";
+    return "";
+  };
+
+  const isAddFormValid = () => {
+    return (
+      addData.firstName.trim() &&
+      addData.lastName.trim() &&
+      isEmail(addData.email) &&
+      addData.password &&
+      addData.password === addData.confirmPassword &&
+      !validatePassword(addData.password) &&
+      addData.role
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  // Filter functions
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    return matchesSearch && matchesStatus && matchesRole;
+  });
+
+  const enableAllPermissions = () => {
+    if (!userPermissions) return;
+    setUserPermissions({
+      ...userPermissions,
+      permissions: userPermissions.permissions.map(p => ({ ...p, canAccess: true }))
+    });
+  };
+
+  const disableAllPermissions = () => {
+    if (!userPermissions) return;
+    setUserPermissions({
+      ...userPermissions,
+      permissions: userPermissions.permissions.map(p => ({ ...p, canAccess: false }))
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <main style={{ padding: 32 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, fontSize: 28, marginBottom: 24 }}>
-        <span>Manage Users</span>
-        <button onClick={() => {
-          // Set org ID from localStorage user when opening modal
-          let organizationId = "";
-          const userStr = localStorage.getItem("user");
-          if (userStr) {
-            try {
-              const user = JSON.parse(userStr);
-              organizationId = user.organizationId ? String(user.organizationId) : "";
-            } catch {}
-          }
-          setAddData(d => ({ ...d, organizationId }));
-          setShowAdd(true);
-        }} style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', fontSize: 24 }} title="Add User">
-          <FaUserPlus />
-        </button>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600 mt-1">Manage users and their permissions</p>
+        </div>
       </div>
-      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32 }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', color: '#888' }}>Loading...</div>
-        ) : error ? (
-          <div style={{ textAlign: 'center', color: 'red' }}>{error}</div>
-        ) : users.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#888' }}>No users found.</div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#fafafa', color: '#888', fontWeight: 600 }}>
-                <th style={{ textAlign: 'left', padding: 12 }}>Name</th>
-                <th style={{ textAlign: 'left', padding: 12 }}>Email</th>
-                <th style={{ textAlign: 'left', padding: 12 }}>Mobile</th>
-                <th style={{ textAlign: 'left', padding: 12 }}>Role</th>
-                <th style={{ textAlign: 'center', padding: 12 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  {editId === user.id ? (
-                    <>
-                      <td style={{ padding: 12 }}>
-                        <input
-                          value={editData.name || ''}
-                          onChange={e => handleEditChange('name', e.target.value)}
-                          style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #eee' }}
-                          disabled={saving}
-                        />
-                      </td>
-                      <td style={{ padding: 12 }}>
-                        <input
-                          value={editData.email || ''}
-                          onChange={e => handleEditChange('email', e.target.value)}
-                          style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #eee' }}
-                          disabled={saving}
-                        />
-                      </td>
-                      <td style={{ padding: 12 }}>
-                        <input
-                          value={editData.phone || ''}
-                          onChange={e => handleEditChange('phone', e.target.value)}
-                          style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #eee' }}
-                          disabled={saving}
-                        />
-                      </td>
-                      <td style={{ padding: 12 }}>
-                        <input
-                          value={editData.role || ''}
-                          onChange={e => handleEditChange('role', e.target.value)}
-                          style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #eee' }}
-                          disabled={saving}
-                        />
-                      </td>
-                      <td style={{ padding: 12, textAlign: 'center' }}>
-                        <button onClick={() => saveEdit(user.id)} style={{ background: 'none', border: 'none', color: '#1db96b', cursor: 'pointer', marginRight: 12 }} title="Save" disabled={saving}>
-                          <FaSave />
-                        </button>
-                        <button onClick={cancelEdit} style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer' }} title="Cancel" disabled={saving}>
-                          <FaTimes />
-                        </button>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td style={{ padding: 12 }}>{user.name}</td>
-                      <td style={{ padding: 12 }}>{user.email}</td>
-                      <td style={{ padding: 12 }}>{user.phone}</td>
-                      <td style={{ padding: 12 }}>{user.role}</td>
-                      <td style={{ padding: 12, textAlign: 'center' }}>
-                        <button style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} title="Edit" onClick={() => startEdit(user)}>
-                          <FaEdit />
-                        </button>
-                        <button style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer' }} title="Delete" onClick={() => deleteUser(user.id)} disabled={saving}>
-                          <FaTrash />
-                        </button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'users'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FaUsers className="inline mr-2" />
+            User Management
+          </button>
+          <button
+            onClick={() => setActiveTab('permissions')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'permissions'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FaShieldAlt className="inline mr-2" />
+            Permission Management
+          </button>
+        </nav>
       </div>
-      {/* Add User Modal */}
-      {showAdd && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.15)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 10, padding: 32, width: 320, minWidth: 320, maxWidth: 320, boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
-            <button onClick={() => setShowAdd(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}><FaTimes /></button>
-            <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Add User</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input placeholder="First Name" value={addData.firstName} 
-                onChange={e => {
-                  const val = e.target.value.replace(/[^A-Za-z]/g, '');
-                  handleAddChange('firstName', val);
-                }}
-                onBlur={() => setAddTouched(t => ({ ...t, firstName: true }))}
-                onFocus={() => setAddTouched(t => ({ ...t, firstName: true }))}
-                style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
-              {addTouched.firstName && !isAddFirstNameValid && <div style={{ color: 'red', fontSize: 13 }}>First name is required and must contain only letters.</div>}
-              <input placeholder="Last Name" value={addData.lastName} onChange={e => handleAddChange('lastName', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
-              <input placeholder="Email" value={addData.email} 
-                onChange={e => handleAddChange('email', e.target.value)}
-                onBlur={() => setAddTouched(t => ({ ...t, email: true }))}
-                onFocus={() => setAddTouched(t => ({ ...t, email: true }))}
-                style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
-              {addTouched.email && !isAddEmailValid && <div style={{ color: 'red', fontSize: 13 }}>Enter a valid email address.</div>}
-              <input placeholder="Phone" value={addData.phone} onChange={e => handleAddChange('phone', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding} />
-              <div style={{ position: 'relative' }}>
-                <input
-                  placeholder="Password"
-                  type={showPassword ? "text" : "password"}
-                  value={addData.password}
-                  onChange={e => handleAddChange('password', e.target.value)}
-                  onBlur={() => setAddTouched(t => ({ ...t, password: true }))}
-                  onFocus={() => setAddTouched(t => ({ ...t, password: true }))}
-                  style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', width: '100%' }}
-                  disabled={adding}
-                />
-                <span
-                  onClick={() => setShowPassword(v => !v)}
-                  style={{ position: 'absolute', right: 10, top: 10, cursor: 'pointer', color: '#888' }}
-                >
-                  {showPassword ? <FaEye /> : <FaEyeSlash />}
-                </span>
-              </div>
-              {addTouched.password && !isAddPasswordValid && (
-                <div style={{ color: 'red', fontSize: 13, wordBreak: 'break-word', maxWidth: 280, margin: '0 auto' }}>
-                  Password must be 8-32 characters, contain letters, numbers, a special character, and no spaces.
-                </div>
-              )}
-              <div style={{ position: 'relative', marginBottom: 0 }}>
-                <input
-                  placeholder="Confirm Password"
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={addData.confirmPassword}
-                  onChange={e => handleAddChange('confirmPassword', e.target.value)}
-                  onBlur={() => setAddTouched(t => ({ ...t, confirmPassword: true }))}
-                  onFocus={() => setAddTouched(t => ({ ...t, confirmPassword: true }))}
-                  style={{
-                    padding: 8,
-                    borderRadius: 5,
-                    border: '1px solid #eee',
-                    width: '100%'
-                  }}
-                  disabled={adding}
-                />
-                <span
-                  onClick={() => setShowConfirmPassword(v => !v)}
-                  style={{ position: 'absolute', right: 10, top: 10, cursor: 'pointer', color: '#888' }}
-                >
-                  {showConfirmPassword ? <FaEye /> : <FaEyeSlash />}
-                </span>
-                {addTouched.confirmPassword && !isAddConfirmPasswordValid && (
-                  <div style={{ color: 'red', fontSize: 13, marginTop: 2, textAlign: 'center' }}>Passwords do not match</div>
-                )}
-              </div>
-              <select value={addData.role} onChange={e => handleAddChange('role', e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} disabled={adding}>
-                {roles.map(r => <option key={r} value={r}>{r}</option>)}
+
+      {/* User Management Tab */}
+      {activeTab === 'users' && (
+        <div>
+          {/* Filters and Add Button */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1 relative">
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
+                <option value="DENIED">Denied</option>
               </select>
-              {addUserError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{addUserError}</div>}
-              <button onClick={addUser} style={{ background: isAddFormValid ? '#ff9800' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: isAddFormValid ? 'pointer' : 'not-allowed', opacity: adding ? 0.7 : 1 }} disabled={adding || !isAddFormValid}>
-                {adding ? 'Adding...' : 'Add'}
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Roles</option>
+                {roles.map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <FaUserPlus />
+                Add User
               </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+
+          {/* Users Table */}
+          {filteredUsers.length === 0 ? (
+            <div className="text-center py-12">
+              <FaUsers className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {users.length === 0 ? "No users in the database." : "No users match your search criteria."}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white shadow overflow-hidden sm:rounded-md">
+              <ul className="divide-y divide-gray-200">
+                {filteredUsers.map((user) => (
+                  <li key={user.id} className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                            <span className="text-sm font-medium text-gray-700">
+                              {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {editId === user.id ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={editData.name || ''}
+                                onChange={(e) => handleEditChange('name', e.target.value)}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Full Name"
+                              />
+                              <input
+                                type="email"
+                                value={editData.email || ''}
+                                onChange={(e) => handleEditChange('email', e.target.value)}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Email"
+                              />
+                              <input
+                                type="tel"
+                                value={editData.phone || ''}
+                                onChange={(e) => handleEditChange('phone', e.target.value)}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Phone"
+                              />
+                              <select
+                                value={editData.role || ''}
+                                onChange={(e) => handleEditChange('role', e.target.value)}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                              >
+                                {roles.map(role => (
+                                  <option key={role} value={role}>{role}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                                {user.status && (
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[user.status]}`}>
+                                    {statusIcons[user.status]}
+                                    <span className="ml-1">{user.status}</span>
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-500">{user.email}</p>
+                              <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+                                <span>{user.role}</span>
+                                {user.phone && <span>{user.phone}</span>}
+                                {user.createdAt && <span>Joined {formatDate(user.createdAt)}</span>}
+                              </div>
+                              {user.status === 'APPROVED' && user.approvedAt && (
+                                <p className="text-xs text-green-600 mt-1">
+                                  Approved on {formatDate(user.approvedAt)}
+                                  {user.approvedByName && ` by ${user.approvedByName}`}
+                                </p>
+                              )}
+                              {user.status === 'DENIED' && user.deniedAt && (
+                                <div className="text-xs text-red-600 mt-1">
+                                  <p>Denied on {formatDate(user.deniedAt)}
+                                    {user.deniedByName && ` by ${user.deniedByName}`}
+                                  </p>
+                                  {user.denialReason && <p>Reason: {user.denialReason}</p>}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {editId === user.id ? (
+                          <>
+                            <button
+                              onClick={() => saveEdit(user.id)}
+                              disabled={saving}
+                              className="p-2 text-green-600 hover:text-green-800 disabled:opacity-50"
+                            >
+                              <FaSave />
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="p-2 text-gray-600 hover:text-gray-800"
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {user.status === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={() => approveUser(user.id)}
+                                  className="p-2 text-green-600 hover:text-green-800"
+                                  title="Approve User"
+                                >
+                                  <FaCheck />
+                                </button>
+                                <button
+                                  onClick={() => denyUser(user.id)}
+                                  className="p-2 text-red-600 hover:text-red-800"
+                                  title="Deny User"
+                                >
+                                  <FaBan />
+                                </button>
+                              </>
+                            )}
+                            {(user.status === 'APPROVED' || user.status === 'DENIED') && (
+                              <button
+                                onClick={() => resetUserStatus(user.id)}
+                                className="p-2 text-yellow-600 hover:text-yellow-800"
+                                title="Reset Status"
+                              >
+                                <FaUndo />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => startEdit(user)}
+                              className="p-2 text-blue-600 hover:text-blue-800"
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              onClick={() => deleteUser(user.id)}
+                              className="p-2 text-red-600 hover:text-red-800"
+                            >
+                              <FaTrash />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Permission Management Tab */}
+      {activeTab === 'permissions' && (
+        <div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* User Selection Panel */}
+            <div className="lg:col-span-1">
+              <div className="bg-white shadow rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Select User</h3>
+                  {permissionUsers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <FaUserCog className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No approved users</h3>
+                      <p className="mt-1 text-sm text-gray-500">No approved users found in the database.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {permissionUsers.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => {
+                            setSelectedUser(parseInt(user.id));
+                            fetchUserPermissions(parseInt(user.id));
+                          }}
+                          className={`w-full text-left p-3 rounded-lg border ${
+                            selectedUser === parseInt(user.id)
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                              <span className="text-xs font-medium text-gray-700">
+                                {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                              <p className="text-xs text-gray-500">{user.role}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Permission Management Panel */}
+            <div className="lg:col-span-2">
+              <div className="bg-white shadow rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  {!selectedUser ? (
+                    <div className="text-center py-12">
+                      <FaShieldAlt className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">Select a user</h3>
+                      <p className="mt-1 text-sm text-gray-500">Choose a user from the left panel to manage their permissions.</p>
+                    </div>
+                  ) : permissionLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : !userPermissions ? (
+                    <div className="text-center py-12">
+                      <FaTimesCircle className="mx-auto h-12 w-12 text-red-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">Failed to load permissions</h3>
+                      <p className="mt-1 text-sm text-gray-500">Unable to load user permissions from the database.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex justify-between items-center mb-6">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">
+                            Permissions for {userPermissions.userName}
+                          </h3>
+                          <p className="text-sm text-gray-500">{userPermissions.userEmail} • {userPermissions.userRole}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={enableAllPermissions}
+                            className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200"
+                          >
+                            Enable All
+                          </button>
+                          <button
+                            onClick={disableAllPermissions}
+                            className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200"
+                          >
+                            Disable All
+                          </button>
+                        </div>
+                      </div>
+
+                      {modules.length === 0 ? (
+                        <div className="text-center py-8">
+                          <FaShieldAlt className="mx-auto h-12 w-12 text-gray-400" />
+                          <h3 className="mt-2 text-sm font-medium text-gray-900">No modules found</h3>
+                          <p className="mt-1 text-sm text-gray-500">No modules found in the database.</p>
+                        </div>
+                      ) : userPermissions.permissions.length === 0 ? (
+                        <div className="text-center py-8">
+                          <FaShieldAlt className="mx-auto h-12 w-12 text-gray-400" />
+                          <h3 className="mt-2 text-sm font-medium text-gray-900">No permissions found</h3>
+                          <p className="mt-1 text-sm text-gray-500">No permissions found for this user in the database.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {userPermissions.permissions.map((permission) => (
+                            <div key={permission.moduleId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-900">{permission.moduleName}</h4>
+                                <p className="text-sm text-gray-500">{permission.moduleDescription}</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={permission.canAccess}
+                                  onChange={() => togglePermission(permission.moduleId)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                              </label>
+                            </div>
+                          ))}
+                          
+                          <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                            <div className="text-sm text-gray-500">
+                              {userPermissions.permissions.filter(p => p.canAccess).length} of {userPermissions.permissions.length} permissions enabled
+                            </div>
+                            <button
+                              onClick={updateUserPermissions}
+                              disabled={savingPermissions}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                            >
+                              {savingPermissions && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                              Save Permissions
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </main>
+
+      {/* Add User Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New User</h3>
+              {addUserError && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {addUserError}
+                </div>
+              )}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">First Name</label>
+                  <input
+                    type="text"
+                    value={addData.firstName}
+                    onChange={(e) => setAddData({...addData, firstName: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                  <input
+                    type="text"
+                    value={addData.lastName}
+                    onChange={(e) => setAddData({...addData, lastName: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    value={addData.email}
+                    onChange={(e) => setAddData({...addData, email: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                  {addData.email && !isEmail(addData.email) && (
+                    <p className="text-red-500 text-xs mt-1">Please enter a valid email</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <input
+                    type="tel"
+                    value={addData.phone}
+                    onChange={(e) => setAddData({...addData, phone: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <select
+                    value={addData.role}
+                    onChange={(e) => setAddData({...addData, role: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {roles.map(role => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={addData.password}
+                      onChange={(e) => setAddData({...addData, password: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showPassword ? <FaEyeSlash className="h-4 w-4 text-gray-400" /> : <FaEye className="h-4 w-4 text-gray-400" />}
+                    </button>
+                  </div>
+                  {addData.password && validatePassword(addData.password) && (
+                    <p className="text-red-500 text-xs mt-1">{validatePassword(addData.password)}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={addData.confirmPassword}
+                      onChange={(e) => setAddData({...addData, confirmPassword: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showConfirmPassword ? <FaEyeSlash className="h-4 w-4 text-gray-400" /> : <FaEye className="h-4 w-4 text-gray-400" />}
+                    </button>
+                  </div>
+                  {addData.confirmPassword && addData.password !== addData.confirmPassword && (
+                    <p className="text-red-500 text-xs mt-1">Passwords don't match</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowAdd(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addUser}
+                  disabled={adding || !isAddFormValid()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {adding && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                  Add User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 } 

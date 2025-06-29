@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes, FaArrowDown, FaArrowUp, FaTrash } from "react-icons/fa";
 import { toast } from 'react-toastify';
+import TermsAndConditions from '../../components/TermsAndConditions';
 
 interface OrganizationStats {
   totalUsers: number;
@@ -1444,6 +1445,13 @@ export default function KitchenDetailsPage() {
           </div>
         </div>
       )}
+
+      {/* Terms and Conditions Section */}
+      <div style={{ marginTop: 24 }}>
+        <TermsAndConditions 
+          apiUrl={process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'} 
+        />
+      </div>
     </main>
   );
 } 

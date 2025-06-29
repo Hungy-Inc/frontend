@@ -20,7 +20,7 @@ export interface DashboardSummary {
     totalWeight: number
   }
   outgoingStats: {
-    totalMeals: number
+    totalWeight: number
     totalShifts: number
   }
   volunteerStats: {

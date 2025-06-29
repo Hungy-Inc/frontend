@@ -27,7 +27,6 @@ type WeighingCategory = {
   category: string;
   kilogram_kg_: number;
   pound_lb_: number;
-  noofmeals: number;
 };
 
 const getYearOptions = () => {
@@ -134,38 +133,46 @@ export default function OutgoingStatsPage() {
     }
   };
 
-  // Helper to convert meals based on selected unit
-  const convertMeals = (value: number | string) => {
+  // Helper to convert weight based on selected unit
+  const convertWeight = (value: number | string) => {
     if (typeof value !== 'number') return value;
     
     // Handle base units
-    if (selectedUnit === 'Meals') {
-      return value.toFixed(0);
+    if (selectedUnit === 'kg') {
+      return value.toFixed(2);
+    }
+    
+    if (selectedUnit === 'lb') {
+      return (value * 2.20462).toFixed(2);
     }
     
     // Handle custom weighing categories
     const category = weighingCategories.find(c => c.category === selectedUnit);
-    if (category && category.noofmeals > 0) {
-      // Convert meals to custom unit (divide by meals per unit)
-      return (value / category.noofmeals).toFixed(2);
+    if (category && category.kilogram_kg_ > 0) {
+      // Convert kg to custom unit (divide by kg per unit)
+      return (value / category.kilogram_kg_).toFixed(2);
     }
     
-    return value.toFixed(0);
+    return value.toFixed(2);
   };
 
-  // Helper to convert meals for calculations (returns number)
-  const convertMealsForCalculation = (value: number | string) => {
+  // Helper to convert weight for calculations (returns number)
+  const convertWeightForCalculation = (value: number | string) => {
     if (typeof value !== 'number') return 0;
     
     // Handle base units
-    if (selectedUnit === 'Meals') {
+    if (selectedUnit === 'kg') {
       return value;
+    }
+    
+    if (selectedUnit === 'lb') {
+      return value * 2.20462;
     }
     
     // Handle custom weighing categories
     const category = weighingCategories.find(c => c.category === selectedUnit);
-    if (category && category.noofmeals > 0) {
-      return value / category.noofmeals;
+    if (category && category.kilogram_kg_ > 0) {
+      return value / category.kilogram_kg_;
     }
     
     return value;
@@ -173,7 +180,8 @@ export default function OutgoingStatsPage() {
 
   // Helper to get unit label for display
   const getUnitLabel = () => {
-    if (selectedUnit === 'Meals') return 'meals';
+    if (selectedUnit === 'kg') return 'kg';
+    if (selectedUnit === 'lb') return 'lb';
     return selectedUnit;
   };
 
@@ -186,10 +194,10 @@ export default function OutgoingStatsPage() {
       data: tableData.map(row => {
         const newRow = { ...row };
         delete newRow['Collections'];
-        // Convert meal columns
+        // Convert weight columns
         Object.keys(newRow).forEach(key => {
           if (key !== 'Date' && typeof newRow[key] === 'number') {
-            newRow[key] = convertMeals(newRow[key]);
+            newRow[key] = convertWeight(newRow[key]);
           }
         });
         return newRow;
@@ -221,7 +229,7 @@ export default function OutgoingStatsPage() {
       const convertedData = { ...monthData };
       Object.keys(convertedData).forEach(key => {
         if (key !== 'Month' && typeof convertedData[key] === 'number') {
-          convertedData[key] = convertMeals(convertedData[key]);
+          convertedData[key] = convertWeight(convertedData[key]);
         }
       });
       return convertedData;
@@ -241,7 +249,7 @@ export default function OutgoingStatsPage() {
           totals[col] = tableData.reduce((sum, row) => {
             const value = row[col];
             if (typeof value === 'number') {
-              return sum + convertMealsForCalculation(value);
+              return sum + convertWeightForCalculation(value);
             }
             return sum;
           }, 0);
@@ -258,7 +266,7 @@ export default function OutgoingStatsPage() {
           tableData.forEach(row => {
             const d = new Date(row['Date'] as string);
             if (!isNaN(d.getTime()) && typeof row[col] === 'number') {
-              totals[col] += convertMealsForCalculation(row[col]);
+              totals[col] += convertWeightForCalculation(row[col]);
             }
           });
         }
@@ -270,7 +278,7 @@ export default function OutgoingStatsPage() {
   const totals = calculateTotals();
 
   // Combine base units with weighing categories for dropdown
-  const baseUnits = ['Meals'];
+  const baseUnits = ['kg', 'lb'];
   const allUnits = [...baseUnits, ...weighingCategories.map(c => c.category)];
 
   return (

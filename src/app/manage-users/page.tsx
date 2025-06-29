@@ -222,8 +222,8 @@ export default function ManageUsersPage() {
   };
 
   const resetUserStatus = async (userId: string) => {
-    try {
-      const token = localStorage.getItem("token");
+      try {
+        const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userId}/reset`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
@@ -249,7 +249,7 @@ export default function ManageUsersPage() {
         throw new Error("Failed to fetch user permissions");
       }
       
-      const data = await response.json();
+        const data = await response.json();
       setUserPermissions(data);
     } catch (err) {
       console.error("Failed to load user permissions:", err);
@@ -390,7 +390,7 @@ export default function ManageUsersPage() {
         },
         body: JSON.stringify(addData),
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to add user");
@@ -509,7 +509,7 @@ export default function ManageUsersPage() {
           >
             <FaShieldAlt className="inline mr-2" />
             Permission Management
-          </button>
+        </button>
         </nav>
       </div>
 
@@ -589,31 +589,31 @@ export default function ManageUsersPage() {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          {editId === user.id ? (
+                  {editId === user.id ? (
                             <div className="space-y-2">
-                              <input
+                        <input
                                 type="text"
-                                value={editData.name || ''}
+                          value={editData.name || ''}
                                 onChange={(e) => handleEditChange('name', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Full Name"
                               />
-                              <input
+                        <input
                                 type="email"
-                                value={editData.email || ''}
+                          value={editData.email || ''}
                                 onChange={(e) => handleEditChange('email', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Email"
                               />
-                              <input
+                        <input
                                 type="tel"
-                                value={editData.phone || ''}
+                          value={editData.phone || ''}
                                 onChange={(e) => handleEditChange('phone', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Phone"
                               />
                               <select
-                                value={editData.role || ''}
+                          value={editData.role || ''}
                                 onChange={(e) => handleEditChange('role', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                               >
@@ -662,20 +662,20 @@ export default function ManageUsersPage() {
                           <>
                             <button
                               onClick={() => saveEdit(user.id)}
-                              disabled={saving}
+                          disabled={saving}
                               className="p-2 text-green-600 hover:text-green-800 disabled:opacity-50"
                             >
-                              <FaSave />
-                            </button>
+                          <FaSave />
+                        </button>
                             <button
                               onClick={cancelEdit}
                               className="p-2 text-gray-600 hover:text-gray-800"
                             >
-                              <FaTimes />
-                            </button>
-                          </>
-                        ) : (
-                          <>
+                          <FaTimes />
+                        </button>
+                    </>
+                  ) : (
+                    <>
                             {user.status === 'PENDING' && (
                               <>
                                 <button
@@ -707,13 +707,13 @@ export default function ManageUsersPage() {
                               onClick={() => startEdit(user)}
                               className="p-2 text-blue-600 hover:text-blue-800"
                             >
-                              <FaEdit />
-                            </button>
+                          <FaEdit />
+                        </button>
                             <button
                               onClick={() => deleteUser(user.id)}
                               className="p-2 text-red-600 hover:text-red-800"
                             >
-                              <FaTrash />
+                          <FaTrash />
                             </button>
                           </>
                         )}
@@ -869,8 +869,8 @@ export default function ManageUsersPage() {
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+        )}
+      </div>
               </div>
             </div>
           </div>
@@ -946,9 +946,9 @@ export default function ManageUsersPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Password</label>
                   <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={addData.password}
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={addData.password}
                       onChange={(e) => setAddData({...addData, password: e.target.value})}
                       className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                       required
@@ -960,7 +960,7 @@ export default function ManageUsersPage() {
                     >
                       {showPassword ? <FaEyeSlash className="h-4 w-4 text-gray-400" /> : <FaEye className="h-4 w-4 text-gray-400" />}
                     </button>
-                  </div>
+              </div>
                   {addData.password && validatePassword(addData.password) && (
                     <p className="text-red-500 text-xs mt-1">{validatePassword(addData.password)}</p>
                   )}
@@ -968,9 +968,9 @@ export default function ManageUsersPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
                   <div className="relative">
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={addData.confirmPassword}
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={addData.confirmPassword}
                       onChange={(e) => setAddData({...addData, confirmPassword: e.target.value})}
                       className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                       required

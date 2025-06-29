@@ -16,7 +16,6 @@ interface WeighingCategory {
   category: string;
   kilogram_kg_: number;
   pound_lb_: number;
-  noofmeals: number;
 }
 
 interface WeighingRecord {
@@ -24,7 +23,6 @@ interface WeighingRecord {
   category: string;
   kilogram_kg_: number;
   pound_lb_: number;
-  noofmeals: number;
 }
 
 interface WeighingStats {
@@ -35,7 +33,7 @@ interface WeighingStats {
     categoryName: string;
     totalKilogram: number;
     totalPound: number;
-    totalMeals: number;
+    totalWeight: number;
   }[];
 }
 
@@ -61,6 +59,7 @@ export default function KitchenDetailsPage() {
   const [incomingDollarValue, setIncomingDollarValue] = useState<number>(0);
   const [isEditingIncomingValue, setIsEditingIncomingValue] = useState(false);
   const [editingIncomingValue, setEditingIncomingValue] = useState<string>("");
+  const [incomingValueUnit, setIncomingValueUnit] = useState<"kg" | "lb">("kg");
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
@@ -75,22 +74,20 @@ export default function KitchenDetailsPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryWeight, setNewCategoryWeight] = useState("");
   const [newCategoryUnit, setNewCategoryUnit] = useState<"kg" | "lb">("kg");
-  const [newCategoryMeals, setNewCategoryMeals] = useState("");
+
   
   // Add weighing form state
   const [newWeighingData, setNewWeighingData] = useState({
     category: "",
     weight: "",
-    unit: "kg" as "kg" | "lb",
-    noofmeals: ""
+    unit: "kg" as "kg" | "lb"
   });
   
   // Edit weighing form state
   const [editWeighingData, setEditWeighingData] = useState({
     category: "",
     weight: "",
-    unit: "kg" as "kg" | "lb",
-    noofmeals: ""
+    unit: "kg" as "kg" | "lb"
   });
 
   useEffect(() => {
@@ -293,15 +290,24 @@ export default function KitchenDetailsPage() {
 
   const handleStartEditIncomingValue = () => {
     setIsEditingIncomingValue(true);
-    setEditingIncomingValue(incomingDollarValue.toString());
+    // Convert stored kg value to display unit
+    const displayValue = incomingValueUnit === "kg" 
+      ? incomingDollarValue 
+      : incomingDollarValue * 2.20462; // Convert $/kg to $/lb
+    setEditingIncomingValue(displayValue.toFixed(2));
   };
 
   const handleSaveIncomingValue = async () => {
-    const value = parseFloat(editingIncomingValue);
-    if (isNaN(value) || value < 0) {
+    const inputValue = parseFloat(editingIncomingValue);
+    if (isNaN(inputValue) || inputValue < 0) {
       toast.error('Please enter a valid positive number');
       return;
     }
+
+    // Convert entered value to per kg for storage (all calculations use per kg)
+    const valuePerKg = incomingValueUnit === "kg" 
+      ? inputValue 
+      : inputValue / 2.20462; // Convert $/lb to $/kg
     
     try {
       const token = localStorage.getItem("token");
@@ -310,7 +316,8 @@ export default function KitchenDetailsPage() {
         return;
       }
 
-      console.log('Saving incoming dollar value:', value);
+      console.log('Saving incoming dollar value (per kg):', valuePerKg);
+      console.log('Original input value (per', incomingValueUnit + '):', inputValue);
       console.log('Organization ID:', organization.id);
 
       // Use the new dedicated endpoint for updating incoming dollar value only
@@ -321,7 +328,7 @@ export default function KitchenDetailsPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          incoming_dollar_value: value
+          incoming_dollar_value: valuePerKg
         }),
       });
 
@@ -394,8 +401,7 @@ export default function KitchenDetailsPage() {
         body: JSON.stringify({
           category: newCategoryName.trim(),
           weight: parseFloat(newCategoryWeight),
-          unit: newCategoryUnit,
-          noofmeals: parseInt(newCategoryMeals) || 0
+          unit: newCategoryUnit
         })
       });
 
@@ -409,7 +415,6 @@ export default function KitchenDetailsPage() {
       setNewCategoryName("");
       setNewCategoryWeight("");
       setNewCategoryUnit("kg");
-      setNewCategoryMeals("");
       setShowAddCategory(false);
       toast.success('Category added successfully');
       fetchWeighingData(); // Refresh data
@@ -436,8 +441,7 @@ export default function KitchenDetailsPage() {
         body: JSON.stringify({
           category: newWeighingData.category,
           weight: parseFloat(newWeighingData.weight),
-          unit: newWeighingData.unit,
-          noofmeals: parseInt(newWeighingData.noofmeals) || 0
+          unit: newWeighingData.unit
         })
       });
 
@@ -451,8 +455,7 @@ export default function KitchenDetailsPage() {
       setNewWeighingData({
         category: "",
         weight: "",
-        unit: "kg" as "kg" | "lb",
-        noofmeals: ""
+        unit: "kg" as "kg" | "lb"
       });
       setShowAddWeighing(false);
       toast.success('Weighing record added successfully');
@@ -467,8 +470,7 @@ export default function KitchenDetailsPage() {
     setEditWeighingData({
       category: weighing.category,
       weight: weighing.kilogram_kg_.toString(),
-      unit: "kg" as "kg" | "lb",
-      noofmeals: weighing.noofmeals.toString()
+      unit: "kg" as "kg" | "lb"
     });
     setShowEditWeighing(true);
   };
@@ -490,8 +492,7 @@ export default function KitchenDetailsPage() {
         body: JSON.stringify({
           category: editWeighingData.category,
           weight: parseFloat(editWeighingData.weight),
-          unit: editWeighingData.unit,
-          noofmeals: parseInt(editWeighingData.noofmeals) || 0
+          unit: editWeighingData.unit
         })
       });
 
@@ -505,8 +506,7 @@ export default function KitchenDetailsPage() {
       setEditWeighingData({
         category: "",
         weight: "",
-        unit: "kg" as "kg" | "lb",
-        noofmeals: ""
+        unit: "kg" as "kg" | "lb"
       });
       setShowEditWeighing(false);
       setEditingWeighingId(null);
@@ -522,8 +522,7 @@ export default function KitchenDetailsPage() {
     setEditWeighingData({
       category: "",
       weight: "",
-      unit: "kg" as "kg" | "lb",
-      noofmeals: ""
+      unit: "kg" as "kg" | "lb"
     });
     setShowEditWeighing(false);
   };
@@ -814,7 +813,25 @@ export default function KitchenDetailsPage() {
               border: '1px solid #e9ecef'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Incoming Dollar Value</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Incoming Dollar Value</h3>
+                  <select
+                    value={incomingValueUnit}
+                    onChange={(e) => setIncomingValueUnit(e.target.value as "kg" | "lb")}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: 4,
+                      border: '1px solid #dee2e6',
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: '#666',
+                      background: '#fff'
+                    }}
+                  >
+                    <option value="kg">per kg</option>
+                    <option value="lb">per lb</option>
+                  </select>
+                </div>
                 <button
                   onClick={handleStartEditIncomingValue}
                   style={{
@@ -840,61 +857,107 @@ export default function KitchenDetailsPage() {
               </div>
               
               {isEditingIncomingValue ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>$</div>
-                  <input
-                    type="number"
-                    value={editingIncomingValue}
-                    onChange={(e) => setEditingIncomingValue(e.target.value)}
-                    style={{
-                      background: '#fff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: 6,
-                      padding: '8px 12px',
-                      fontSize: 24,
-                      fontWeight: 700,
-                      color: '#333',
-                      width: '200px',
-                      outline: 'none'
-                    }}
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                  />
-                  <button
-                    onClick={handleSaveIncomingValue}
-                    style={{
-                      background: '#28a745',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '8px 16px',
-                      cursor: 'pointer',
-                      color: '#fff',
-                      fontWeight: 600,
-                      fontSize: 14
-                    }}
-                  >
-                    <FaSave />
-                  </button>
-                  <button
-                    onClick={handleCancelEditIncomingValue}
-                    style={{
-                      background: '#dc3545',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '8px 16px',
-                      cursor: 'pointer',
-                      color: '#fff',
-                      fontWeight: 600,
-                      fontSize: 14
-                    }}
-                  >
-                    <FaTimes />
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>$</div>
+                    <input
+                      type="number"
+                      value={editingIncomingValue}
+                      onChange={(e) => setEditingIncomingValue(e.target.value)}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: '#333',
+                        width: '150px',
+                        outline: 'none'
+                      }}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                    <select
+                      value={incomingValueUnit}
+                      onChange={(e) => {
+                        const newUnit = e.target.value as "kg" | "lb";
+                        const currentValue = parseFloat(editingIncomingValue) || 0;
+                        let convertedValue;
+                        
+                        // Convert between units when switching
+                        if (incomingValueUnit === "kg" && newUnit === "lb") {
+                          convertedValue = currentValue * 2.20462; // kg to lb
+                        } else if (incomingValueUnit === "lb" && newUnit === "kg") {
+                          convertedValue = currentValue / 2.20462; // lb to kg
+                        } else {
+                          convertedValue = currentValue;
+                        }
+                        
+                        setIncomingValueUnit(newUnit);
+                        setEditingIncomingValue(convertedValue.toFixed(2));
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 6,
+                        border: '1px solid #dee2e6',
+                        fontSize: 16,
+                        fontWeight: 600,
+                        color: '#333',
+                        background: '#fff'
+                      }}
+                    >
+                      <option value="kg">per kg</option>
+                      <option value="lb">per lb</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleSaveIncomingValue}
+                      style={{
+                        background: '#28a745',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      onClick={handleCancelEditIncomingValue}
+                      style={{
+                        background: '#dc3545',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
-                  ${incomingDollarValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                    ${(() => {
+                      const displayValue = incomingValueUnit === "kg" 
+                        ? incomingDollarValue 
+                        : incomingDollarValue * 2.20462;
+                      return displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    })()}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                    per {incomingValueUnit}
+                  </div>
                 </div>
               )}
             </div>
@@ -988,7 +1051,6 @@ export default function KitchenDetailsPage() {
                         <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.category}</span>
                         <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram_kg_.toFixed(2)} kg</span>
                         <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound_lb_.toFixed(2)} lb</span>
-                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.noofmeals} meals</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
@@ -1112,27 +1174,6 @@ export default function KitchenDetailsPage() {
                 <option value="lb">lb</option>
               </select>
             </div>
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Number of Meals</label>
-              <input
-                type="number"
-                min="0"
-                max="999999"
-                value={newCategoryMeals}
-                onChange={(e) => setNewCategoryMeals(e.target.value)}
-                placeholder="Enter number of meals"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  border: '1px solid #ddd',
-                  fontSize: 14
-                }}
-              />
-              <div style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
-                Number of meals this category represents (whole number only)
-              </div>
-            </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowAddCategory(false)}
@@ -1254,27 +1295,6 @@ export default function KitchenDetailsPage() {
                 </select>
               </div>
             </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Number of Meals</label>
-              <input
-                type="number"
-                min="0"
-                max="999999"
-                value={newWeighingData.noofmeals}
-                onChange={(e) => setNewWeighingData(prev => ({ ...prev, noofmeals: e.target.value }))}
-                placeholder="Enter number of meals"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  border: '1px solid #ddd',
-                  fontSize: 14
-                }}
-              />
-              <div style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
-                Number of meals this weighing represents (whole number only)
-              </div>
-            </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowAddWeighing(false)}
@@ -1388,27 +1408,6 @@ export default function KitchenDetailsPage() {
                   <option value="kg">kg</option>
                   <option value="lb">lb</option>
                 </select>
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Number of Meals</label>
-              <input
-                type="number"
-                min="0"
-                max="999999"
-                value={editWeighingData.noofmeals}
-                onChange={(e) => setEditWeighingData(prev => ({ ...prev, noofmeals: e.target.value }))}
-                placeholder="Enter number of meals"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  border: '1px solid #ddd',
-                  fontSize: 14
-                }}
-              />
-              <div style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
-                Number of meals this weighing represents (whole number only)
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

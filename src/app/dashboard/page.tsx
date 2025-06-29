@@ -289,37 +289,32 @@ export default function Dashboard() {
     return found && found.kilogram_kg_ ? weightKg / found.kilogram_kg_ : weightKg;
   };
 
-  // Helper to convert meals based on selected weighing category
-  const convertMealsForCategory = (rawMeals: number) => {
-    if (selectedUnit === 'kg' || selectedUnit === 'lb') return rawMeals;
+  // Helper to convert weight based on selected weighing category
+  const convertWeightForCategory = (rawWeight: number) => {
+    if (selectedUnit === 'kg') return rawWeight;
+    if (selectedUnit === 'lb') return rawWeight * 2.20462;
     const found = customUnits.find(u => u.category === selectedUnit);
-    if (found && found.noofmeals > 0) {
-      // Convert raw meals to the selected category's units (divide by meals per unit)
-      return Math.round(rawMeals / found.noofmeals);
+    if (found && found.kilogram_kg_ > 0) {
+      // Convert kg to custom unit (divide by kg per unit)
+      return rawWeight / found.kilogram_kg_;
     }
-    return rawMeals;
+    return rawWeight;
   };
 
   // Outgoing stats summary calculations (category totals and grand total)
   const categoryTotals: Record<string, number> = {};
+  const categoryTotalsRaw: Record<string, number> = {};
   if (outTable && outTable.length > 0) {
     outTable.forEach((cat: any) => {
-      categoryTotals[cat.category] = convertMealsForCategory(cat.total);
+      categoryTotalsRaw[cat.category] = cat.total; // Keep raw values in kg
+      categoryTotals[cat.category] = convertWeightForCategory(cat.total); // Converted values for display
     });
   }
   const totalDistributed = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
 
-  // Calculate equivalent value based on actual meals (not converted units)
-  let equivalentValue = 0;
-  if (selectedUnit === 'kg' || selectedUnit === 'lb') {
-    // Use raw meal count
-    equivalentValue = Object.values(outTable || []).reduce((sum, cat: any) => sum + (cat.total || 0), 0) * 10;
-  } else {
-    // Use displayed value * noofmeals
-    const found = customUnits.find(u => u.category === selectedUnit);
-    const noofmeals = found && found.noofmeals > 0 ? found.noofmeals : 1;
-    equivalentValue = Object.values(categoryTotals).reduce((sum, val) => sum + (val * noofmeals), 0) * 10;
-  }
+  // Calculate equivalent value based on actual weight (in kg)
+  const totalWeightKg = Object.values(outTable || []).reduce((sum, cat: any) => sum + (cat.total || 0), 0);
+  const equivalentValue = totalWeightKg * 10; // $10 per kg equivalent
 
   // Pie chart data (use selected unit)
   const pieData = {
@@ -360,6 +355,9 @@ export default function Dashboard() {
   console.log('outTable:', outTable);
   console.log('selectedUnit:', selectedUnit);
   console.log('customUnits:', customUnits);
+  console.log('categoryTotalsRaw:', categoryTotalsRaw);
+  console.log('categoryTotals (converted):', categoryTotals);
+  console.log('totalDistributed:', totalDistributed);
 
   return (
     <main className="min-h-screen bg-[#fff8f3]">
@@ -509,7 +507,7 @@ export default function Dashboard() {
               Outgoing Stats
               {selectedUnit !== 'kg' && selectedUnit !== 'lb' && (
                 <span style={{ fontSize: 14, fontWeight: 400, color: '#666', marginLeft: 8 }}>
-                  (Converted to {selectedUnit} meal units)
+                  (Converted to {selectedUnit} weight units)
                 </span>
               )}
             </div>
@@ -544,7 +542,7 @@ export default function Dashboard() {
                             <tr>
                               <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
                               <th style={{ textAlign: 'right', padding: '6px 8px' }}>
-                                {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+                                Weight ({getUnitLabel()})
                               </th>
                             </tr>
                           </thead>
@@ -552,12 +550,12 @@ export default function Dashboard() {
                             {cat.shifts.map((shift: any) => (
                               <tr key={shift.shiftName}>
                                 <td style={{ padding: '6px 8px', textAlign: 'left' }}>{shift.shiftName}</td>
-                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>{convertMealsForCategory(shift.total)}</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>{Math.round(convertWeightForCategory(shift.total) * 100) / 100}</td>
                               </tr>
                             ))}
                             <tr style={{ fontWeight: 700, background: '#fafafa' }}>
                               <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
-                              <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{convertMealsForCategory(cat.total)}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{Math.round(convertWeightForCategory(cat.total) * 100) / 100}</td>
                             </tr>
                           </tbody>
                         </table>
@@ -573,7 +571,7 @@ export default function Dashboard() {
                             <tr>
                               <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
                               <th style={{ textAlign: 'right', padding: '6px 8px' }}>
-                                {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+                                Weight ({getUnitLabel()})
                               </th>
                             </tr>
                           </thead>
@@ -581,12 +579,12 @@ export default function Dashboard() {
                             {cat.shifts.map((shift: any) => (
                               <tr key={shift.shiftName}>
                                 <td style={{ padding: '6px 8px', textAlign: 'left' }}>{shift.shiftName}</td>
-                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>{convertMealsForCategory(shift.total)}</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>{Math.round(convertWeightForCategory(shift.total) * 100) / 100}</td>
                               </tr>
                             ))}
                             <tr style={{ fontWeight: 700, background: '#fafafa' }}>
                               <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
-                              <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{convertMealsForCategory(cat.total)}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{Math.round(convertWeightForCategory(cat.total) * 100) / 100}</td>
                             </tr>
                           </tbody>
                         </table>
@@ -624,9 +622,9 @@ export default function Dashboard() {
                 <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>{category}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                   <span style={{ wordBreak: 'break-word', lineHeight: '1.4', flex: '1 1 auto', maxWidth: '70%' }}>
-                    Total {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+                    Total Weight ({getUnitLabel()})
                   </span>
-                  <span style={{ fontWeight: 700, flex: '0 0 auto' }}>{total}</span>
+                  <span style={{ fontWeight: 700, flex: '0 0 auto' }}>{Math.round(total * 100) / 100}</span>
                 </div>
               </div>
             ))}
@@ -635,7 +633,7 @@ export default function Dashboard() {
           {/* Summary Row */}
           <div style={{ display: 'flex', background: '#FFF5ED', borderRadius: 10, padding: 16, alignItems: 'center', gap: 24, fontWeight: 700, fontSize: 16, color: '#f24503', marginBottom: 8 }}>
             <div style={{ color: '#f24503', fontSize: 22 }}>
-              Total Distributed {totalDistributed} {selectedUnit !== 'kg' && selectedUnit !== 'lb' ? `${selectedUnit} Units` : 'Meals'}
+              Total Distributed {totalDistributed.toFixed(2)} {getUnitLabel()}
             </div>
             <div style={{ color: '#f24503', fontSize: 18, marginLeft: 'auto' }}>Equivalent Value ${equivalentValue.toLocaleString()}</div>
           </div>

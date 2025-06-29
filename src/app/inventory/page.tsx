@@ -26,7 +26,6 @@ type WeighingCategory = {
   category: string;
   kilogram_kg_: number;
   pound_lb_: number;
-  noofmeals: number;
 };
 
 function getYearOptions() {

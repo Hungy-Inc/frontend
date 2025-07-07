@@ -333,14 +333,14 @@ export default function KitchenDetailsPage() {
       });
 
       console.log('Response status:', res.status);
-
+      
       if (!res.ok) {
         const errorData = await res.json();
         console.error('Error response:', errorData);
         toast.error(errorData.error || 'Failed to update incoming dollar value');
         return;
       }
-
+      
       const updatedOrg = await res.json();
       console.log('Updated organization:', updatedOrg);
 
@@ -814,7 +814,7 @@ export default function KitchenDetailsPage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Incoming Dollar Value</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Incoming Dollar Value</h3>
                   <select
                     value={incomingValueUnit}
                     onChange={(e) => setIncomingValueUnit(e.target.value as "kg" | "lb")}
@@ -859,26 +859,26 @@ export default function KitchenDetailsPage() {
               {isEditingIncomingValue ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>$</div>
-                    <input
-                      type="number"
-                      value={editingIncomingValue}
-                      onChange={(e) => setEditingIncomingValue(e.target.value)}
-                      style={{
-                        background: '#fff',
-                        border: '1px solid #dee2e6',
-                        borderRadius: 6,
-                        padding: '8px 12px',
-                        fontSize: 24,
-                        fontWeight: 700,
-                        color: '#333',
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>$</div>
+                  <input
+                    type="number"
+                    value={editingIncomingValue}
+                    onChange={(e) => setEditingIncomingValue(e.target.value)}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #dee2e6',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      fontSize: 24,
+                      fontWeight: 700,
+                      color: '#333',
                         width: '150px',
-                        outline: 'none'
-                      }}
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0"
-                    />
+                      outline: 'none'
+                    }}
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                  />
                     <select
                       value={incomingValueUnit}
                       onChange={(e) => {
@@ -913,41 +913,41 @@ export default function KitchenDetailsPage() {
                     </select>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={handleSaveIncomingValue}
-                      style={{
-                        background: '#28a745',
-                        border: 'none',
-                        borderRadius: 6,
-                        padding: '8px 16px',
-                        cursor: 'pointer',
-                        color: '#fff',
-                        fontWeight: 600,
-                        fontSize: 14
-                      }}
-                    >
-                      <FaSave />
-                    </button>
-                    <button
-                      onClick={handleCancelEditIncomingValue}
-                      style={{
-                        background: '#dc3545',
-                        border: 'none',
-                        borderRadius: 6,
-                        padding: '8px 16px',
-                        cursor: 'pointer',
-                        color: '#fff',
-                        fontWeight: 600,
-                        fontSize: 14
-                      }}
-                    >
-                      <FaTimes />
-                    </button>
+                  <button
+                    onClick={handleSaveIncomingValue}
+                    style={{
+                      background: '#28a745',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 14
+                    }}
+                  >
+                    <FaSave />
+                  </button>
+                  <button
+                    onClick={handleCancelEditIncomingValue}
+                    style={{
+                      background: '#dc3545',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 14
+                    }}
+                  >
+                    <FaTimes />
+                  </button>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
                     ${(() => {
                       const displayValue = incomingValueUnit === "kg" 
                         ? incomingDollarValue 

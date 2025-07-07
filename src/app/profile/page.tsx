@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaUser, FaEnvelope, FaPhone, FaBuilding, FaUserShield, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 interface UserProfile {
   id: string;
@@ -107,7 +108,9 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!canSave) {
-      setSaveError('Please fill all fields correctly. Name: letters only, Phone: numbers only, Email: valid format.');
+      const errorMessage = 'Please fill all fields correctly. Name: letters only, Phone: numbers only, Email: valid format.';
+      setSaveError(errorMessage);
+      toast.error(errorMessage);
       return;
     }
     try {
@@ -136,9 +139,12 @@ export default function ProfilePage() {
       } : null);
       setIsEditing(false);
       setSaveError('');
+      toast.success('Profile updated successfully!');
     } catch (err) {
       console.error('Error saving profile:', err);
-      setSaveError('Failed to save changes');
+      const errorMessage = 'Failed to save changes';
+      setSaveError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import styles from './IncomingStats.module.css';
+import { toast } from 'react-toastify';
 
 const months = [
   { value: 0, label: 'All Months' },
@@ -156,7 +157,7 @@ export default function IncomingStatsPage() {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('No authentication token found');
+        toast.error('No authentication token found');
         return;
       }
       const params = new URLSearchParams({
@@ -181,8 +182,9 @@ export default function IncomingStatsPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast.success('Export completed successfully!');
     } catch (err) {
-      alert('Export failed. Please try again.');
+      toast.error('Export failed. Please try again.');
     }
   };
 

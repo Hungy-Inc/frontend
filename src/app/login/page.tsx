@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
+import { toast } from 'react-toastify';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,7 +23,9 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Invalid credentials');
+        const errorMessage = data.error || 'Invalid credentials';
+        setError(errorMessage);
+        toast.error(errorMessage);
       } else {
         if (data.token) {
           localStorage.setItem('token', data.token);
@@ -30,10 +33,13 @@ export default function LoginPage() {
           const user = jwtDecode(data.token);
           localStorage.setItem('user', JSON.stringify(user));
         }
+        toast.success('Login successful! Redirecting...');
         router.push('/dashboard');
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      const errorMessage = 'Network error. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 'use client';
 import styles from '../incoming-stats/IncomingStats.module.css';
 import React, { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 
 const months = [
   { value: 0, label: 'All Months' },
@@ -111,7 +112,7 @@ export default function OutgoingStatsPage() {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/filtered/export?month=${selectedMonth}&year=${selectedYear}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/filtered/export?month=${selectedMonth}&year=${selectedYear}&unit=${selectedUnit}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -128,8 +129,9 @@ export default function OutgoingStatsPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast.success('Export completed successfully!');
     } catch (err) {
-      alert('Failed to export Excel.');
+      toast.error('Failed to export Excel.');
     }
   };
 

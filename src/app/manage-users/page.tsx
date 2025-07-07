@@ -20,6 +20,7 @@ import {
   FaFilter,
   FaUserCog
 } from "react-icons/fa";
+import { toast } from 'react-toastify';
 
 interface User {
   id: string;
@@ -95,6 +96,9 @@ export default function ManageUsersPage() {
     confirmPassword: "", 
     role: "VOLUNTEER"
   });
+  const [agreementFile, setAgreementFile] = useState<File | null>(null);
+  const [uploadingAgreement, setUploadingAgreement] = useState(false);
+  const [agreementFileUrl, setAgreementFileUrl] = useState<string>('');
   const [adding, setAdding] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -110,6 +114,8 @@ export default function ManageUsersPage() {
   const [userPermissions, setUserPermissions] = useState<UserPermissionData | null>(null);
   const [permissionLoading, setPermissionLoading] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  const [permissionSearchTerm, setPermissionSearchTerm] = useState('');
+  const [permissionFilterTerm, setPermissionFilterTerm] = useState('');
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -194,8 +200,9 @@ export default function ManageUsersPage() {
       if (!response.ok) throw new Error("Failed to approve user");
       await fetchUsers();
       await fetchPermissionUsers();
+      toast.success("User approved successfully!");
     } catch (err) {
-      alert("Failed to approve user. Please try again.");
+      toast.error("Failed to approve user. Please try again.");
     }
   };
 
@@ -216,8 +223,9 @@ export default function ManageUsersPage() {
       if (!response.ok) throw new Error("Failed to deny user");
       await fetchUsers();
       await fetchPermissionUsers();
+      toast.success("User denied successfully!");
     } catch (err) {
-      alert("Failed to deny user. Please try again.");
+      toast.error("Failed to deny user. Please try again.");
     }
   };
 
@@ -231,8 +239,9 @@ export default function ManageUsersPage() {
       if (!response.ok) throw new Error("Failed to reset user status");
       await fetchUsers();
       await fetchPermissionUsers();
+      toast.success("User status reset successfully!");
     } catch (err) {
-      alert("Failed to reset user status. Please try again.");
+      toast.error("Failed to reset user status. Please try again.");
     }
   };
 
@@ -284,11 +293,11 @@ export default function ManageUsersPage() {
       }
       
       await fetchPermissionUsers();
-      alert("Permissions updated successfully!");
-    } catch (err) {
-      console.error("Failed to update permissions:", err);
-      alert("Failed to update permissions. Please try again.");
-    } finally {
+              toast.success("Permissions updated successfully!");
+      } catch (err) {
+        console.error("Failed to update permissions:", err);
+        toast.error("Failed to update permissions. Please try again.");
+      } finally {
       setSavingPermissions(false);
     }
   };
@@ -354,8 +363,9 @@ export default function ManageUsersPage() {
       await fetchUsers();
       setEditId(null);
       setEditData({});
+      toast.success("User updated successfully!");
     } catch (err) {
-      alert("Failed to update user. Please try again.");
+      toast.error("Failed to update user. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -372,8 +382,46 @@ export default function ManageUsersPage() {
       });
       if (!response.ok) throw new Error("Failed to delete user");
       await fetchUsers();
+      toast.success("User deleted successfully!");
     } catch (err) {
-      alert("Failed to delete user. Please try again.");
+      toast.error("Failed to delete user. Please try again.");
+    }
+  };
+
+  const handleAgreementFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAgreementFile(file);
+    setUploadingAgreement(true);
+    setAddUserError('');
+
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append('agreement', file);
+
+      const response = await fetch(`${apiUrl}/api/users/upload-agreement`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to upload agreement");
+      }
+
+      const result = await response.json();
+      setAgreementFileUrl(result.fileUrl);
+    } catch (err: any) {
+      setAddUserError(err.message || "Failed to upload agreement. Please try again.");
+      setAgreementFile(null);
+      setAgreementFileUrl('');
+    } finally {
+      setUploadingAgreement(false);
     }
   };
 
@@ -388,7 +436,12 @@ export default function ManageUsersPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(addData),
+        body: JSON.stringify({
+          ...addData,
+          agreementFileUrl,
+          agreementFileName: agreementFile?.name,
+          agreementFileSize: agreementFile?.size
+        }),
       });
       
       if (!response.ok) {
@@ -407,8 +460,13 @@ export default function ManageUsersPage() {
         confirmPassword: "", 
         role: "VOLUNTEER"
       });
+      setAgreementFile(null);
+      setAgreementFileUrl('');
+      setUploadingAgreement(false);
+      toast.success("User added successfully!");
     } catch (err: any) {
       setAddUserError(err.message || "Failed to add user. Please try again.");
+      toast.error(err.message || "Failed to add user. Please try again.");
     } finally {
       setAdding(false);
     }
@@ -433,7 +491,9 @@ export default function ManageUsersPage() {
       addData.password &&
       addData.password === addData.confirmPassword &&
       !validatePassword(addData.password) &&
-      addData.role
+      addData.role &&
+      agreementFileUrl && // Terms and conditions agreement is required
+      !uploadingAgreement
     );
   };
 
@@ -465,6 +525,20 @@ export default function ManageUsersPage() {
       permissions: userPermissions.permissions.map(p => ({ ...p, canAccess: false }))
     });
   };
+
+  // Filter permission users based on search term
+  const filteredPermissionUsers = permissionUsers.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(permissionSearchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(permissionSearchTerm.toLowerCase()) ||
+                         user.role.toLowerCase().includes(permissionSearchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Filter permissions based on filter term (only by permission name)
+  const filteredPermissions = userPermissions?.permissions.filter(permission => {
+    const matchesFilter = permission.moduleName.toLowerCase().includes(permissionFilterTerm.toLowerCase());
+    return matchesFilter;
+  }) || [];
 
   if (loading) {
     return (
@@ -736,19 +810,40 @@ export default function ManageUsersPage() {
               <div className="bg-white shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Select User</h3>
+                  
+                  {/* Search Bar for Permission Management */}
+                  <div className="mb-4">
+                    <div className="relative">
+                      <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search users..."
+                        value={permissionSearchTerm}
+                        onChange={(e) => setPermissionSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                  </div>
                   {permissionUsers.length === 0 ? (
                     <div className="text-center py-8">
                       <FaUserCog className="mx-auto h-12 w-12 text-gray-400" />
                       <h3 className="mt-2 text-sm font-medium text-gray-900">No approved users</h3>
                       <p className="mt-1 text-sm text-gray-500">No approved users found in the database.</p>
                     </div>
+                  ) : filteredPermissionUsers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <FaSearch className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
+                      <p className="mt-1 text-sm text-gray-500">No users match your search criteria.</p>
+                    </div>
                   ) : (
                     <div className="space-y-2">
-                      {permissionUsers.map((user) => (
+                      {filteredPermissionUsers.map((user) => (
                         <button
                           key={user.id}
                           onClick={() => {
                             setSelectedUser(parseInt(user.id));
+                            setPermissionFilterTerm(''); // Clear filter when selecting new user
                             fetchUserPermissions(parseInt(user.id));
                           }}
                           className={`w-full text-left p-3 rounded-lg border ${
@@ -798,7 +893,7 @@ export default function ManageUsersPage() {
                     </div>
                   ) : (
                     <div>
-                      <div className="flex justify-between items-center mb-6">
+                      <div className="flex justify-between items-center mb-4">
                         <div>
                           <h3 className="text-lg font-medium text-gray-900">
                             Permissions for {userPermissions.userName}
@@ -821,6 +916,20 @@ export default function ManageUsersPage() {
                         </div>
                       </div>
 
+                      {/* Permission Filter */}
+                      <div className="mb-6">
+                        <div className="relative">
+                          <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Filter permissions..."
+                            value={permissionFilterTerm}
+                            onChange={(e) => setPermissionFilterTerm(e.target.value)}
+                            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          />
+                        </div>
+                      </div>
+
                       {modules.length === 0 ? (
                         <div className="text-center py-8">
                           <FaShieldAlt className="mx-auto h-12 w-12 text-gray-400" />
@@ -833,9 +942,21 @@ export default function ManageUsersPage() {
                           <h3 className="mt-2 text-sm font-medium text-gray-900">No permissions found</h3>
                           <p className="mt-1 text-sm text-gray-500">No permissions found for this user in the database.</p>
                         </div>
+                      ) : filteredPermissions.length === 0 ? (
+                        <div className="text-center py-8">
+                          <FaFilter className="mx-auto h-12 w-12 text-gray-400" />
+                          <h3 className="mt-2 text-sm font-medium text-gray-900">No permissions match filter</h3>
+                          <p className="mt-1 text-sm text-gray-500">No permissions match your filter criteria.</p>
+                          <button
+                            onClick={() => setPermissionFilterTerm('')}
+                            className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                          >
+                            Clear filter
+                          </button>
+                        </div>
                       ) : (
                         <div className="space-y-4">
-                          {userPermissions.permissions.map((permission) => (
+                          {filteredPermissions.map((permission) => (
                             <div key={permission.moduleId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                               <div>
                                 <h4 className="text-sm font-medium text-gray-900">{permission.moduleName}</h4>
@@ -855,7 +976,18 @@ export default function ManageUsersPage() {
                           
                           <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                             <div className="text-sm text-gray-500">
-                              {userPermissions.permissions.filter(p => p.canAccess).length} of {userPermissions.permissions.length} permissions enabled
+                              {permissionFilterTerm ? (
+                                <>
+                                  {filteredPermissions.filter(p => p.canAccess).length} of {filteredPermissions.length} filtered permissions enabled
+                                  <span className="text-gray-400 ml-2">
+                                    ({userPermissions.permissions.filter(p => p.canAccess).length} of {userPermissions.permissions.length} total)
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  {userPermissions.permissions.filter(p => p.canAccess).length} of {userPermissions.permissions.length} permissions enabled
+                                </>
+                              )}
                             </div>
                             <button
                               onClick={updateUserPermissions}
@@ -987,10 +1119,58 @@ export default function ManageUsersPage() {
                     <p className="text-red-500 text-xs mt-1">Passwords don't match</p>
                   )}
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Terms and Conditions Agreement <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif"
+                      onChange={handleAgreementFileChange}
+                      disabled={uploadingAgreement}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                      required
+                    />
+                    {uploadingAgreement && (
+                      <div className="flex items-center mt-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        <span className="text-sm text-gray-600">Uploading agreement...</span>
+                      </div>
+                    )}
+                    {agreementFile && agreementFileUrl && (
+                      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                        <p className="text-sm text-green-700">
+                          ✓ Agreement uploaded: {agreementFile.name}
+                        </p>
+                      </div>
+                    )}
+                    {!agreementFileUrl && !uploadingAgreement && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload a signed terms and conditions agreement (PDF, Word, image, or text file)
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button
-                  onClick={() => setShowAdd(false)}
+                  onClick={() => {
+                    setShowAdd(false);
+                    setAddData({ 
+                      firstName: "", 
+                      lastName: "", 
+                      email: "", 
+                      phone: "", 
+                      password: "", 
+                      confirmPassword: "", 
+                      role: "VOLUNTEER"
+                    });
+                    setAgreementFile(null);
+                    setAgreementFileUrl('');
+                    setUploadingAgreement(false);
+                    setAddUserError('');
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
                   Cancel

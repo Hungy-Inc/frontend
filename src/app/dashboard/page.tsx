@@ -7,6 +7,7 @@ import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { toast } from 'react-toastify';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -246,7 +247,7 @@ export default function Dashboard() {
   const totalHours = Number(volunteers.reduce((sum, v) => sum + v.hours, 0).toFixed(2));
 
   // Custom units state (move these above helpers)
-  const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number; noofmeals: number }[]>([]);
+  const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<'kg' | 'lb' | string>('kg');
 
   // Fetch custom units on mount
@@ -346,8 +347,9 @@ export default function Dashboard() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(link.href);
+      toast.success('Export completed successfully!');
     } catch (err) {
-      alert('Export failed. Please try again.');
+      toast.error('Export failed. Please try again.');
     }
   };
 
@@ -424,14 +426,14 @@ export default function Dashboard() {
                 </div>
                 {/* Donor breakdown table */}
                 <table style={{ width: '100%', fontSize: 15 }}>
-                  <thead>
-                    <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+                <thead>
+                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
                       <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donor</th>
                       <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Weight ({getUnitLabel()})</th>
                       <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Value ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                  </tr>
+                </thead>
+                <tbody>
                     {Object.entries(orgTotals).map(([donor, totals]) => (
                       <tr key={donor}>
                         <td style={{ padding: '8px 8px 8px 0' }}>{donor}</td>
@@ -439,8 +441,8 @@ export default function Dashboard() {
                         <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>${totals.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                </tbody>
+              </table>
               </div>
             )}
           </div>
@@ -478,15 +480,15 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {/* Volunteer table */}
-                <table style={{ width: '100%', fontSize: 15 }}>
-                  <thead>
-                    <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+              <table style={{ width: '100%', fontSize: 15 }}>
+                <thead>
+                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
                       <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Name</th>
                       <th style={{ textAlign: 'left', padding: '8px' }}>Role</th>
                       <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Hours</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                  </tr>
+                </thead>
+                <tbody>
                     {volunteers.slice(0, 8).map((v, idx) => (
                       <tr key={idx}>
                         <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
@@ -494,8 +496,8 @@ export default function Dashboard() {
                         <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{v.hours}</td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                </tbody>
+              </table>
               </div>
             )}
           </div>
@@ -537,24 +539,24 @@ export default function Dashboard() {
                     {firstRow.map((cat: any) => (
                       <div key={cat.category} style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 220 }}>
                         <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 8 }}>{cat.category}</div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'transparent' }}>
-                          <thead>
-                            <tr>
-                              <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'transparent' }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Shift</th>
                               <th style={{ textAlign: 'right', padding: '6px 8px' }}>
                                 Weight ({getUnitLabel()})
                               </th>
-                            </tr>
-                          </thead>
-                          <tbody>
+                              </tr>
+                            </thead>
+                            <tbody>
                             {cat.shifts.map((shift: any) => (
                               <tr key={shift.shiftName}>
                                 <td style={{ padding: '6px 8px', textAlign: 'left' }}>{shift.shiftName}</td>
                                 <td style={{ padding: '6px 8px', textAlign: 'right' }}>{Math.round(convertWeightForCategory(shift.total) * 100) / 100}</td>
-                              </tr>
-                            ))}
-                            <tr style={{ fontWeight: 700, background: '#fafafa' }}>
-                              <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
+                                </tr>
+                              ))}
+                              <tr style={{ fontWeight: 700, background: '#fafafa' }}>
+                                <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
                               <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{Math.round(convertWeightForCategory(cat.total) * 100) / 100}</td>
                             </tr>
                           </tbody>
@@ -585,10 +587,10 @@ export default function Dashboard() {
                             <tr style={{ fontWeight: 700, background: '#fafafa' }}>
                               <td style={{ padding: '6px 8px', textAlign: 'left', color: '#222' }}>Total</td>
                               <td style={{ padding: '6px 8px', textAlign: 'right', color: '#222' }}>{Math.round(convertWeightForCategory(cat.total) * 100) / 100}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                     ))}
                   </div>
                 ];
@@ -605,8 +607,8 @@ export default function Dashboard() {
               style={{ color: '#ff9800', background: 'none', border: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
               onClick={() => {
                 const month = getMonthNumber(period);
-                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${month}&year=${year}&unit=${selectedUnit}`;
-                downloadExcel(url, `outgoing-stats-${year}-${month}.xlsx`);
+                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/dashboard-summary/export?month=${month}&year=${year}&unit=${selectedUnit}`;
+                downloadExcel(url, `dashboard-summary-${year}-${month}.xlsx`);
               }}
             >
               <FiDownload /> Export to Excel

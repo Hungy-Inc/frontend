@@ -1,6 +1,7 @@
 'use client';
 import styles from '../incoming-stats/IncomingStats.module.css';
 import React, { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 
 
 const months = [
@@ -99,25 +100,9 @@ export default function InventoryPage() {
     fetchData();
   }, [selectedMonth, selectedYear, selectedUnit]);
 
-  // Helper to convert weight based on selected unit
-  const convertWeight = (weight: number) => {
+  // Helper to format weight for display (no conversion needed - backend handles it)
+  const formatWeight = (weight: number) => {
     if (weight == null || isNaN(weight)) return 0;
-    
-    // Handle base units
-    if (selectedUnit === 'Pounds (lb)') {
-      return (weight * 2.20462);
-    }
-    if (selectedUnit === 'Kilograms (kg)') {
-      return weight;
-    }
-    
-    // Handle custom weighing categories
-    const category = weighingCategories.find(c => c.category === selectedUnit);
-    if (category && category.kilogram_kg_ > 0) {
-      // Convert kg to custom unit (divide by kg per unit)
-      return weight / category.kilogram_kg_;
-    }
-    
     return weight;
   };
 
@@ -139,7 +124,7 @@ export default function InventoryPage() {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('No authentication token found');
+        toast.error('No authentication token found');
         return;
       }
       const params = new URLSearchParams({
@@ -164,8 +149,9 @@ export default function InventoryPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast.success('Export completed successfully!');
     } catch (err) {
-      alert('Export failed. Please try again.');
+      toast.error('Export failed. Please try again.');
     }
   };
 
@@ -239,10 +225,10 @@ export default function InventoryPage() {
                   <tr key={donor}>
                     <td>{donor}</td>
                     {categories.map((cat: string) => (
-                      <td key={cat}>{convertWeight(tableData[donor][cat]).toFixed(2)}</td>
+                      <td key={cat}>{formatWeight(tableData[donor][cat]).toFixed(2)}</td>
                     ))}
                     <td className={styles.totalCol}>
-                      {convertWeight(Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
+                      {formatWeight(Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -250,11 +236,11 @@ export default function InventoryPage() {
                   <td>Total</td>
                   {categories.map((cat: string) => (
                     <td key={cat}>
-                      {convertWeight(donors.reduce((sum, donor) => sum + tableData[donor][cat], 0)).toFixed(2)}
+                      {formatWeight(donors.reduce((sum, donor) => sum + tableData[donor][cat], 0)).toFixed(2)}
                     </td>
                   ))}
                   <td className={styles.totalCol}>
-                    {convertWeight(donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
+                    {formatWeight(donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
                   </td>
                 </tr>
               </tbody>

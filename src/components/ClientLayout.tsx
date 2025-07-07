@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function ClientLayout({
   children,
@@ -13,7 +15,8 @@ export default function ClientLayout({
   const isHomePage = pathname === '/';
   const isLoginPage = pathname === '/login';
   const isForgotPasswordPage = pathname === '/forgot-password';
-  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage;
+  const isShiftSignupPage = pathname.startsWith('/shift-signup');
+  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#f7f7f9" }}>
@@ -22,6 +25,18 @@ export default function ClientLayout({
         {shouldShowSidebarAndHeader && <Header />}
         <main style={{ flex: 1 }}>{children}</main>
       </div>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 } 

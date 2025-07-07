@@ -351,7 +351,7 @@ export default function ScheduleShiftsPage() {
 
       fetchShifts();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete shift');
+      toast.error(err.message || 'Failed to delete shift');
     }
   };
 
@@ -597,6 +597,10 @@ export default function ScheduleShiftsPage() {
 
   // Filter recurringShifts for the cards
   const filteredRecurring = recurringShifts.filter((rec: any) => {
+    // Exclude Meals Counting and Collection categories
+    const category = categoryOptions.find(cat => cat.id === rec.shiftCategoryId);
+    if (category && (category.name === 'Meals Counting' || category.name === 'Collection')) return false;
+    
     // Category filter
     if (selectedCardCategory && String(rec.shiftCategoryId) !== String(selectedCardCategory)) return false;
     // Shift name filter - show all shifts with the same name regardless of timing
@@ -620,7 +624,13 @@ export default function ScheduleShiftsPage() {
   // Get unique shift names for the dropdown - only filter by category, not timing, and remove case-insensitive duplicates
   const shiftNameOptions = Array.from(
     recurringShifts
-      .filter(rec => !selectedCardCategory || String(rec.shiftCategoryId) === String(selectedCardCategory))
+      .filter(rec => {
+        // Exclude Meals Counting and Collection categories
+        const category = categoryOptions.find(cat => cat.id === rec.shiftCategoryId);
+        if (category && (category.name === 'Meals Counting' || category.name === 'Collection')) return false;
+        
+        return !selectedCardCategory || String(rec.shiftCategoryId) === String(selectedCardCategory);
+      })
       .reduce((map, rec) => {
         const normalized = rec.name.trim().toLowerCase();
         if (!map.has(normalized)) {
@@ -813,35 +823,55 @@ export default function ScheduleShiftsPage() {
     const pendingSlots = Math.max(0, totalSlots - bookedSlots);
 
     return (
-      <div key={rec.id} style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: '28px 36px', minHeight: 90, marginBottom: 16, border: '2px solid #f5f5f5', position: 'relative', transition: 'box-shadow 0.2s', gap: 24 }}>
-        <div style={{ marginRight: 32, fontSize: 36, width: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span role="img" aria-label="meal">🍲</span>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 24, marginBottom: 4, fontFamily: 'Poppins,Inter,sans-serif', color: '#222' }}>{rec.name || 'Supper Shift'}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 2 }}>
-            <span style={{ color: '#ff9800', fontWeight: 600, fontSize: 18 }}>
-              {nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-            <span style={{ color: '#888', fontWeight: 500, fontSize: 16 }}>
-              {new Date(rec.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}–{new Date(rec.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-            <span style={{ color: '#bbb', fontSize: 15, marginLeft: 8 }}>{rec.location}</span>
+      <div key={rec.id} style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: '20px 24px', marginBottom: 12, border: '1px solid #f0f0f0', position: 'relative', transition: 'box-shadow 0.2s' }}>
+        {/* Header Section */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 28, width: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span role="img" aria-label="meal">🍲</span>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 2, fontFamily: 'Poppins,Inter,sans-serif', color: '#222' }}>{rec.name || 'Supper Shift'}</div>
+              <div style={{ color: '#ff9800', fontWeight: 600, fontSize: 13, background: '#fff3e0', padding: '2px 8px', borderRadius: 8, display: 'inline-block' }}>
+                📅 {nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </div>
+            </div>
           </div>
-          {/* Removed Show Employees button for cleaner UI */}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 180, marginLeft: 24, position: 'relative', gap: 4 }}>
-          <span style={{ color: '#333', fontWeight: 500, fontSize: 15, marginBottom: 2 }}>
-            <b>Total Slots:</b> {totalSlots}
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-            <span style={{ color: '#ff9800', fontWeight: 700, fontSize: 16, borderRadius: 14, padding: '6px 18px', background: '#f5f5f5', display: 'inline-block' }}>
-              <b>Booked:</b> {bookedSlots}
-            </span>
-            <span style={{ color: '#ff9800', fontWeight: 700, fontSize: 16, borderRadius: 14, padding: '6px 18px', background: '#f5f5f5', display: 'inline-block' }}>
-              <b>Pending:</b> {pendingSlots}
-            </span>
+          
+          {/* Capacity Badge */}
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ background: pendingSlots > 0 ? '#e8f5e8' : '#ffe8e8', color: pendingSlots > 0 ? '#2e7d32' : '#d32f2f', padding: '4px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600, marginBottom: 2 }}>
+              {pendingSlots > 0 ? `${pendingSlots} spots available` : 'Fully booked'}
+            </div>
+            <div style={{ color: '#888', fontSize: 11 }}>
+              {bookedSlots}/{totalSlots} filled
+            </div>
           </div>
+        </div>
+        
+        {/* Details Section */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 14, padding: '12px 16px', background: '#f9f9f9', borderRadius: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#ff9800', fontSize: 16 }}>🕒</span>
+            <div>
+              <div style={{ color: '#333', fontWeight: 600, fontSize: 14 }}>
+                {new Date(rec.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(rec.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+              <div style={{ color: '#666', fontSize: 11 }}>Shift Time</div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#ff9800', fontSize: 16 }}>📍</span>
+            <div>
+              <div style={{ color: '#333', fontWeight: 600, fontSize: 14 }}>{rec.location}</div>
+              <div style={{ color: '#666', fontSize: 11 }}>Location</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={handleManageEmployeesClick}
             style={{ 
@@ -849,16 +879,97 @@ export default function ScheduleShiftsPage() {
               color: '#fff', 
               border: 'none', 
               borderRadius: 8,
-              padding: '10px 22px',
-              marginTop: 8,
+              padding: '8px 16px',
               cursor: 'pointer',
-              fontWeight: 700,
-              fontSize: 16,
-              boxShadow: '0 2px 8px rgba(255,152,0,0.10)',
-              letterSpacing: 0.5
+              fontWeight: 600,
+              fontSize: 13,
+              boxShadow: '0 1px 4px rgba(255,152,0,0.15)',
+              letterSpacing: 0.2,
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(255,152,0,0.25)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 4px rgba(255,152,0,0.15)';
             }}
           >
-            Manage Employees
+            👥 Manage
+          </button>
+          <button
+            onClick={async () => {
+              const categoryName = categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name || 'Unknown';
+              const dateStr = nextDate.toISOString().split('T')[0];
+              const signupUrl = `${window.location.origin}/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(rec.name)}?date=${dateStr}`;
+              
+              // Check if shift exists in database, if not create it
+              let shiftExists = matchingShifts.length > 0;
+              
+              if (!shiftExists) {
+                try {
+                  const token = localStorage.getItem("token");
+                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({
+                      name: rec.name,
+                      shiftCategoryId: rec.shiftCategoryId,
+                      startTime: nextDate.toISOString(),
+                      endTime: (() => {
+                        const end = new Date(nextDate);
+                        end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
+                        return end.toISOString();
+                      })(),
+                      location: rec.location,
+                      slots: rec.slots
+                    })
+                  });
+                  
+                  if (res.ok) {
+                    // Refresh shifts list to include the newly created shift
+                    await fetchShifts();
+                    toast.success('Shift created and signup link copied to clipboard!');
+                  } else {
+                    throw new Error('Failed to create shift');
+                  }
+                } catch (err) {
+                  toast.error('Failed to create shift for this date');
+                  return;
+                }
+              } else {
+                toast.success('Signup link copied to clipboard!');
+              }
+              
+              // Copy to clipboard
+              navigator.clipboard.writeText(signupUrl).catch(() => {
+                toast.error('Failed to copy link');
+              });
+            }}
+            style={{ 
+              background: 'linear-gradient(90deg, #4caf50 60%, #66bb6a 100%)',
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 8,
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 13,
+              boxShadow: '0 1px 4px rgba(76,175,80,0.15)',
+              letterSpacing: 0.2,
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(76,175,80,0.25)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 4px rgba(76,175,80,0.15)';
+            }}
+          >
+            📋 Copy Link
           </button>
         </div>
       </div>
@@ -1427,16 +1538,16 @@ export default function ScheduleShiftsPage() {
   };
 
   return (
-    <main style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>Schedule Shifts</h1>
-        <p style={{ color: '#666', fontSize: 16 }}>Manage and schedule shifts for your organization</p>
+    <main style={{ padding: '16px 24px', maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Schedule Shifts</h1>
+        <p style={{ color: '#666', fontSize: 14 }}>Manage and schedule shifts for your organization</p>
       </div>
 
       {/* Category and Day Filters */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         {/* Category Tabs */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
           <button
             key="all"
             onClick={() => setSelectedCardCategory("")}
@@ -1445,15 +1556,18 @@ export default function ScheduleShiftsPage() {
               color: selectedCardCategory === "" ? '#fff' : '#333',
               border: 'none',
               borderRadius: 6,
-              padding: '8px 18px',
+              padding: '6px 14px',
               cursor: 'pointer',
               fontWeight: 600,
-              minWidth: 120
+              fontSize: 14,
+              minWidth: 100
             }}
           >
             All Categories
                 </button>
-          {categoryOptions.map(opt => (
+          {categoryOptions
+            .filter(opt => opt.name !== 'Meals Counting' && opt.name !== 'Collection')
+            .map(opt => (
             <button
               key={opt.id}
               onClick={() => setSelectedCardCategory(String(opt.id))}
@@ -1462,16 +1576,17 @@ export default function ScheduleShiftsPage() {
                 color: selectedCardCategory === String(opt.id) ? '#fff' : '#333',
                 border: 'none',
                 borderRadius: 6,
-                padding: '8px 18px',
+                padding: '6px 14px',
                 cursor: 'pointer',
                 fontWeight: 600,
-                minWidth: 120,
+                fontSize: 14,
+                minWidth: 100,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6
+                gap: 4
               }}
             >
-              {opt.icon && <span style={{ fontSize: 18 }}>{opt.icon}</span>}
+              {opt.icon && <span style={{ fontSize: 16 }}>{opt.icon}</span>}
               {opt.name}
             </button>
           ))}
@@ -1481,8 +1596,8 @@ export default function ScheduleShiftsPage() {
     
 
       {/* Shift Name Tabs */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button
             onClick={() => setSelectedShiftName("")}
             style={{
@@ -1490,10 +1605,11 @@ export default function ScheduleShiftsPage() {
               color: selectedShiftName === "" ? '#fff' : '#333',
               border: 'none',
               borderRadius: 6,
-              padding: '8px 18px',
+              padding: '6px 14px',
               cursor: 'pointer',
               fontWeight: 600,
-              minWidth: 100
+              fontSize: 14,
+              minWidth: 80
             }}
           >
             All Shifts
@@ -1507,10 +1623,11 @@ export default function ScheduleShiftsPage() {
                 color: selectedShiftName === name ? '#fff' : '#333',
                 border: 'none',
                 borderRadius: 6,
-                padding: '8px 18px',
+                padding: '6px 14px',
                 cursor: 'pointer',
                 fontWeight: 600,
-                minWidth: 100
+                fontSize: 14,
+                minWidth: 80
               }}
             >
               {name}
@@ -1522,80 +1639,80 @@ export default function ScheduleShiftsPage() {
 
         
       {/* Date Filter Section */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Left side - Date filter buttons */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <button
-              onClick={() => setDateFilter('today')}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => setDateFilter('today')}
+            style={{
+              background: dateFilter === 'today' ? '#ff9800' : '#f5f5f5',
+              color: dateFilter === 'today' ? '#fff' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14
+            }}
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setDateFilter('week')}
+            style={{
+              background: dateFilter === 'week' ? '#ff9800' : '#f5f5f5',
+              color: dateFilter === 'week' ? '#fff' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14
+            }}
+          >
+            This Week
+          </button>
+          <button
+            onClick={() => setDateFilter('custom')}
+            style={{
+              background: dateFilter === 'custom' ? '#ff9800' : '#f5f5f5',
+              color: dateFilter === 'custom' ? '#fff' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14
+            }}
+          >
+            Custom Date
+          </button>
+          {dateFilter === 'custom' && (
+            <input
+              type="date"
+              value={customDate}
+              onChange={(e) => setCustomDate(e.target.value)}
+              min={todayStr}
               style={{
-                background: dateFilter === 'today' ? '#ff9800' : '#f5f5f5',
-                color: dateFilter === 'today' ? '#fff' : '#333',
-                border: 'none',
+                padding: '6px 8px',
                 borderRadius: 6,
-                padding: '8px 16px',
-                cursor: 'pointer',
-                fontWeight: 600
+                border: '1px solid #ddd',
+                fontSize: 14
               }}
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setDateFilter('week')}
-              style={{
-                background: dateFilter === 'week' ? '#ff9800' : '#f5f5f5',
-                color: dateFilter === 'week' ? '#fff' : '#333',
-                border: 'none',
-                borderRadius: 6,
-                padding: '8px 16px',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              This Week
-            </button>
-            <button
-              onClick={() => setDateFilter('custom')}
-              style={{
-                background: dateFilter === 'custom' ? '#ff9800' : '#f5f5f5',
-                color: dateFilter === 'custom' ? '#fff' : '#333',
-                border: 'none',
-                borderRadius: 6,
-                padding: '8px 16px',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              Custom Date
-            </button>
-            {dateFilter === 'custom' && (
-              <input
-                type="date"
-                value={customDate}
-                onChange={(e) => setCustomDate(e.target.value)}
-                min={todayStr}
-                style={{
-                  padding: 8,
-                  borderRadius: 6,
-                  border: '1px solid #eee',
-                  fontSize: 14
-                }}
-              />
-            )}
-          </div>
+            />
+          )}
         </div>
       </div>
 
       {/* Shifts Display */}
-      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32 }}>
+      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 20 }}>
         {loading ? (
-          <div style={{ textAlign: 'center', color: '#888' }}>Loading...</div>
+          <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>Loading...</div>
         ) : error ? (
-          <div style={{ textAlign: 'center', color: 'red' }}>{error}</div>
+          <div style={{ textAlign: 'center', color: 'red', padding: 20 }}>{error}</div>
         ) : filteredRecurring.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#888' }}>No recurring shifts found for the selected filters.</div>
+          <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>No recurring shifts found for the selected filters.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filteredRecurring.map(rec => renderShiftCard(rec))}
           </div>
         )}

@@ -1,6 +1,7 @@
 'use client';
 import styles from '../incoming-stats/IncomingStats.module.css';
 import React, { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 
 const months = [
   { value: 0, label: 'All Months' },
@@ -90,8 +91,9 @@ export default function VolunteersPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast.success('Export completed successfully!');
     } catch (err) {
-      alert('Failed to export Excel.');
+      toast.error('Failed to export Excel.');
     }
   };
 
@@ -158,9 +160,6 @@ export default function VolunteersPage() {
         </div>
       </div>
       <div className={styles.tableWrapper}>
-        <div className={styles.tableTitle}>
-          Volunteer Hours Breakdown
-        </div>
         <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
           {loading ? (
             <div style={{ padding: 32, textAlign: 'center' }}>Loading...</div>

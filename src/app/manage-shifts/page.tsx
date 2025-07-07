@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { FaEdit, FaTrash, FaPlusCircle } from "react-icons/fa";
+import { toast } from 'react-toastify';
 
 export default function ManageShiftsPage() {
   const [tab, setTab] = useState<'shiftcategory' | 'recurringshifts'>('recurringshifts');
@@ -139,8 +140,10 @@ export default function ManageShiftsPage() {
       setAddName("");
       setAddIcon("");
       fetchCategories();
+      toast.success('Category added successfully!');
     } catch (err: any) {
       setAddError(err.message || 'Failed to add category');
+      toast.error(err.message || 'Failed to add category');
     } finally {
       setAdding(false);
     }
@@ -173,8 +176,10 @@ export default function ManageShiftsPage() {
       setEditName("");
       setEditIcon("");
       fetchCategories();
+      toast.success('Category updated successfully!');
     } catch (err: any) {
       setEditError(err.message || 'Failed to update category');
+      toast.error(err.message || 'Failed to update category');
     } finally {
       setEditing(false);
     }
@@ -198,8 +203,9 @@ export default function ManageShiftsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete category');
       fetchCategories();
+      toast.success('Category deleted successfully!');
     } catch (err: any) {
-      alert(err.message || 'Failed to delete category');
+      toast.error(err.message || 'Failed to delete category');
     }
   };
 
@@ -243,8 +249,10 @@ export default function ManageShiftsPage() {
       setShowAddRecurring(false);
       setAddRecurring({ name: '', dayOfWeek: 0, startTime: '', endTime: '', shiftCategoryId: '', location: '', slots: 1 });
       fetchRecurringShifts();
+      toast.success('Recurring shift added successfully!');
     } catch (err: any) {
       setAddRecurringError(err.message || 'Failed to add recurring shift');
+      toast.error(err.message || 'Failed to add recurring shift');
     } finally {
       setAddingRecurring(false);
     }
@@ -303,8 +311,10 @@ export default function ManageShiftsPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to update recurring shift');
       setEditRecurringId(null);
       fetchRecurringShifts();
+      toast.success('Recurring shift updated successfully!');
     } catch (err: any) {
       setEditRecurringError(err.message || 'Failed to update recurring shift');
+      toast.error(err.message || 'Failed to update recurring shift');
     } finally {
       setEditingRecurring(false);
     }
@@ -326,8 +336,9 @@ export default function ManageShiftsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete recurring shift');
       fetchRecurringShifts();
+      toast.success('Recurring shift deleted successfully!');
     } catch (err: any) {
-      alert(err.message || 'Failed to delete recurring shift');
+      toast.error(err.message || 'Failed to delete recurring shift');
     }
   };
 

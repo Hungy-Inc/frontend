@@ -33,6 +33,33 @@ interface SignupFormData {
   selectedDate: string;
 }
 
+// Helper: Parse YYYY-MM-DD as Halifax local date
+function parseHalifaxDate(dateStr: string): Date {
+  if (!dateStr) return new Date('');
+  const [year, month, day] = dateStr.split('-').map(Number);
+  // Construct a Date object as if the date is midnight in Halifax
+  // Get the UTC time for midnight in Halifax
+  // Halifax is UTC-4 or UTC-3 depending on DST, but for display, we use the timeZone option
+  // So we can use Date.UTC and then display with timeZone: 'America/Halifax'
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+}
+
+// Helper to format YYYY-MM-DD as Halifax local date string
+function formatHalifaxDateString(dateStr: string) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-').map(Number);
+  // Create a Date object at noon UTC to avoid timezone issues
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  // Always display in Halifax timezone
+  return date.toLocaleDateString('en-CA', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/Halifax'
+  });
+}
+
 export default function ShiftSignupPage() {
   const params = useParams();
   const router = useRouter();
@@ -158,6 +185,13 @@ export default function ShiftSignupPage() {
       // Refresh shift details to update available slots
       fetchShiftDetails();
       
+      // Trigger refresh on admin page if it's open
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('shiftSignupCompleted', {
+          detail: { shiftId: data.shiftSignup?.id }
+        }));
+      }
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -174,14 +208,16 @@ export default function ShiftSignupPage() {
   };
 
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-CA', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'America/Halifax' // Use Atlantic Canada timezone
     });
   };
 
@@ -231,22 +267,19 @@ export default function ShiftSignupPage() {
               <strong>{shift?.name}</strong> ({shift?.categoryName})
             </p>
             <p className="text-sm text-gray-600">
-              📅 {formData.selectedDate ? new Date(formData.selectedDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              }) : 'Date selected'}
+              📅 {formData.selectedDate ? formatHalifaxDateString(formData.selectedDate) : 'Date selected'}
             </p>
             <p className="text-sm text-gray-600">
-              🕒 {shift && `${new Date(shift.startTime).toLocaleTimeString('en-US', {
+              🕒 {shift && `${new Date(shift.startTime).toLocaleTimeString('en-CA', {
                 hour: 'numeric',
                 minute: '2-digit',
-                hour12: true
-              })} - ${new Date(shift.endTime).toLocaleTimeString('en-US', {
+                hour12: true,
+                timeZone: 'America/Halifax'
+              })} - ${new Date(shift.endTime).toLocaleTimeString('en-CA', {
                 hour: 'numeric',
                 minute: '2-digit',
-                hour12: true
+                hour12: true,
+                timeZone: 'America/Halifax'
               })}`}
             </p>
             <p className="text-sm text-gray-600">
@@ -292,14 +325,16 @@ export default function ShiftSignupPage() {
                   <div>
                     <p className="font-medium">Time</p>
                     <p className="text-sm">
-                      {new Date(shift.startTime).toLocaleTimeString('en-US', {
+                      {new Date(shift.startTime).toLocaleTimeString('en-CA', {
                         hour: 'numeric',
                         minute: '2-digit',
-                        hour12: true
-                      })} - {new Date(shift.endTime).toLocaleTimeString('en-US', {
+                        hour12: true,
+                        timeZone: 'America/Halifax'
+                      })} - {new Date(shift.endTime).toLocaleTimeString('en-CA', {
                         hour: 'numeric',
                         minute: '2-digit',
-                        hour12: true
+                        hour12: true,
+                        timeZone: 'America/Halifax'
                       })}
                     </p>
                   </div>
@@ -356,14 +391,16 @@ export default function ShiftSignupPage() {
                   <div>
                     <p className="font-medium">Time</p>
                     <p className="text-sm">
-                      {new Date(shift.startTime).toLocaleTimeString('en-US', {
+                      {new Date(shift.startTime).toLocaleTimeString('en-CA', {
                         hour: 'numeric',
                         minute: '2-digit',
-                        hour12: true
-                      })} - {new Date(shift.endTime).toLocaleTimeString('en-US', {
+                        hour12: true,
+                        timeZone: 'America/Halifax'
+                      })} - {new Date(shift.endTime).toLocaleTimeString('en-CA', {
                         hour: 'numeric',
                         minute: '2-digit',
-                        hour12: true
+                        hour12: true,
+                        timeZone: 'America/Halifax'
                       })}
                     </p>
                   </div>
@@ -469,12 +506,7 @@ export default function ShiftSignupPage() {
                  </label>
                  <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
                    <p className="text-gray-900 font-medium" style={{ color: '#ff9800' }}>
-                     📅 {formData.selectedDate ? new Date(formData.selectedDate).toLocaleDateString('en-US', {
-                       weekday: 'long',
-                       year: 'numeric',
-                       month: 'long',
-                       day: 'numeric'
-                     }) : 'No date selected'}
+                     📅 {formData.selectedDate ? formatHalifaxDateString(formData.selectedDate) : 'No date selected'}
                    </p>
                  </div>
                  <input
@@ -484,12 +516,7 @@ export default function ShiftSignupPage() {
                  />
                </div>
                
-               <div className="rounded-lg p-4" style={{ backgroundColor: '#fff3e0', border: '1px solid #ffcc80' }}>
-                 <p className="text-sm" style={{ color: '#e65100' }}>
-                   <strong>Note:</strong> If you're a new volunteer, you'll receive an email with instructions to set up your password. 
-                   If you already have an account, you'll receive a confirmation email.
-                 </p>
-               </div>
+
               
               <button
                 type="submit"

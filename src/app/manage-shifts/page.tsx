@@ -227,8 +227,9 @@ export default function ManageShiftsPage() {
         }
       }
       const token = localStorage.getItem("token");
-      const startTime = addRecurring.startTime ? `${baseDate}T${addRecurring.startTime}` : '';
-      const endTime = addRecurring.endTime ? `${baseDate}T${addRecurring.endTime}` : '';
+      // Create times in Halifax timezone (UTC-3 or UTC-4 depending on DST)
+      const startTime = addRecurring.startTime ? `${baseDate}T${addRecurring.startTime}:00-03:00` : '';
+      const endTime = addRecurring.endTime ? `${baseDate}T${addRecurring.endTime}:00-03:00` : '';
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
         method: 'POST',
         headers: {
@@ -290,8 +291,9 @@ export default function ManageShiftsPage() {
         }
       }
       const token = localStorage.getItem("token");
-      const startTime = editRecurring.startTime ? `${baseDate}T${editRecurring.startTime}` : '';
-      const endTime = editRecurring.endTime ? `${baseDate}T${editRecurring.endTime}` : '';
+      // Create times in Halifax timezone (UTC-3 or UTC-4 depending on DST)
+      const startTime = editRecurring.startTime ? `${baseDate}T${editRecurring.startTime}:00-03:00` : '';
+      const endTime = editRecurring.endTime ? `${baseDate}T${editRecurring.endTime}:00-03:00` : '';
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
         method: 'PUT',
         headers: {
@@ -351,7 +353,7 @@ export default function ManageShiftsPage() {
   const isRecurringSlotsValid = Number(addRecurring.slots) > 0;
   const isRecurringFormValid = isRecurringNameValid && isRecurringDayValid && isRecurringStartTimeValid && isRecurringEndTimeValid && isRecurringCategoryValid && isRecurringLocationValid && isRecurringSlotsValid;
 
-  const isCategoryNameValid = /^[A-Za-z0-9]+$/.test(addName.trim());
+  const isCategoryNameValid = addName.trim().length > 0;
 
   // Unique shift names for dropdown (case-insensitive, trimmed)
   const shiftNameOptions = Array.from(
@@ -453,10 +455,22 @@ export default function ManageShiftsPage() {
                   <button onClick={() => setShowAdd(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}>×</button>
                   <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Add Shift Category</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <input placeholder="Name" value={addName} onChange={e => setAddName(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                    <div>
+                      <input placeholder="Name" value={addName} onChange={e => setAddName(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', width: '100%' }} />
+                      <div style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
+                        Category names must be unique within your organization
+                      </div>
+                      {addName.trim() && categories.find(
+                        cat => cat.name.toLowerCase() === addName.trim().toLowerCase()
+                      ) && (
+                        <div style={{ color: '#f44336', fontSize: 12, marginTop: 4 }}>
+                          Category "{addName.trim()}" already exists
+                        </div>
+                      )}
+                    </div>
                     <input placeholder="Icon (optional)" value={addIcon} onChange={e => setAddIcon(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                     {addError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{addError}</div>}
-                    <button onClick={handleAddCategory} style={{ background: isCategoryNameValid ? '#ff9800' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: adding ? 'not-allowed' : isCategoryNameValid ? 'pointer' : 'not-allowed', opacity: adding ? 0.7 : 1 }} disabled={adding || !isCategoryNameValid}>
+                    <button onClick={handleAddCategory} style={{ background: (isCategoryNameValid && !categories.find(cat => cat.name.toLowerCase() === addName.trim().toLowerCase())) ? '#ff9800' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: adding ? 'not-allowed' : (isCategoryNameValid && !categories.find(cat => cat.name.toLowerCase() === addName.trim().toLowerCase())) ? 'pointer' : 'not-allowed', opacity: adding ? 0.7 : 1 }} disabled={adding || !isCategoryNameValid || !!categories.find(cat => cat.name.toLowerCase() === addName.trim().toLowerCase())}>
                       {adding ? 'Adding...' : 'Add'}
                     </button>
                   </div>
@@ -552,8 +566,8 @@ export default function ManageShiftsPage() {
                         </td>
                         <td style={{ padding: '12px 0' }}>{shift.name}</td>
                         <td style={{ padding: 12 }}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek]}</td>
-                        <td style={{ padding: 12 }}>{shift.startTime ? shift.startTime.slice(11, 16) : ''}</td>
-                        <td style={{ padding: 12 }}>{shift.endTime ? shift.endTime.slice(11, 16) : ''}</td>
+                        <td style={{ padding: 12 }}>{shift.startTime ? new Date(shift.startTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Halifax' }) : ''}</td>
+                        <td style={{ padding: 12 }}>{shift.endTime ? new Date(shift.endTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Halifax' }) : ''}</td>
                         <td style={{ padding: 12 }}>{shift.location}</td>
                         <td style={{ padding: 12 }}>{shift.slots}</td>
                         <td style={{ padding: 12, textAlign: 'center' }}>

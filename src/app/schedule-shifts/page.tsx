@@ -69,6 +69,7 @@ export default function ScheduleShiftsPage() {
   const [selectedRecurringUsers, setSelectedRecurringUsers] = useState<any[]>([]);
 
   const [scheduling, setScheduling] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
 
   // Add new state for employee selection popup
   const [showEmployeePopup, setShowEmployeePopup] = useState(false);
@@ -112,7 +113,47 @@ export default function ScheduleShiftsPage() {
     fetchUsers();
     fetchCategories();
     fetchRecurringShifts();
-  }, []);
+    
+    // Smart refresh - check for changes every 10 seconds
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/last-updated`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.lastUpdated > lastUpdateTime) {
+            fetchShifts();
+            fetchRecurringShifts();
+            setLastUpdateTime(data.lastUpdated);
+          }
+        }
+      } catch (err) {
+        // Silently fail - don't interrupt user experience
+        // If endpoint doesn't exist, just refresh every 30 seconds as fallback
+        if (Date.now() - lastUpdateTime > 30000) {
+          fetchShifts();
+          fetchRecurringShifts();
+          setLastUpdateTime(Date.now());
+        }
+      }
+    }, 10000);
+    
+    // Listen for shift signup events
+    const handleShiftSignup = () => {
+      fetchShifts();
+      fetchRecurringShifts();
+      setLastUpdateTime(Date.now());
+    };
+    
+    window.addEventListener('shiftSignupCompleted', handleShiftSignup);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('shiftSignupCompleted', handleShiftSignup);
+    };
+  }, [lastUpdateTime]);
 
   // Fetch users on page load
   useEffect(() => {
@@ -540,7 +581,7 @@ export default function ScheduleShiftsPage() {
                   start.setHours(new Date(opt.startTime).getHours(), new Date(opt.startTime).getMinutes(), 0, 0);
                   const end = new Date(nextDate);
                   end.setHours(new Date(opt.endTime).getHours(), new Date(opt.endTime).getMinutes(), 0, 0);
-        return `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        return `${start.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })} - ${end.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}`;
       })
   ));
 
@@ -564,14 +605,16 @@ export default function ScheduleShiftsPage() {
 
   // Helper to get next occurrence date for a recurring shift
   const getNextOccurrence = (rec: any) => {
-          const today = new Date();
+    const today = new Date();
     const todayDay = today.getDay();
     let dayDiff = rec.dayOfWeek - todayDay;
     if (dayDiff < 0) dayDiff += 7;
     // If today is the recurring day, show today (not 7 days later)
-          const nextDate = new Date(today);
-          nextDate.setDate(today.getDate() + dayDiff);
-    nextDate.setHours(new Date(rec.startTime).getHours(), new Date(rec.startTime).getMinutes(), 0, 0);
+    const nextDate = new Date(today);
+    nextDate.setDate(today.getDate() + dayDiff);
+    // Set time in Atlantic timezone
+    const recStart = new Date(rec.startTime);
+    nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
     return nextDate;
   };
 
@@ -832,8 +875,11 @@ export default function ScheduleShiftsPage() {
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 2, fontFamily: 'Poppins,Inter,sans-serif', color: '#222' }}>{rec.name || 'Supper Shift'}</div>
+              <div style={{ color: '#666', fontWeight: 500, fontSize: 12, marginBottom: 4 }}>
+                📋 {categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name || 'Unknown Category'}
+              </div>
               <div style={{ color: '#ff9800', fontWeight: 600, fontSize: 13, background: '#fff3e0', padding: '2px 8px', borderRadius: 8, display: 'inline-block' }}>
-                📅 {nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                📅 {nextDate.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Halifax' })}
               </div>
             </div>
           </div>
@@ -855,7 +901,7 @@ export default function ScheduleShiftsPage() {
             <span style={{ color: '#ff9800', fontSize: 16 }}>🕒</span>
             <div>
               <div style={{ color: '#333', fontWeight: 600, fontSize: 14 }}>
-                {new Date(rec.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(rec.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(rec.startTime).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })} - {new Date(rec.endTime).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
               </div>
               <div style={{ color: '#666', fontSize: 11 }}>Shift Time</div>
             </div>
@@ -901,7 +947,8 @@ export default function ScheduleShiftsPage() {
           <button
             onClick={async () => {
               const categoryName = categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name || 'Unknown';
-              const dateStr = nextDate.toISOString().split('T')[0];
+              // Use the nextDate directly for consistent date calculation
+              const dateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
               const signupUrl = `${window.location.origin}/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(rec.name)}?date=${dateStr}`;
               
               // Check if shift exists in database, if not create it
@@ -916,10 +963,20 @@ export default function ScheduleShiftsPage() {
                     body: JSON.stringify({
                       name: rec.name,
                       shiftCategoryId: rec.shiftCategoryId,
-                      startTime: nextDate.toISOString(),
+                      startTime: (() => {
+                        // Extract time from recurring shift and create in Halifax timezone
+                        const recStart = new Date(rec.startTime);
+                        const start = new Date(nextDate);
+                        start.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
+                        // Convert to Halifax timezone for storage
+                        return start.toISOString();
+                      })(),
                       endTime: (() => {
+                        // Extract time from recurring shift and create in Halifax timezone
+                        const recEnd = new Date(rec.endTime);
                         const end = new Date(nextDate);
-                        end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
+                        end.setHours(recEnd.getHours(), recEnd.getMinutes(), 0, 0);
+                        // Convert to Halifax timezone for storage
                         return end.toISOString();
                       })(),
                       location: rec.location,
@@ -1539,9 +1596,35 @@ export default function ScheduleShiftsPage() {
 
   return (
     <main style={{ padding: '16px 24px', maxWidth: 1400, margin: '0 auto' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Schedule Shifts</h1>
-        <p style={{ color: '#666', fontSize: 14 }}>Manage and schedule shifts for your organization</p>
+      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Schedule Shifts</h1>
+          <p style={{ color: '#666', fontSize: 14 }}>Manage and schedule shifts for your organization</p>
+        </div>
+        <button
+          onClick={() => {
+            fetchShifts();
+            fetchRecurringShifts();
+            toast.success('Data refreshed!');
+          }}
+          style={{
+            background: '#ff9800',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 16px',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: 14,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e68900'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ff9800'}
+        >
+          🔄 Refresh
+        </button>
       </div>
 
       {/* Category and Day Filters */}

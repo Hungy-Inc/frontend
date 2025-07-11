@@ -493,12 +493,17 @@ export default function ManageUsersPage() {
       !validatePassword(addData.password) &&
       addData.role &&
       agreementFileUrl && // Terms and conditions agreement is required
-      !uploadingAgreement
+      !uploadingAgreement &&
+      addData.phone &&
+      addData.phone.length === 10 &&
+      /^\d{10}$/.test(addData.phone)
     );
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString('en-CA', {
+      timeZone: 'America/Halifax'
+    });
   };
 
   // Filter functions
@@ -1059,9 +1064,19 @@ export default function ManageUsersPage() {
                   <input
                     type="tel"
                     value={addData.phone}
-                    onChange={(e) => setAddData({...addData, phone: e.target.value})}
+                    onChange={(e) => {
+                      // Only allow digits, max 10
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setAddData({ ...addData, phone: val });
+                    }}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    maxLength={10}
+                    pattern="[0-9]{10}"
+                    required
                   />
+                  {addData.phone && addData.phone.length !== 10 && (
+                    <p className="text-red-500 text-xs mt-1">Phone number must be exactly 10 digits</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Role</label>

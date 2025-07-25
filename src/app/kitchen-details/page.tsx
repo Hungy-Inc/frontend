@@ -49,7 +49,8 @@ export default function KitchenDetailsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     name: "",
-    address: ""
+    address: "",
+    email: ""
   });
   const [addresses, setAddresses] = useState<string[]>([]);
   const [newAddress, setNewAddress] = useState("");
@@ -116,9 +117,23 @@ export default function KitchenDetailsPage() {
 
       const userOrg = organizations[0];
       setOrganization(userOrg);
+      
+      // Parse addresses to ensure proper format
+      let parsedAddresses: string[] = [];
+      if (userOrg.address) {
+        try {
+          // First try parsing as JSON
+          parsedAddresses = JSON.parse(userOrg.address);
+        } catch {
+          // If not JSON, treat as comma-separated string
+          parsedAddresses = userOrg.address.split(',').map((addr: string) => addr.trim()).filter((addr: string) => addr);
+        }
+      }
+      
       setEditData({
         name: userOrg.name || "",
-        address: userOrg.address || ""
+        address: JSON.stringify(parsedAddresses),
+        email: userOrg.email || ""
       });
       
       // Load incoming dollar value from organization data
@@ -127,25 +142,8 @@ export default function KitchenDetailsPage() {
       console.log('Incoming dollar value loaded:', incomingValue);
       setIncomingDollarValue(incomingValue);
 
-      // Parse addresses from JSON string or comma-separated string
-      try {
-        let parsedAddresses: string[];
-        if (userOrg.address) {
-          try {
-            // First try parsing as JSON
-            parsedAddresses = JSON.parse(userOrg.address);
-          } catch {
-            // If not JSON, treat as comma-separated string
-            parsedAddresses = userOrg.address.split(',').map((addr: string) => addr.trim()).filter((addr: string) => addr);
-          }
-        } else {
-          parsedAddresses = [];
-        }
-        setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
-      } catch (err) {
-        console.error('Error parsing addresses:', err);
-        setAddresses([]);
-      }
+      // Set addresses from already parsed data
+      setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
 
       // Fetch organization statistics
       const statsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${userOrg.id}/stats`, {
@@ -205,11 +203,12 @@ export default function KitchenDetailsPage() {
 
   const isOrgNameValid = /^[A-Za-z0-9\s]+$/.test(editData.name.trim());
   const isAddressValid = addresses.length > 0;
-  const canUpdate = isOrgNameValid && isAddressValid;
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editData.email.trim());
+  const canUpdate = isOrgNameValid && isAddressValid && isEmailValid;
 
   const handleUpdate = async () => {
     if (!canUpdate) {
-      toast.error('Organization name must contain only letters and spaces, and at least one address is required.');
+      toast.error('Organization name must contain only letters and spaces, at least one address is required, and email must be valid.');
       return;
     }
     try {
@@ -222,7 +221,8 @@ export default function KitchenDetailsPage() {
         },
         body: JSON.stringify({
           name: editData.name.trim() || organization.name,
-          address: editData.address // Already a JSON string
+          address: editData.address, // Already a JSON string
+          email: editData.email.trim() || organization.email
         })
       });
       if (!res.ok) {
@@ -231,6 +231,14 @@ export default function KitchenDetailsPage() {
       }
       const updatedOrg = await res.json();
       setOrganization(updatedOrg);
+      
+      // Update editData with the latest values from the server
+      setEditData({
+        name: updatedOrg.name || "",
+        address: updatedOrg.address || "",
+        email: updatedOrg.email || ""
+      });
+      
       setIsEditing(false);
       toast.success("Organization details updated successfully");
     } catch (err: any) {
@@ -627,6 +635,24 @@ export default function KitchenDetailsPage() {
                 )}
                 {isEditing && !isOrgNameValid && (
                   <div style={{ color: 'red', fontSize: 13 }}>Organization name must contain only letters and spaces.</div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, color: '#666' }}>Email</label>
+                {isEditing ? (
+                  <input
+                    type="email"
+                    value={editData.email}
+                    onChange={(e) => setEditData(prev => ({ ...prev, email: e.target.value }))}
+                    style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', width: '100%', maxWidth: 400 }}
+                    placeholder="organization@example.com"
+                  />
+                ) : (
+                  <div style={{ fontSize: 16 }}>{organization?.email || 'N/A'}</div>
+                )}
+                {isEditing && !isEmailValid && editData.email.trim() && (
+                  <div style={{ color: 'red', fontSize: 13 }}>Please enter a valid email address.</div>
                 )}
               </div>
 

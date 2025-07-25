@@ -70,6 +70,7 @@ export default function Dashboard() {
   // User/org info for header
   const [orgName, setOrgName] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Fetch recurring shifts for mapping shift times to names
   const [recurringShifts, setRecurringShifts] = useState<any[]>([]);
@@ -101,15 +102,7 @@ export default function Dashboard() {
         if (user.lastName) displayName = user.lastName;
         else displayName = 'User';
         setUserName(displayName);
-        // Fetch org name if not cached
-        if (user.organizationId) {
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organization/${user.organizationId}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          })
-            .then(res => res.json())
-            .then(data => setOrgName(data.name || ''))
-            .catch(() => setOrgName(''));
-        }
+        // Don't fetch org name here as Header component already does it
       } catch {
         setUserName('User');
       }
@@ -232,9 +225,12 @@ export default function Dashboard() {
       const user = localStorage.getItem('user');
       if (!token || !user) {
         router.push('/login');
+        return;
       }
+      // Set initial loading to false after auth check
+      setInitialLoading(false);
     }
-  }, []);
+  }, [router]);
 
   // Unit conversion
   const convertWeight = (weight: number) => {
@@ -353,13 +349,17 @@ export default function Dashboard() {
     }
   };
 
-  // Debug: Log outgoing stats data
-  console.log('outTable:', outTable);
-  console.log('selectedUnit:', selectedUnit);
-  console.log('customUnits:', customUnits);
-  console.log('categoryTotalsRaw:', categoryTotalsRaw);
-  console.log('categoryTotals (converted):', categoryTotals);
-  console.log('totalDistributed:', totalDistributed);
+  // Show loading screen during initial authentication check
+  if (initialLoading) {
+    return (
+      <main className="min-h-screen bg-[#fff8f3] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#fff8f3]">

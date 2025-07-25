@@ -18,7 +18,8 @@ import {
   FaTimesCircle,
   FaSearch,
   FaFilter,
-  FaUserCog
+  FaUserCog,
+  FaFileAlt
 } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
@@ -242,6 +243,53 @@ export default function ManageUsersPage() {
       toast.success("User status reset successfully!");
     } catch (err) {
       toast.error("Failed to reset user status. Please try again.");
+    }
+  };
+
+  const viewUserAgreement = async (userId: string) => {
+    try {
+      console.log('Fetching user agreement for userId:', userId);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/agreement`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!response.ok) {
+        console.error('API response not ok:', response.status, response.statusText);
+        if (response.status === 404) {
+          toast.error("No license agreement found for this user");
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Error response:', errorData);
+          toast.error(errorData.error || "Failed to fetch user agreement");
+        }
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Received agreement data:', data);
+      
+      if (data.documentUrl) {
+        console.log('Opening document URL:', data.documentUrl);
+        
+        // Test if the URL is accessible before opening
+        try {
+          const testResponse = await fetch(data.documentUrl, { method: 'HEAD' });
+          if (!testResponse.ok) {
+            console.warn('Document URL might not be accessible:', testResponse.status);
+          }
+        } catch (testError) {
+          console.warn('Could not test document URL accessibility:', testError);
+        }
+        //toast.success("Opening user agreement document");
+        window.open(data.documentUrl, '_blank');
+      } else {
+        console.error('No documentUrl in response:', data);
+        toast.error("No agreement document available for this user");
+      }
+    } catch (err) {
+      console.error('Error in viewUserAgreement:', err);
+      toast.error("Failed to open user agreement");
     }
   };
 
@@ -571,9 +619,13 @@ export default function ManageUsersPage() {
             onClick={() => setActiveTab('users')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'users'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-orange-500 text-orange-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
+            style={{
+              borderBottomColor: activeTab === 'users' ? '#EF5C11' : 'transparent',
+              color: activeTab === 'users' ? '#EF5C11' : undefined
+            }}
           >
             <FaUsers className="inline mr-2" />
             User Management
@@ -582,9 +634,13 @@ export default function ManageUsersPage() {
             onClick={() => setActiveTab('permissions')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'permissions'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-orange-500 text-orange-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
+            style={{
+              borderBottomColor: activeTab === 'permissions' ? '#EF5C11' : 'transparent',
+              color: activeTab === 'permissions' ? '#EF5C11' : undefined
+            }}
           >
             <FaShieldAlt className="inline mr-2" />
             Permission Management
@@ -604,14 +660,16 @@ export default function ManageUsersPage() {
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
               />
             </div>
             <div className="flex gap-2">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
               >
                 <option value="all">All Status</option>
                 <option value="PENDING">Pending</option>
@@ -621,7 +679,8 @@ export default function ManageUsersPage() {
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
               >
                 <option value="all">All Roles</option>
                 {roles.map(role => (
@@ -630,7 +689,13 @@ export default function ManageUsersPage() {
               </select>
               <button
                 onClick={() => setShowAdd(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="px-4 py-2 text-white rounded-lg flex items-center gap-2"
+                style={{ 
+                  backgroundColor: '#EF5C11',
+                  '&:hover': { backgroundColor: '#666666' }
+                } as React.CSSProperties}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
               >
                 <FaUserPlus />
                 Add User
@@ -694,7 +759,8 @@ export default function ManageUsersPage() {
                               <select
                           value={editData.role || ''}
                                 onChange={(e) => handleEditChange('role', e.target.value)}
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                                style={{ '--tw-ring-color': '#EF5C11', '--tw-border-opacity': '1' } as React.CSSProperties}
                               >
                                 {roles.map(role => (
                                   <option key={role} value={role}>{role}</option>
@@ -783,8 +849,18 @@ export default function ManageUsersPage() {
                               </button>
                             )}
                             <button
+                              onClick={() => viewUserAgreement(user.id)}
+                              className="p-2 text-purple-600 hover:text-purple-800"
+                              title="View License Agreement"
+                            >
+                              <FaFileAlt />
+                            </button>
+                            <button
                               onClick={() => startEdit(user)}
-                              className="p-2 text-blue-600 hover:text-blue-800"
+                              className="p-2"
+                              style={{ color: '#EF5C11' }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = '#666666'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = '#EF5C11'}
                             >
                           <FaEdit />
                         </button>
@@ -825,7 +901,8 @@ export default function ManageUsersPage() {
                         placeholder="Search users..."
                         value={permissionSearchTerm}
                         onChange={(e) => setPermissionSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                        style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                       />
                     </div>
                   </div>
@@ -853,9 +930,13 @@ export default function ManageUsersPage() {
                           }}
                           className={`w-full text-left p-3 rounded-lg border ${
                             selectedUser === parseInt(user.id)
-                              ? 'border-blue-500 bg-blue-50'
+                              ? 'border-orange-500'
                               : 'border-gray-200 hover:border-gray-300'
                           }`}
+                          style={selectedUser === parseInt(user.id) ? {
+                            borderColor: '#EF5C11',
+                            backgroundColor: '#F5F4F2'
+                          } : undefined}
                         >
                           <div className="flex items-center space-x-3">
                             <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
@@ -888,7 +969,7 @@ export default function ManageUsersPage() {
                     </div>
                   ) : permissionLoading ? (
                     <div className="flex items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: '#EF5C11' }}></div>
                     </div>
                   ) : !userPermissions ? (
                     <div className="text-center py-12">
@@ -897,26 +978,43 @@ export default function ManageUsersPage() {
                       <p className="mt-1 text-sm text-gray-500">Unable to load user permissions from the database.</p>
                     </div>
                   ) : (
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">
-                            Permissions for {userPermissions.userName}
-                          </h3>
-                          <p className="text-sm text-gray-500">{userPermissions.userEmail} • {userPermissions.userRole}</p>
+                                        <div>
+                      <div className="mb-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <div>
+                            <h3 className="text-lg font-medium text-gray-900">
+                              Permissions for {userPermissions.userName}
+                            </h3>
+                            <p className="text-sm text-gray-500">{userPermissions.userEmail} • {userPermissions.userRole}</p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={enableAllPermissions}
+                              className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200"
+                            >
+                              Enable All
+                            </button>
+                            <button
+                              onClick={disableAllPermissions}
+                              className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200"
+                            >
+                              Disable All
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex justify-end">
                           <button
-                            onClick={enableAllPermissions}
-                            className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200"
+                            onClick={updateUserPermissions}
+                            disabled={savingPermissions}
+                            className="px-4 py-2 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
+                            style={{ 
+                              backgroundColor: '#EF5C11'
+                            } as React.CSSProperties}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
                           >
-                            Enable All
-                          </button>
-                          <button
-                            onClick={disableAllPermissions}
-                            className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200"
-                          >
-                            Disable All
+                            {savingPermissions && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                            Save Permissions
                           </button>
                         </div>
                       </div>
@@ -925,13 +1023,14 @@ export default function ManageUsersPage() {
                       <div className="mb-6">
                         <div className="relative">
                           <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                          <input
-                            type="text"
-                            placeholder="Filter permissions..."
-                            value={permissionFilterTerm}
-                            onChange={(e) => setPermissionFilterTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                          />
+                                                <input
+                        type="text"
+                        placeholder="Filter permissions..."
+                        value={permissionFilterTerm}
+                        onChange={(e) => setPermissionFilterTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                        style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                      />
                         </div>
                       </div>
 
@@ -974,7 +1073,11 @@ export default function ManageUsersPage() {
                                   onChange={() => togglePermission(permission.moduleId)}
                                   className="sr-only peer"
                                 />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
+                                  style={{
+                                    '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
+                                    backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
+                                  } as React.CSSProperties}></div>
                               </label>
                             </div>
                           ))}
@@ -994,14 +1097,7 @@ export default function ManageUsersPage() {
                                 </>
                               )}
                             </div>
-                            <button
-                              onClick={updateUserPermissions}
-                              disabled={savingPermissions}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                            >
-                              {savingPermissions && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
-                              Save Permissions
-                            </button>
+
                           </div>
                         </div>
                       )}
@@ -1032,7 +1128,8 @@ export default function ManageUsersPage() {
                     type="text"
                     value={addData.firstName}
                     onChange={(e) => setAddData({...addData, firstName: e.target.value})}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                     required
                   />
                 </div>
@@ -1042,7 +1139,8 @@ export default function ManageUsersPage() {
                     type="text"
                     value={addData.lastName}
                     onChange={(e) => setAddData({...addData, lastName: e.target.value})}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                     required
                   />
                 </div>
@@ -1052,7 +1150,8 @@ export default function ManageUsersPage() {
                     type="email"
                     value={addData.email}
                     onChange={(e) => setAddData({...addData, email: e.target.value})}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                     required
                   />
                   {addData.email && !isEmail(addData.email) && (
@@ -1069,7 +1168,8 @@ export default function ManageUsersPage() {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                       setAddData({ ...addData, phone: val });
                     }}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                     maxLength={10}
                     pattern="[0-9]{10}"
                     required
@@ -1083,7 +1183,8 @@ export default function ManageUsersPage() {
                   <select
                     value={addData.role}
                     onChange={(e) => setAddData({...addData, role: e.target.value})}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                   >
                     {roles.map(role => (
                       <option key={role} value={role}>{role}</option>
@@ -1097,7 +1198,8 @@ export default function ManageUsersPage() {
                   type={showPassword ? "text" : "password"}
                   value={addData.password}
                       onChange={(e) => setAddData({...addData, password: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                      style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                       required
                     />
                     <button
@@ -1119,7 +1221,8 @@ export default function ManageUsersPage() {
                   type={showConfirmPassword ? "text" : "password"}
                   value={addData.confirmPassword}
                       onChange={(e) => setAddData({...addData, confirmPassword: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                      style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                       required
                     />
                     <button
@@ -1193,7 +1296,12 @@ export default function ManageUsersPage() {
                 <button
                   onClick={addUser}
                   disabled={adding || !isAddFormValid()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 text-white rounded-md disabled:opacity-50 flex items-center gap-2"
+                  style={{ 
+                    backgroundColor: '#EF5C11'
+                  } as React.CSSProperties}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
                 >
                   {adding && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                   Add User

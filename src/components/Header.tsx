@@ -17,27 +17,33 @@ export default function Header() {
         const token = localStorage.getItem("token");
         const userStr = localStorage.getItem("user");
         if (!token || !userStr) {
-          router.push('/login');
-          return;
+          return; // Don't redirect from header, let page handle it
         }
 
         try {
           const user = JSON.parse(userStr);
           setUserEmail(user.email || '');
           if (user.organizationId) {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${user.organizationId}`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error();
-            const data = await response.json();
-            setOrgName(data.name);
+            // Add a small delay to prevent blocking other loads
+            setTimeout(async () => {
+              try {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${user.organizationId}`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                if (response.ok) {
+                  const data = await response.json();
+                  setOrgName(data.name);
+                }
+              } catch (err) {
+                console.error('Error fetching organization:', err);
+              }
+            }, 200);
           }
         } catch (err) {
           console.error('Error parsing user data:', err);
-          router.push('/login');
         }
       } catch (err) {
-        console.error('Error fetching organization:', err);
+        console.error('Error in header:', err);
       }
     };
 

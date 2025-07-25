@@ -33,8 +33,11 @@ export default function LoginPage() {
           const user = jwtDecode(data.token);
           localStorage.setItem('user', JSON.stringify(user));
         }
-        toast.success('Login successful! Redirecting...');
-        router.push('/dashboard');
+        // Small delay to ensure token is stored and show success message
+        setTimeout(() => {
+          toast.success('Login successful! Redirecting...');
+          router.push('/dashboard');
+        }, 50);
       }
     } catch (err) {
       const errorMessage = 'Network error. Please try again.';

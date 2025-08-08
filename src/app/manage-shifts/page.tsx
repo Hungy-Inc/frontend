@@ -767,7 +767,11 @@ export default function ManageShiftsPage() {
                           </button>
                         </td>
                         <td style={{ padding: 12, textAlign: 'center' }}>
-                          <button style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} title="Edit" onClick={() => handleEditRecurring(shift)}>
+                          <button 
+                            style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} 
+                            title="Edit" 
+                            onClick={() => window.location.href = `/edit-shift/${shift.id}`}
+                          >
                             <FaEdit />
                           </button>
                           <button style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer' }} title="Delete" onClick={() => handleDeleteRecurring(shift)}>

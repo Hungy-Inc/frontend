@@ -1,0 +1,873 @@
+"use client";
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff } from "react-icons/fa";
+import { toast } from 'react-toastify';
+
+// Utility functions for Halifax timezone conversion
+const convertUTCToHalifax = (utcTimeString: string): string => {
+  const utcDate = new Date(utcTimeString);
+  const halifaxDate = new Date(utcDate.toLocaleString("en-US", {timeZone: "America/Halifax"}));
+  return halifaxDate.toISOString().slice(0, 16);
+};
+
+const convertHalifaxToUTC = (halifaxTimeString: string): string => {
+  // Create a date in Halifax timezone
+  const halifaxDate = new Date(halifaxTimeString + ':00');
+  const utcDate = new Date(halifaxDate.getTime() - (halifaxDate.getTimezoneOffset() * 60000));
+  return utcDate.toISOString();
+};
+
+const extractTimeFromUTC = (utcTimeString: string): string => {
+  const utcDate = new Date(utcTimeString);
+  const halifaxDate = new Date(utcDate.toLocaleString("en-US", {timeZone: "America/Halifax"}));
+  return halifaxDate.toTimeString().slice(0, 5);
+};
+
+interface ShiftDetails {
+  id: number;
+  name: string;
+  dayOfWeek: number | null;
+  startTime: string;
+  endTime: string;
+  shiftCategoryId: number;
+  location: string;
+  slots: number;
+  isRecurring: boolean;
+  isActive: boolean;
+  ShiftCategory: {
+    id: number;
+    name: string;
+    icon?: string;
+  };
+}
+
+interface RegistrationFields {
+  id?: number;
+  shiftId: number;
+  requireFirstName: boolean;
+  requireLastName: boolean;
+  requireEmail: boolean;
+  requireAgeBracket: boolean;
+  requireBirthdate: boolean;
+  requirePronouns: boolean;
+  requirePhone: boolean;
+  requireAddress: boolean;
+  requireCity: boolean;
+  requirePostalCode: boolean;
+  requireHomePhone: boolean;
+  requireEmergencyContactName: boolean;
+  requireEmergencyContactNumber: boolean;
+  requireCommunicationPreferences: boolean;
+  requireProfilePictureUrl: boolean;
+  requireAllergies: boolean;
+  requireMedicalConcerns: boolean;
+  requirePreferredDays: boolean;
+  requirePreferredShifts: boolean;
+  requireFrequency: boolean;
+  requirePreferredPrograms: boolean;
+  requireCanCallIfShortHanded: boolean;
+  requireSchoolWorkCommitment: boolean;
+  requireRequiredHours: boolean;
+  requireHowDidYouHear: boolean;
+  requireStartDate: boolean;
+  requireParentGuardianName: boolean;
+  requireParentGuardianEmail: boolean;
+}
+
+interface CategoryOption {
+  id: number;
+  name: string;
+  icon?: string;
+}
+
+// Field configuration with enum-based labels and descriptions
+const FIELD_CONFIG = [
+  {
+    key: 'requireFirstName' as keyof RegistrationFields,
+    label: 'First Name',
+    description: 'Volunteer\'s first name',
+    category: 'Basic Information',
+    required: true
+  },
+  {
+    key: 'requireLastName' as keyof RegistrationFields,
+    label: 'Last Name',
+    description: 'Volunteer\'s last name',
+    category: 'Basic Information',
+    required: true
+  },
+  {
+    key: 'requireEmail' as keyof RegistrationFields,
+    label: 'Email Address',
+    description: 'Primary contact email',
+    category: 'Basic Information',
+    required: true
+  },
+  {
+    key: 'requireAgeBracket' as keyof RegistrationFields,
+    label: 'Age Bracket',
+    description: 'Age range (Under 16, 16-29, 30-39, 40-49, 50-59, 60-69, 70+)',
+    category: 'Personal Information',
+    required: false
+  },
+  {
+    key: 'requireBirthdate' as keyof RegistrationFields,
+    label: 'Birth Date',
+    description: 'Date of birth for age verification',
+    category: 'Personal Information',
+    required: false
+  },
+  {
+    key: 'requirePronouns' as keyof RegistrationFields,
+    label: 'Pronouns',
+    description: 'Preferred pronouns (He/Him, She/Her, They/Them, Prefer not to say)',
+    category: 'Personal Information',
+    required: false
+  },
+  {
+    key: 'requirePhone' as keyof RegistrationFields,
+    label: 'Phone Number',
+    description: 'Primary phone number',
+    category: 'Contact & Address',
+    required: false
+  },
+  {
+    key: 'requireAddress' as keyof RegistrationFields,
+    label: 'Address',
+    description: 'Street address',
+    category: 'Contact & Address',
+    required: false
+  },
+  {
+    key: 'requireCity' as keyof RegistrationFields,
+    label: 'City',
+    description: 'City of residence',
+    category: 'Contact & Address',
+    required: false
+  },
+  {
+    key: 'requirePostalCode' as keyof RegistrationFields,
+    label: 'Postal Code',
+    description: 'Postal/ZIP code',
+    category: 'Contact & Address',
+    required: false
+  },
+  {
+    key: 'requireHomePhone' as keyof RegistrationFields,
+    label: 'Home Phone',
+    description: 'Alternative phone number',
+    category: 'Contact & Address',
+    required: false
+  },
+  {
+    key: 'requireEmergencyContactName' as keyof RegistrationFields,
+    label: 'Emergency Contact Name',
+    description: 'Name of emergency contact person',
+    category: 'Emergency Contact',
+    required: false
+  },
+  {
+    key: 'requireEmergencyContactNumber' as keyof RegistrationFields,
+    label: 'Emergency Contact Number',
+    description: 'Phone number of emergency contact',
+    category: 'Emergency Contact',
+    required: false
+  },
+  {
+    key: 'requireCommunicationPreferences' as keyof RegistrationFields,
+    label: 'Communication Preferences',
+    description: 'Preferred contact method (Email, SMS, App Notification)',
+    category: 'Communication',
+    required: false
+  },
+  {
+    key: 'requireProfilePictureUrl' as keyof RegistrationFields,
+    label: 'Profile Picture',
+    description: 'Profile photo upload',
+    category: 'Profile',
+    required: false
+  },
+  {
+    key: 'requireAllergies' as keyof RegistrationFields,
+    label: 'Allergies',
+    description: 'Any food or environmental allergies',
+    category: 'Health & Safety',
+    required: false
+  },
+  {
+    key: 'requireMedicalConcerns' as keyof RegistrationFields,
+    label: 'Medical Concerns',
+    description: 'Any medical conditions or concerns',
+    category: 'Health & Safety',
+    required: false
+  },
+  {
+    key: 'requirePreferredDays' as keyof RegistrationFields,
+    label: 'Preferred Days',
+    description: 'Preferred days for volunteering',
+    category: 'Volunteering Preferences',
+    required: false
+  },
+  {
+    key: 'requirePreferredShifts' as keyof RegistrationFields,
+    label: 'Preferred Shifts',
+    description: 'Preferred shift times',
+    category: 'Volunteering Preferences',
+    required: false
+  },
+  {
+    key: 'requireFrequency' as keyof RegistrationFields,
+    label: 'Volunteering Frequency',
+    description: 'How often they can volunteer (Weekly, Bi-weekly, Monthly, Daily, Once, When time permits)',
+    category: 'Volunteering Preferences',
+    required: false
+  },
+  {
+    key: 'requirePreferredPrograms' as keyof RegistrationFields,
+    label: 'Preferred Programs',
+    description: 'Specific programs they\'re interested in',
+    category: 'Volunteering Preferences',
+    required: false
+  },
+  {
+    key: 'requireCanCallIfShortHanded' as keyof RegistrationFields,
+    label: 'Can Call If Short-Handed',
+    description: 'Willing to be called for last-minute shifts',
+    category: 'Volunteering Preferences',
+    required: false
+  },
+  {
+    key: 'requireSchoolWorkCommitment' as keyof RegistrationFields,
+    label: 'School/Work Commitment',
+    description: 'Currently in school or working',
+    category: 'Commitment Details',
+    required: false
+  },
+  {
+    key: 'requireRequiredHours' as keyof RegistrationFields,
+    label: 'Required Hours',
+    description: 'Number of hours needed (for students/community service)',
+    category: 'Commitment Details',
+    required: false
+  },
+  {
+    key: 'requireHowDidYouHear' as keyof RegistrationFields,
+    label: 'How Did You Hear About Us',
+    description: 'Source of information (Family/Friends, Google, Social Media, Connect Fredericton, School, Work, Notice Boards, Events)',
+    category: 'Additional Information',
+    required: false
+  },
+  {
+    key: 'requireStartDate' as keyof RegistrationFields,
+    label: 'Preferred Start Date',
+    description: 'When they would like to start volunteering',
+    category: 'Additional Information',
+    required: false
+  },
+  {
+    key: 'requireParentGuardianName' as keyof RegistrationFields,
+    label: 'Parent/Guardian Name',
+    description: 'Parent or guardian name (for minors)',
+    category: 'Youth Volunteer Information',
+    required: false
+  },
+  {
+    key: 'requireParentGuardianEmail' as keyof RegistrationFields,
+    label: 'Parent/Guardian Email',
+    description: 'Parent or guardian email (for minors)',
+    category: 'Youth Volunteer Information',
+    required: false
+  }
+];
+
+export default function EditShiftPage() {
+  const params = useParams();
+  const router = useRouter();
+  const shiftId = parseInt(params.shiftId as string);
+
+  const [shift, setShift] = useState<ShiftDetails | null>(null);
+  const [registrationFields, setRegistrationFields] = useState<RegistrationFields | null>(null);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Form state for shift details
+  const [shiftForm, setShiftForm] = useState({
+    name: '',
+    dayOfWeek: 0,
+    startTime: '',
+    endTime: '',
+    shiftCategoryId: '',
+    location: '',
+    slots: 1,
+    isActive: true
+  });
+
+  useEffect(() => {
+    if (shiftId) {
+      fetchShiftDetails();
+      fetchCategories();
+    }
+  }, [shiftId]);
+
+  const fetchShiftDetails = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      
+      // Fetch shift details
+      const shiftRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/edit`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!shiftRes.ok) throw new Error("Failed to fetch shift details");
+      const shiftData = await shiftRes.json();
+      setShift(shiftData);
+
+      // Set form data with Halifax timezone conversion
+      setShiftForm({
+        name: shiftData.name,
+        dayOfWeek: shiftData.dayOfWeek || 0,
+        startTime: shiftData.isRecurring 
+          ? extractTimeFromUTC(shiftData.startTime)
+          : convertUTCToHalifax(shiftData.startTime),
+        endTime: shiftData.isRecurring 
+          ? extractTimeFromUTC(shiftData.endTime)
+          : convertUTCToHalifax(shiftData.endTime),
+        shiftCategoryId: String(shiftData.shiftCategoryId),
+        location: shiftData.location,
+        slots: shiftData.slots,
+        isActive: shiftData.isActive
+      });
+
+      // Fetch registration fields
+      const fieldsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/registration-fields`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!fieldsRes.ok) throw new Error("Failed to fetch registration fields");
+      const fieldsData = await fieldsRes.json();
+      setRegistrationFields(fieldsData);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load shift details");
+      toast.error("Failed to load shift details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      const data = await res.json();
+      setCategories(data);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  };
+
+  const handleShiftSave = async () => {
+    if (!shift) return;
+    
+    setSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Prepare update data based on shift type
+      let updateData: any = {
+        name: shiftForm.name,
+        shiftCategoryId: Number(shiftForm.shiftCategoryId),
+        location: shiftForm.location,
+        slots: Number(shiftForm.slots),
+        isActive: shiftForm.isActive
+      };
+
+      if (shift.isRecurring) {
+        // Recurring shift - use time format with Halifax to UTC conversion
+        const baseDate = '1969-06-10';
+        updateData.dayOfWeek = Number(shiftForm.dayOfWeek);
+        // Convert Halifax time to UTC for recurring shifts
+        const startTimeUTC = convertHalifaxToUTC(`${baseDate}T${shiftForm.startTime}:00`);
+        const endTimeUTC = convertHalifaxToUTC(`${baseDate}T${shiftForm.endTime}:00`);
+        updateData.startTime = startTimeUTC;
+        updateData.endTime = endTimeUTC;
+      } else {
+        // One-time shift - use full datetime with Halifax to UTC conversion
+        updateData.startTime = convertHalifaxToUTC(shiftForm.startTime);
+        updateData.endTime = convertHalifaxToUTC(shiftForm.endTime);
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update shift');
+      }
+
+      toast.success('Shift details updated successfully!');
+      await fetchShiftDetails(); // Refresh data
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update shift');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRegistrationFieldsSave = async () => {
+    if (!registrationFields) return;
+    
+    setSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/registration-fields`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(registrationFields)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update registration fields');
+      }
+
+      toast.success('Registration fields updated successfully!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update registration fields');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFieldToggle = (fieldKey: keyof RegistrationFields) => {
+    if (!registrationFields) return;
+    
+    setRegistrationFields(prev => ({
+      ...prev!,
+      [fieldKey]: !prev![fieldKey]
+    }));
+  };
+
+  const handleBack = () => {
+    router.push('/manage-shifts');
+  };
+
+  const handleTypeSwitch = async (newType: 'recurring' | 'one-time') => {
+    if (!shift) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      
+      let requestBody: any = { newType };
+      
+      if (newType === 'one-time') {
+        // For one-time shifts, we need date and time
+        const date = prompt('Enter the date for this one-time shift (YYYY-MM-DD):');
+        const startTime = prompt('Enter start time (HH:MM):');
+        const endTime = prompt('Enter end time (HH:MM):');
+        
+        if (!date || !startTime || !endTime) {
+          toast.error('Date and times are required');
+          return;
+        }
+        
+        requestBody.date = date;
+        requestBody.startTime = startTime;
+        requestBody.endTime = endTime;
+      } else {
+        // For recurring shifts, we need day of week and time
+        const dayOfWeek = prompt('Enter day of week (0-6, where 0 is Sunday):');
+        const startTime = prompt('Enter start time (HH:MM):');
+        const endTime = prompt('Enter end time (HH:MM):');
+        
+        if (dayOfWeek === null || !startTime || !endTime) {
+          toast.error('Day of week and times are required');
+          return;
+        }
+        
+        requestBody.dayOfWeek = parseInt(dayOfWeek);
+        requestBody.startTime = startTime;
+        requestBody.endTime = endTime;
+      }
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/switch-type`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to switch shift type');
+      }
+
+      toast.success(`Shift switched to ${newType} successfully!`);
+      // Refresh the page to show updated data
+      window.location.reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to switch shift type');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading shift details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !shift) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error || "Shift not found"}</p>
+          <button
+            onClick={handleBack}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+          >
+            Back to Manage Shifts
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Group fields by category
+  const groupedFields = FIELD_CONFIG.reduce((acc, field) => {
+    if (!acc[field.category]) {
+      acc[field.category] = [];
+    }
+    acc[field.category].push(field);
+    return acc;
+  }, {} as Record<string, typeof FIELD_CONFIG>);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <button
+                onClick={handleBack}
+                className="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              >
+                <FaArrowLeft className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Edit Shift: {shift.name}
+              </h1>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8">
+          {/* Section A: Shift Details */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
+                  Section A
+                </span>
+                Shift Details
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleTypeSwitch('recurring')}
+                  disabled={shift?.isRecurring}
+                  className={`px-3 py-1 text-sm rounded ${
+                    shift?.isRecurring 
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Make Recurring
+                </button>
+                <button
+                  onClick={() => handleTypeSwitch('one-time')}
+                  disabled={!shift?.isRecurring}
+                  className={`px-3 py-1 text-sm rounded ${
+                    !shift?.isRecurring 
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                >
+                  Make One-time
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Shift Name *
+                </label>
+                <input
+                  type="text"
+                  value={shiftForm.name}
+                  onChange={(e) => setShiftForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="Enter shift name"
+                />
+              </div>
+
+              {shift.isRecurring && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Day of Week *
+                  </label>
+                  <select
+                    value={shiftForm.dayOfWeek}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, dayOfWeek: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                      <option key={i} value={i}>{day}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {shift.isRecurring ? 'Start Time *' : 'Start Date & Time *'}
+                    <span className="text-xs text-gray-500 ml-1">(Halifax Time)</span>
+                  </label>
+                  <input
+                    type={shift.isRecurring ? 'time' : 'datetime-local'}
+                    value={shiftForm.startTime}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, startTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {shift.isRecurring ? 'End Time *' : 'End Date & Time *'}
+                    <span className="text-xs text-gray-500 ml-1">(Halifax Time)</span>
+                  </label>
+                  <input
+                    type={shift.isRecurring ? 'time' : 'datetime-local'}
+                    value={shiftForm.endTime}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, endTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category *
+                </label>
+                <select
+                  value={shiftForm.shiftCategoryId}
+                  onChange={(e) => setShiftForm(prev => ({ ...prev, shiftCategoryId: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="">Select Category</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location *
+                </label>
+                <input
+                  type="text"
+                  value={shiftForm.location}
+                  onChange={(e) => setShiftForm(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="Enter location"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Number of Slots *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={shiftForm.slots}
+                  onChange={(e) => setShiftForm(prev => ({ ...prev, slots: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex items-center">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={shiftForm.isActive}
+                    onChange={(e) => setShiftForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                    className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Active</span>
+                </label>
+              </div>
+
+              <button
+                onClick={handleShiftSave}
+                disabled={saving || !shiftForm.name || !shiftForm.startTime || !shiftForm.endTime || !shiftForm.shiftCategoryId || !shiftForm.location}
+                className="w-full bg-orange-500 text-white py-2 px-4 rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FaSave className="mr-2" />
+                    Save Shift Details
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Section B: Registration Fields */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
+                Section B
+              </span>
+              Registration Fields Configuration
+            </h2>
+
+            {registrationFields && (
+              <div className="space-y-6">
+                {/* Search Bar */}
+                <div className="mb-6">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search fields by name..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {(() => {
+                  const allFilteredFields = Object.entries(groupedFields).map(([category, fields]) => {
+                    // Filter fields based on search term
+                    const filteredFields = fields.filter(field => 
+                      field.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      field.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      category.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+
+                    return { category, fields: filteredFields };
+                  }).filter(({ fields }) => fields.length > 0);
+
+                  if (searchTerm && allFilteredFields.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 text-lg">No fields found matching "{searchTerm}"</p>
+                        <p className="text-gray-400 text-sm mt-2">Try searching for a different term</p>
+                      </div>
+                    );
+                  }
+
+                                     return allFilteredFields.map(({ category, fields }) => (
+                     <div key={category} className="border border-gray-200 rounded-lg p-4">
+                       <h3 className="text-lg font-medium text-gray-900 mb-4">{category}</h3>
+                       <div className="space-y-3">
+                         {fields.map((field) => (
+                           <div key={field.key} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
+                             <div className="flex-1">
+                               <div className="flex items-center">
+                                 <label className="text-sm font-medium text-gray-900">
+                                   {field.label}
+                                   {field.required && <span className="text-red-500 ml-1">*</span>}
+                                 </label>
+                               </div>
+                               <p className="text-xs text-gray-600 mt-1">{field.description}</p>
+                             </div>
+                             <div className="ml-4">
+                               <button
+                                 onClick={() => handleFieldToggle(field.key)}
+                                 disabled={field.required}
+                                 className={`p-2 rounded-lg transition-colors ${
+                                   field.required 
+                                     ? 'bg-green-100 text-green-600 cursor-not-allowed' 
+                                     : registrationFields![field.key]
+                                       ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                 }`}
+                                 title={field.required ? 'This field is always required' : 'Toggle field requirement'}
+                               >
+                                 {registrationFields![field.key] ? <FaToggleOn className="w-4 h-4" /> : <FaToggleOff className="w-4 h-4" />}
+                               </button>
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   ));
+                 })()}
+
+                <button
+                  onClick={handleRegistrationFieldsSave}
+                  disabled={saving}
+                  className="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <FaSave className="mr-2" />
+                      Save Registration Fields
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+} 

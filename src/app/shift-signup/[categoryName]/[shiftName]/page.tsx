@@ -24,6 +24,36 @@ interface ShiftDetails {
   organizationId: number;
   organizationName: string;
   signedUpCount: number;
+  registrationFields?: {
+    requireFirstName: boolean;
+    requireLastName: boolean;
+    requireEmail: boolean;
+    requireAgeBracket: boolean;
+    requireBirthdate: boolean;
+    requirePronouns: boolean;
+    requirePhone: boolean;
+    requireAddress: boolean;
+    requireCity: boolean;
+    requirePostalCode: boolean;
+    requireHomePhone: boolean;
+    requireEmergencyContactName: boolean;
+    requireEmergencyContactNumber: boolean;
+    requireCommunicationPreferences: boolean;
+    requireProfilePictureUrl: boolean;
+    requireAllergies: boolean;
+    requireMedicalConcerns: boolean;
+    requirePreferredDays: boolean;
+    requirePreferredShifts: boolean;
+    requireFrequency: boolean;
+    requirePreferredPrograms: boolean;
+    requireCanCallIfShortHanded: boolean;
+    requireSchoolWorkCommitment: boolean;
+    requireRequiredHours: boolean;
+    requireHowDidYouHear: boolean;
+    requireStartDate: boolean;
+    requireParentGuardianName: boolean;
+    requireParentGuardianEmail: boolean;
+  };
 }
 
 interface SignupFormData {
@@ -31,6 +61,32 @@ interface SignupFormData {
   firstName: string;
   lastName: string;
   selectedDate: string;
+  // Dynamic fields based on shift requirements
+  ageBracket?: string;
+  birthdate?: string;
+  pronouns?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  homePhone?: string;
+  emergencyContactName?: string;
+  emergencyContactNumber?: string;
+  communicationPreferences?: string;
+  profilePictureUrl?: string;
+  allergies?: string;
+  medicalConcerns?: string;
+  preferredDays?: string;
+  preferredShifts?: string;
+  frequency?: string;
+  preferredPrograms?: string;
+  canCallIfShortHanded?: boolean;
+  schoolWorkCommitment?: boolean;
+  requiredHours?: number;
+  howDidYouHear?: string;
+  startDate?: string;
+  parentGuardianName?: string;
+  parentGuardianEmail?: string;
 }
 
 // Helper: Parse YYYY-MM-DD as Halifax local date
@@ -129,6 +185,7 @@ export default function ShiftSignupPage() {
   const validateForm = (): boolean => {
     const errors: Partial<SignupFormData> = {};
     
+    // Always validate basic fields
     if (!formData.email.trim()) {
       errors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -145,6 +202,45 @@ export default function ShiftSignupPage() {
     
     if (!formData.selectedDate.trim()) {
       errors.selectedDate = "Please select a date";
+    }
+
+    // Validate dynamic fields based on shift requirements
+    if (shift?.registrationFields) {
+      const fields = shift.registrationFields;
+      
+      if (fields.requirePhone && !formData.phone?.trim()) {
+        errors.phone = "Phone number is required";
+      }
+      
+      if (fields.requireAddress && !formData.address?.trim()) {
+        errors.address = "Address is required";
+      }
+      
+      if (fields.requireCity && !formData.city?.trim()) {
+        errors.city = "City is required";
+      }
+      
+      if (fields.requirePostalCode && !formData.postalCode?.trim()) {
+        errors.postalCode = "Postal code is required";
+      }
+      
+      if (fields.requireEmergencyContactName && !formData.emergencyContactName?.trim()) {
+        errors.emergencyContactName = "Emergency contact name is required";
+      }
+      
+      if (fields.requireEmergencyContactNumber && !formData.emergencyContactNumber?.trim()) {
+        errors.emergencyContactNumber = "Emergency contact number is required";
+      }
+      
+      if (fields.requireParentGuardianName && !formData.parentGuardianName?.trim()) {
+        errors.parentGuardianName = "Parent/Guardian name is required";
+      }
+      
+      if (fields.requireParentGuardianEmail && !formData.parentGuardianEmail?.trim()) {
+        errors.parentGuardianEmail = "Parent/Guardian email is required";
+      } else if (fields.requireParentGuardianEmail && formData.parentGuardianEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parentGuardianEmail)) {
+        errors.parentGuardianEmail = "Please enter a valid email address";
+      }
     }
     
     setFormErrors(errors);
@@ -169,7 +265,33 @@ export default function ShiftSignupPage() {
         },
         body: JSON.stringify({
           ...formData,
-          shiftDate: formData.selectedDate
+          shiftDate: formData.selectedDate,
+          // Include all dynamic fields
+          ageBracket: formData.ageBracket,
+          birthdate: formData.birthdate,
+          pronouns: formData.pronouns,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          postalCode: formData.postalCode,
+          homePhone: formData.homePhone,
+          emergencyContactName: formData.emergencyContactName,
+          emergencyContactNumber: formData.emergencyContactNumber,
+          communicationPreferences: formData.communicationPreferences,
+          profilePictureUrl: formData.profilePictureUrl,
+          allergies: formData.allergies,
+          medicalConcerns: formData.medicalConcerns,
+          preferredDays: formData.preferredDays,
+          preferredShifts: formData.preferredShifts,
+          frequency: formData.frequency,
+          preferredPrograms: formData.preferredPrograms,
+          canCallIfShortHanded: formData.canCallIfShortHanded,
+          schoolWorkCommitment: formData.schoolWorkCommitment,
+          requiredHours: formData.requiredHours,
+          howDidYouHear: formData.howDidYouHear,
+          startDate: formData.startDate,
+          parentGuardianName: formData.parentGuardianName,
+          parentGuardianEmail: formData.parentGuardianEmail
         }),
       });
       
@@ -515,7 +637,287 @@ export default function ShiftSignupPage() {
                    name="selectedDate"
                  />
                </div>
-               
+
+               {/* Dynamic Fields based on shift requirements */}
+               {shift?.registrationFields && (
+                 <>
+                   {/* Personal Information */}
+                   {(shift.registrationFields.requireAgeBracket || shift.registrationFields.requireBirthdate || shift.registrationFields.requirePronouns) && (
+                     <div className="border-t border-gray-200 pt-4">
+                       <h4 className="text-md font-medium text-gray-900 mb-3">Personal Information</h4>
+                       <div className="space-y-4">
+                         {shift.registrationFields.requireAgeBracket && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Age Bracket *
+                             </label>
+                             <select
+                               value={formData.ageBracket || ''}
+                               onChange={(e) => handleInputChange('ageBracket', e.target.value)}
+                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                               disabled={submitting}
+                             >
+                               <option value="">Select age bracket</option>
+                               <option value="UNDER_16">Under 16</option>
+                               <option value="AGE_16_29">16-29</option>
+                               <option value="AGE_30_39">30-39</option>
+                               <option value="AGE_40_49">40-49</option>
+                               <option value="AGE_50_59">50-59</option>
+                               <option value="AGE_60_69">60-69</option>
+                               <option value="AGE_70_PLUS">70+</option>
+                             </select>
+                           </div>
+                         )}
+
+                         {shift.registrationFields.requireBirthdate && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Birth Date *
+                             </label>
+                             <input
+                               type="date"
+                               value={formData.birthdate || ''}
+                               onChange={(e) => handleInputChange('birthdate', e.target.value)}
+                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                               disabled={submitting}
+                             />
+                           </div>
+                         )}
+
+                         {shift.registrationFields.requirePronouns && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Pronouns *
+                             </label>
+                             <select
+                               value={formData.pronouns || ''}
+                               onChange={(e) => handleInputChange('pronouns', e.target.value)}
+                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                               disabled={submitting}
+                             >
+                               <option value="">Select pronouns</option>
+                               <option value="HE_HIM">He/Him</option>
+                               <option value="SHE_HER">She/Her</option>
+                               <option value="THEY_THEM">They/Them</option>
+                               <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                             </select>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Contact & Address */}
+                   {(shift.registrationFields.requirePhone || shift.registrationFields.requireAddress || shift.registrationFields.requireCity || shift.registrationFields.requirePostalCode || shift.registrationFields.requireHomePhone) && (
+                     <div className="border-t border-gray-200 pt-4">
+                       <h4 className="text-md font-medium text-gray-900 mb-3">Contact & Address</h4>
+                       <div className="space-y-4">
+                         {shift.registrationFields.requirePhone && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Phone Number *
+                             </label>
+                             <input
+                               type="tel"
+                               value={formData.phone || ''}
+                               onChange={(e) => handleInputChange('phone', e.target.value)}
+                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 formErrors.phone ? 'border-red-500' : 'border-gray-300'
+                               }`}
+                               placeholder="Enter your phone number"
+                               disabled={submitting}
+                             />
+                             {formErrors.phone && (
+                               <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>
+                             )}
+                           </div>
+                         )}
+
+                         {shift.registrationFields.requireAddress && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Address *
+                             </label>
+                             <input
+                               type="text"
+                               value={formData.address || ''}
+                               onChange={(e) => handleInputChange('address', e.target.value)}
+                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 formErrors.address ? 'border-red-500' : 'border-gray-300'
+                               }`}
+                               placeholder="Enter your address"
+                               disabled={submitting}
+                             />
+                             {formErrors.address && (
+                               <p className="text-red-500 text-sm mt-1">{formErrors.address}</p>
+                             )}
+                           </div>
+                         )}
+
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           {shift.registrationFields.requireCity && (
+                             <div>
+                               <label className="block text-sm font-medium text-gray-700 mb-1">
+                                 City *
+                               </label>
+                               <input
+                                 type="text"
+                                 value={formData.city || ''}
+                                 onChange={(e) => handleInputChange('city', e.target.value)}
+                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                   formErrors.city ? 'border-red-500' : 'border-gray-300'
+                                 }`}
+                                 placeholder="Enter your city"
+                                 disabled={submitting}
+                               />
+                               {formErrors.city && (
+                                 <p className="text-red-500 text-sm mt-1">{formErrors.city}</p>
+                               )}
+                             </div>
+                           )}
+
+                           {shift.registrationFields.requirePostalCode && (
+                             <div>
+                               <label className="block text-sm font-medium text-gray-700 mb-1">
+                                 Postal Code *
+                               </label>
+                               <input
+                                 type="text"
+                                 value={formData.postalCode || ''}
+                                 onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                   formErrors.postalCode ? 'border-red-500' : 'border-gray-300'
+                                 }`}
+                                 placeholder="Enter your postal code"
+                                 disabled={submitting}
+                               />
+                               {formErrors.postalCode && (
+                                 <p className="text-red-500 text-sm mt-1">{formErrors.postalCode}</p>
+                               )}
+                             </div>
+                           )}
+                         </div>
+
+                         {shift.registrationFields.requireHomePhone && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Home Phone
+                             </label>
+                             <input
+                               type="tel"
+                               value={formData.homePhone || ''}
+                               onChange={(e) => handleInputChange('homePhone', e.target.value)}
+                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                               placeholder="Enter your home phone number"
+                               disabled={submitting}
+                             />
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Emergency Contact */}
+                   {(shift.registrationFields.requireEmergencyContactName || shift.registrationFields.requireEmergencyContactNumber) && (
+                     <div className="border-t border-gray-200 pt-4">
+                       <h4 className="text-md font-medium text-gray-900 mb-3">Emergency Contact</h4>
+                       <div className="space-y-4">
+                         {shift.registrationFields.requireEmergencyContactName && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Emergency Contact Name *
+                             </label>
+                             <input
+                               type="text"
+                               value={formData.emergencyContactName || ''}
+                               onChange={(e) => handleInputChange('emergencyContactName', e.target.value)}
+                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 formErrors.emergencyContactName ? 'border-red-500' : 'border-gray-300'
+                               }`}
+                               placeholder="Enter emergency contact name"
+                               disabled={submitting}
+                             />
+                             {formErrors.emergencyContactName && (
+                               <p className="text-red-500 text-sm mt-1">{formErrors.emergencyContactName}</p>
+                             )}
+                           </div>
+                         )}
+
+                         {shift.registrationFields.requireEmergencyContactNumber && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Emergency Contact Number *
+                             </label>
+                             <input
+                               type="tel"
+                               value={formData.emergencyContactNumber || ''}
+                               onChange={(e) => handleInputChange('emergencyContactNumber', e.target.value)}
+                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 formErrors.emergencyContactNumber ? 'border-red-500' : 'border-gray-300'
+                               }`}
+                               placeholder="Enter emergency contact number"
+                               disabled={submitting}
+                             />
+                             {formErrors.emergencyContactNumber && (
+                               <p className="text-red-500 text-sm mt-1">{formErrors.emergencyContactNumber}</p>
+                             )}
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Youth Volunteer Information */}
+                   {(shift.registrationFields.requireParentGuardianName || shift.registrationFields.requireParentGuardianEmail) && (
+                     <div className="border-t border-gray-200 pt-4">
+                       <h4 className="text-md font-medium text-gray-900 mb-3">Youth Volunteer Information</h4>
+                       <div className="space-y-4">
+                         {shift.registrationFields.requireParentGuardianName && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Parent/Guardian Name *
+                             </label>
+                             <input
+                               type="text"
+                               value={formData.parentGuardianName || ''}
+                               onChange={(e) => handleInputChange('parentGuardianName', e.target.value)}
+                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 formErrors.parentGuardianName ? 'border-red-500' : 'border-gray-300'
+                               }`}
+                               placeholder="Enter parent/guardian name"
+                               disabled={submitting}
+                             />
+                             {formErrors.parentGuardianName && (
+                               <p className="text-red-500 text-sm mt-1">{formErrors.parentGuardianName}</p>
+                             )}
+                           </div>
+                         )}
+
+                         {shift.registrationFields.requireParentGuardianEmail && (
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                               Parent/Guardian Email *
+                             </label>
+                             <input
+                               type="email"
+                               value={formData.parentGuardianEmail || ''}
+                               onChange={(e) => handleInputChange('parentGuardianEmail', e.target.value)}
+                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 formErrors.parentGuardianEmail ? 'border-red-500' : 'border-gray-300'
+                               }`}
+                               placeholder="Enter parent/guardian email"
+                               disabled={submitting}
+                             />
+                             {formErrors.parentGuardianEmail && (
+                               <p className="text-red-500 text-sm mt-1">{formErrors.parentGuardianEmail}</p>
+                             )}
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   )}
+                 </>
+               )}
 
               
               <button

@@ -470,66 +470,6 @@ export default function EditShiftPage() {
     router.push('/manage-shifts');
   };
 
-  const handleTypeSwitch = async (newType: 'recurring' | 'one-time') => {
-    if (!shift) return;
-    
-    try {
-      const token = localStorage.getItem("token");
-      
-      let requestBody: any = { newType };
-      
-      if (newType === 'one-time') {
-        // For one-time shifts, we need date and time
-        const date = prompt('Enter the date for this one-time shift (YYYY-MM-DD):');
-        const startTime = prompt('Enter start time (HH:MM):');
-        const endTime = prompt('Enter end time (HH:MM):');
-        
-        if (!date || !startTime || !endTime) {
-          toast.error('Date and times are required');
-          return;
-        }
-        
-        requestBody.date = date;
-        requestBody.startTime = startTime;
-        requestBody.endTime = endTime;
-      } else {
-        // For recurring shifts, we need day of week and time
-        const dayOfWeek = prompt('Enter day of week (0-6, where 0 is Sunday):');
-        const startTime = prompt('Enter start time (HH:MM):');
-        const endTime = prompt('Enter end time (HH:MM):');
-        
-        if (dayOfWeek === null || !startTime || !endTime) {
-          toast.error('Day of week and times are required');
-          return;
-        }
-        
-        requestBody.dayOfWeek = parseInt(dayOfWeek);
-        requestBody.startTime = startTime;
-        requestBody.endTime = endTime;
-      }
-      
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/switch-type`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to switch shift type');
-      }
-
-      toast.success(`Shift switched to ${newType} successfully!`);
-      // Refresh the page to show updated data
-      window.location.reload();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to switch shift type');
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -598,30 +538,6 @@ export default function EditShiftPage() {
                 </span>
                 Shift Details
               </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleTypeSwitch('recurring')}
-                  disabled={shift?.isRecurring}
-                  className={`px-3 py-1 text-sm rounded ${
-                    shift?.isRecurring 
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  Make Recurring
-                </button>
-                <button
-                  onClick={() => handleTypeSwitch('one-time')}
-                  disabled={!shift?.isRecurring}
-                  className={`px-3 py-1 text-sm rounded ${
-                    !shift?.isRecurring 
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                      : 'bg-green-500 text-white hover:bg-green-600'
-                  }`}
-                >
-                  Make One-time
-                </button>
-              </div>
             </div>
 
             <div className="space-y-4">

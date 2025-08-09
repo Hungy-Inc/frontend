@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { 
   FaEdit, 
   FaTrash, 
@@ -19,7 +20,8 @@ import {
   FaSearch,
   FaFilter,
   FaUserCog,
-  FaFileAlt
+  FaFileAlt,
+  FaExternalLinkAlt
 } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
@@ -78,6 +80,7 @@ const statusIcons = {
 };
 
 export default function ManageUsersPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'users' | 'permissions'>('users');
   
   // User Management State
@@ -380,21 +383,24 @@ export default function ManageUsersPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      let firstName = '';
-      let lastName = '';
       
-      if (editData.name) {
-        const nameParts = editData.name.trim().split(' ');
-        firstName = nameParts[0] || '';
-        lastName = nameParts.slice(1).join(' ') || '';
+      // Validate required fields
+      if (!editData.name || !editData.email) {
+        toast.error("Name and email are required fields");
+        return;
       }
 
+      // Parse name into firstName and lastName
+      const nameParts = editData.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       const updateData = {
-        ...(firstName && { firstName }),
-        ...(lastName && { lastName }),
-        ...(editData.email && { email: editData.email }),
-        ...(editData.phone && { phone: editData.phone }),
-        ...(editData.role && { role: editData.role }),
+        firstName: firstName,
+        lastName: lastName,
+        email: editData.email || '',
+        phone: editData.phone || null,
+        role: editData.role || 'VOLUNTEER',
       };
 
       const response = await fetch(`${apiUrl}/api/users/${id}`, {
@@ -406,14 +412,18 @@ export default function ManageUsersPage() {
         body: JSON.stringify(updateData),
       });
 
-      if (!response.ok) throw new Error("Failed to update user");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update user");
+      }
       
       await fetchUsers();
       setEditId(null);
       setEditData({});
       toast.success("User updated successfully!");
-    } catch (err) {
-      toast.error("Failed to update user. Please try again.");
+    } catch (err: any) {
+      console.error('Save edit error:', err);
+      toast.error(err.message || "Failed to update user. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -552,6 +562,10 @@ export default function ManageUsersPage() {
     return new Date(dateString).toLocaleDateString('en-CA', {
       timeZone: 'America/Halifax'
     });
+  };
+
+  const navigateToUserDetails = (userId: string) => {
+    router.push(`/user-details/${userId}`);
   };
 
   // Filter functions
@@ -722,7 +736,7 @@ export default function ManageUsersPage() {
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
               <ul className="divide-y divide-gray-200">
                 {filteredUsers.map((user) => (
-                  <li key={user.id} className="px-6 py-4">
+                  <li key={user.id} className={`px-6 py-4 ${editId ? 'cursor-default bg-gray-100 opacity-75' : 'hover:bg-gray-50 cursor-pointer'}`} onClick={() => !editId && navigateToUserDetails(user.id)}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="flex-shrink-0">
@@ -802,7 +816,7 @@ export default function ManageUsersPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                         {editId === user.id ? (
                           <>
                             <button
@@ -821,6 +835,7 @@ export default function ManageUsersPage() {
                     </>
                   ) : (
                     <>
+                            
                             {user.status === 'PENDING' && (
                               <>
                                 <button

@@ -31,7 +31,8 @@ export default function ManageShiftsPage() {
     endTime: '',
     shiftCategoryId: '',
     location: '',
-    slots: 1
+    slots: 1,
+    isRecurring: true // Add shift type field
   });
   const [addRecurringError, setAddRecurringError] = useState('');
   const [addingRecurring, setAddingRecurring] = useState(false);
@@ -45,14 +46,13 @@ export default function ManageShiftsPage() {
     endTime: '',
     shiftCategoryId: '',
     location: '',
-    slots: 1
+    slots: 1,
+    isRecurring: true // Add shift type field
   });
   const [editRecurringError, setEditRecurringError] = useState('');
   const [editingRecurring, setEditingRecurring] = useState(false);
 
-  // New state for one-time shifts and enhanced features
-  const [shiftType, setShiftType] = useState<'recurring' | 'one-time'>('recurring');
-  const [filterType, setFilterType] = useState<'all' | 'recurring' | 'one-time'>('all');
+  // New state for enhanced features
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Fetch shift categories for dropdown
@@ -85,7 +85,7 @@ export default function ManageShiftsPage() {
     if (tab === 'shiftcategory') fetchCategories();
     if (tab === 'recurringshifts') fetchRecurringShifts();
     // eslint-disable-next-line
-  }, [tab, filterType, filterActive]);
+  }, [tab, filterActive]);
 
   const fetchCategories = async () => {
     setLoading(true);
@@ -111,7 +111,7 @@ export default function ManageShiftsPage() {
     setErrorRecurring("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts?type=${filterType}&isActive=${filterActive === 'all' ? '' : filterActive === 'active' ? 'true' : 'false'}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts?isActive=${filterActive === 'all' ? '' : filterActive === 'active' ? 'true' : 'false'}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
@@ -221,10 +221,12 @@ export default function ManageShiftsPage() {
     try {
       const token = localStorage.getItem("token");
       
-      if (shiftType === 'recurring') {
-        // Validate that start time is at least 1 hour before end time
-        const baseDate = '1969-06-10';
+      let startTime, endTime;
+      
+      if (addRecurring.isRecurring) {
+        // Recurring shift - use time inputs
         if (addRecurring.startTime && addRecurring.endTime) {
+          const baseDate = '1969-06-10';
           const start = new Date(`${baseDate}T${addRecurring.startTime}`);
           const end = new Date(`${baseDate}T${addRecurring.endTime}`);
           const diffMs = end.getTime() - start.getTime();
@@ -233,67 +235,47 @@ export default function ManageShiftsPage() {
             setAddingRecurring(false);
             return;
           }
+          startTime = `${baseDate}T${addRecurring.startTime}:00-03:00`;
+          endTime = `${baseDate}T${addRecurring.endTime}:00-03:00`;
         }
-        // Create times in Halifax timezone (UTC-3 or UTC-4 depending on DST)
-        const startTime = addRecurring.startTime ? `${baseDate}T${addRecurring.startTime}:00-03:00` : '';
-        const endTime = addRecurring.endTime ? `${baseDate}T${addRecurring.endTime}:00-03:00` : '';
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            ...addRecurring,
-            startTime,
-            endTime,
-            shiftCategoryId: Number(addRecurring.shiftCategoryId),
-            dayOfWeek: Number(addRecurring.dayOfWeek),
-            slots: Number(addRecurring.slots)
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to add recurring shift');
-        toast.success('Recurring shift added successfully!');
       } else {
-        // One-time shift
-        if (!addRecurring.startTime || !addRecurring.endTime) {
-          setAddRecurringError('Start and end date/time are required for one-time shifts.');
-          setAddingRecurring(false);
-          return;
+        // One-time shift - use datetime inputs
+        if (addRecurring.startTime && addRecurring.endTime) {
+          const start = new Date(addRecurring.startTime);
+          const end = new Date(addRecurring.endTime);
+          const diffMs = end.getTime() - start.getTime();
+          if (diffMs < 60 * 60 * 1000) {
+            setAddRecurringError('Shift end time must be at least 1 hour after start time.');
+            setAddingRecurring(false);
+            return;
+          }
+          startTime = addRecurring.startTime;
+          endTime = addRecurring.endTime;
         }
-        
-        const startDate = new Date(addRecurring.startTime);
-        const endDate = new Date(addRecurring.endTime);
-        
-        if (startDate >= endDate) {
-          setAddRecurringError('End time must be after start time.');
-          setAddingRecurring(false);
-          return;
-        }
-        
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/one-time`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            name: addRecurring.name,
-            startTime: startDate.toISOString(),
-            endTime: endDate.toISOString(),
-            shiftCategoryId: Number(addRecurring.shiftCategoryId),
-            location: addRecurring.location,
-            slots: Number(addRecurring.slots)
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to add one-time shift');
-        toast.success('One-time shift added successfully!');
       }
       
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...addRecurring,
+          startTime,
+          endTime,
+          shiftCategoryId: Number(addRecurring.shiftCategoryId),
+          dayOfWeek: addRecurring.isRecurring ? Number(addRecurring.dayOfWeek) : null,
+          slots: Number(addRecurring.slots),
+          isRecurring: addRecurring.isRecurring
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add shift');
+      toast.success(`${addRecurring.isRecurring ? 'Recurring' : 'One-time'} shift added successfully!`);
+      
       setShowAddRecurring(false);
-      setAddRecurring({ name: '', dayOfWeek: 0, startTime: '', endTime: '', shiftCategoryId: '', location: '', slots: 1 });
+      setAddRecurring({ name: '', dayOfWeek: 0, startTime: '', endTime: '', shiftCategoryId: '', location: '', slots: 1, isRecurring: true });
       fetchRecurringShifts();
     } catch (err: any) {
       setAddRecurringError(err.message || 'Failed to add shift');
@@ -316,7 +298,8 @@ export default function ManageShiftsPage() {
         endTime: shift.endTime ? shift.endTime.slice(11, 16) : '',
         shiftCategoryId: String(shift.shiftCategoryId),
         location: shift.location,
-        slots: shift.slots
+        slots: shift.slots,
+        isRecurring: true
       });
     } else {
       // One-time shift - use full datetime
@@ -327,7 +310,8 @@ export default function ManageShiftsPage() {
         endTime: shift.endTime ? new Date(shift.endTime).toISOString().slice(0, 16) : '',
         shiftCategoryId: String(shift.shiftCategoryId),
         location: shift.location,
-        slots: shift.slots
+        slots: shift.slots,
+        isRecurring: false
       });
     }
     setEditRecurringError('');
@@ -339,16 +323,12 @@ export default function ManageShiftsPage() {
     try {
       const token = localStorage.getItem("token");
       
-      // Find the shift being edited to determine its type
-      const shift = recurringShifts.find(s => s.id === editRecurringId);
-      if (!shift) {
-        throw new Error('Shift not found');
-      }
+      let startTime, endTime;
       
-      if (shift.isRecurring) {
-        // Validate that start time is at least 1 hour before end time
-        const baseDate = '1969-06-10';
+      if (editRecurring.isRecurring) {
+        // Recurring shift - use time inputs
         if (editRecurring.startTime && editRecurring.endTime) {
+          const baseDate = '1969-06-10';
           const start = new Date(`${baseDate}T${editRecurring.startTime}`);
           const end = new Date(`${baseDate}T${editRecurring.endTime}`);
           const diffMs = end.getTime() - start.getTime();
@@ -357,70 +337,59 @@ export default function ManageShiftsPage() {
             setEditingRecurring(false);
             return;
           }
+          startTime = `${baseDate}T${editRecurring.startTime}:00-03:00`;
+          endTime = `${baseDate}T${editRecurring.endTime}:00-03:00`;
         }
-        // Create times in Halifax timezone (UTC-3 or UTC-4 depending on DST)
-        const startTime = editRecurring.startTime ? `${baseDate}T${editRecurring.startTime}:00-03:00` : '';
-        const endTime = editRecurring.endTime ? `${baseDate}T${editRecurring.endTime}:00-03:00` : '';
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            ...editRecurring,
-            startTime,
-            endTime,
-            shiftCategoryId: Number(editRecurring.shiftCategoryId),
-            dayOfWeek: Number(editRecurring.dayOfWeek),
-            slots: Number(editRecurring.slots)
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update shift');
-        toast.success('Shift updated successfully!');
       } else {
-        // One-time shift
-        if (!editRecurring.startTime || !editRecurring.endTime) {
-          setEditRecurringError('Start and end date/time are required for one-time shifts.');
-          setEditingRecurring(false);
-          return;
+        // One-time shift - use datetime inputs
+        if (editRecurring.startTime && editRecurring.endTime) {
+          const start = new Date(editRecurring.startTime);
+          const end = new Date(editRecurring.endTime);
+          const diffMs = end.getTime() - start.getTime();
+          if (diffMs < 60 * 60 * 1000) {
+            setEditRecurringError('Shift end time must be at least 1 hour after start time.');
+            setEditingRecurring(false);
+            return;
+          }
+          startTime = editRecurring.startTime;
+          endTime = editRecurring.endTime;
         }
-        
-        const startDate = new Date(editRecurring.startTime);
-        const endDate = new Date(editRecurring.endTime);
-        
-        if (startDate >= endDate) {
-          setEditRecurringError('End time must be after start time.');
-          setEditingRecurring(false);
-          return;
-        }
-        
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            name: editRecurring.name,
-            startTime: startDate.toISOString(),
-            endTime: endDate.toISOString(),
-            shiftCategoryId: Number(editRecurring.shiftCategoryId),
-            location: editRecurring.location,
-            slots: Number(editRecurring.slots)
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update shift');
-        toast.success('Shift updated successfully!');
       }
       
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...editRecurring,
+          startTime,
+          endTime,
+          shiftCategoryId: Number(editRecurring.shiftCategoryId),
+          dayOfWeek: editRecurring.isRecurring ? Number(editRecurring.dayOfWeek) : null,
+          slots: Number(editRecurring.slots)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update shift');
+      toast.success('Shift updated successfully!');
+      
+      setShowAddRecurring(false);
       setEditRecurringId(null);
+      setEditRecurring({
+        name: '',
+        dayOfWeek: 0,
+        startTime: '',
+        endTime: '',
+        shiftCategoryId: '',
+        location: '',
+        slots: 1,
+        isRecurring: true
+      });
       fetchRecurringShifts();
-    } catch (err: any) {
-      setEditRecurringError(err.message || 'Failed to update shift');
-      toast.error(err.message || 'Failed to update shift');
+    } catch (err) {
+      setEditRecurringError(err instanceof Error ? err.message : 'Failed to update shift');
     } finally {
       setEditingRecurring(false);
     }
@@ -428,6 +397,16 @@ export default function ManageShiftsPage() {
   const handleCancelEditRecurring = () => {
     setEditRecurringId(null);
     setEditRecurringError('');
+    setEditRecurring({
+      name: '',
+      dayOfWeek: 0,
+      startTime: '',
+      endTime: '',
+      shiftCategoryId: '',
+      location: '',
+      slots: 1,
+      isRecurring: true
+    });
   };
 
   // Delete Recurring Shift
@@ -474,7 +453,7 @@ export default function ManageShiftsPage() {
   };
 
   const isRecurringNameValid = /^[A-Za-z\s]+$/.test(addRecurring.name.trim());
-  const isRecurringDayValid = shiftType === 'recurring' ? (typeof addRecurring.dayOfWeek === 'number' && addRecurring.dayOfWeek >= 0 && addRecurring.dayOfWeek <= 6) : true;
+  const isRecurringDayValid = addRecurring.isRecurring ? (typeof addRecurring.dayOfWeek === 'number' && addRecurring.dayOfWeek >= 0 && addRecurring.dayOfWeek <= 6) : true;
   const isRecurringStartTimeValid = !!addRecurring.startTime;
   const isRecurringEndTimeValid = !!addRecurring.endTime;
   const isRecurringCategoryValid = !!addRecurring.shiftCategoryId;
@@ -629,11 +608,6 @@ export default function ManageShiftsPage() {
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-                <select value={filterType} onChange={e => setFilterType(e.target.value as any)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', minWidth: 140 }}>
-                  <option value="all">All Types</option>
-                  <option value="recurring">Recurring Only</option>
-                  <option value="one-time">One-Time Only</option>
-                </select>
                 <select value={filterActive} onChange={e => setFilterActive(e.target.value as any)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', minWidth: 140 }}>
                   <option value="all">All Status</option>
                   <option value="active">Active Only</option>
@@ -685,7 +659,7 @@ export default function ManageShiftsPage() {
                     <th style={{ textAlign: 'left', padding: '12px 0 12px 12px' }}>Category</th>
                     <th style={{ textAlign: 'left', padding: '12px 0' }}>Name</th>
                     <th style={{ textAlign: 'left', padding: 12 }}>Type</th>
-                    <th style={{ textAlign: 'left', padding: 12 }}>Day/Date</th>
+                    <th style={{ textAlign: 'left', padding: 12 }}>Day</th>
                     <th style={{ textAlign: 'left', padding: 12 }}>Start</th>
                     <th style={{ textAlign: 'left', padding: 12 }}>End</th>
                     <th style={{ textAlign: 'left', padding: 12 }}>Location</th>
@@ -790,78 +764,57 @@ export default function ManageShiftsPage() {
                   <button onClick={() => setShowAddRecurring(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}>×</button>
                   <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Add Shift</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {/* Shift Type Selector */}
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => setShiftType('recurring')}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: 6,
-                          border: '1px solid #ddd',
-                          background: shiftType === 'recurring' ? '#ff9800' : '#fff',
-                          color: shiftType === 'recurring' ? '#fff' : '#666',
-                          cursor: 'pointer',
-                          fontWeight: 500
-                        }}
-                      >
-                        <FaCalendarAlt style={{ marginRight: 6 }} />
-                        Recurring
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShiftType('one-time')}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: 6,
-                          border: '1px solid #ddd',
-                          background: shiftType === 'one-time' ? '#ff9800' : '#fff',
-                          color: shiftType === 'one-time' ? '#fff' : '#666',
-                          cursor: 'pointer',
-                          fontWeight: 500
-                        }}
-                      >
-                        <FaClock style={{ marginRight: 6 }} />
-                        One-time
-                      </button>
-                    </div>
-
                     <input placeholder="Name" value={addRecurring.name} onChange={e => setAddRecurring(r => ({ ...r, name: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, name: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, name: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                     {addRecurringTouched.name && !isRecurringNameValid && <div style={{ color: 'red', fontSize: 13 }}>Name is required.</div>}
                     
-                    {shiftType === 'recurring' ? (
+                    {/* Shift Type Selection */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type *</label>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="shiftType"
+                            checked={addRecurring.isRecurring}
+                            onChange={() => setAddRecurring(r => ({ ...r, isRecurring: true }))}
+                            style={{ margin: 0 }}
+                          />
+                          <span style={{ fontSize: 14 }}>Recurring</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="shiftType"
+                            checked={!addRecurring.isRecurring}
+                            onChange={() => setAddRecurring(r => ({ ...r, isRecurring: false }))}
+                            style={{ margin: 0 }}
+                          />
+                          <span style={{ fontSize: 14 }}>One-time</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    {/* Day of Week - Only show for recurring shifts */}
+                    {addRecurring.isRecurring && (
                       <select value={addRecurring.dayOfWeek} onChange={e => setAddRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
                         {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
                       </select>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input 
-                          type="datetime-local" 
-                          value={addRecurring.startTime} 
-                          onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} 
-                          onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} 
-                          style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }} 
-                          placeholder="Start Date & Time"
-                        />
-                        <input 
-                          type="datetime-local" 
-                          value={addRecurring.endTime} 
-                          onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} 
-                          onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} 
-                          style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }} 
-                          placeholder="End Date & Time"
-                        />
-                      </div>
                     )}
                     
-                    {shiftType === 'recurring' && (
+                    {/* Date/Time inputs based on shift type */}
+                    {addRecurring.isRecurring ? (
                       <>
                         <input type="time" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                         {addRecurringTouched.startTime && !isRecurringStartTimeValid && <div style={{ color: 'red', fontSize: 13 }}>Start time is required.</div>}
                         <input type="time" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                         {addRecurringTouched.endTime && !isRecurringEndTimeValid && <div style={{ color: 'red', fontSize: 13 }}>End time is required.</div>}
+                      </>
+                    ) : (
+                      <>
+                        <input type="datetime-local" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                        {addRecurringTouched.startTime && !isRecurringStartTimeValid && <div style={{ color: 'red', fontSize: 13 }}>Start date & time is required.</div>}
+                        <input type="datetime-local" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                        {addRecurringTouched.endTime && !isRecurringEndTimeValid && <div style={{ color: 'red', fontSize: 13 }}>End date & time is required.</div>}
                       </>
                     )}
                     
@@ -891,40 +844,44 @@ export default function ManageShiftsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <input placeholder="Name" value={editRecurring.name} onChange={e => setEditRecurring(r => ({ ...r, name: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                     
-                    {/* Show appropriate fields based on shift type */}
-                    {(() => {
-                      const shift = recurringShifts.find(s => s.id === editRecurringId);
-                      if (shift?.isRecurring) {
-                        return (
-                          <>
-                            <select value={editRecurring.dayOfWeek} onChange={e => setEditRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
-                              {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
-                            </select>
-                            <input type="time" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                            <input type="time" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                          </>
-                        );
-                      } else {
-                        return (
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <input 
-                              type="datetime-local" 
-                              value={editRecurring.startTime} 
-                              onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} 
-                              style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }} 
-                              placeholder="Start Date & Time"
-                            />
-                            <input 
-                              type="datetime-local" 
-                              value={editRecurring.endTime} 
-                              onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} 
-                              style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }} 
-                              placeholder="End Date & Time"
-                            />
-                          </div>
-                        );
-                      }
-                    })()}
+                    {/* Shift Type Display (Read-only) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type</label>
+                      <div style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: 4,
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        fontSize: 14,
+                        fontWeight: 500,
+                        background: editRecurring.isRecurring ? '#e3f2fd' : '#fff3e0',
+                        color: editRecurring.isRecurring ? '#1976d2' : '#f57c00',
+                        border: '1px solid #e0e0e0'
+                      }}>
+                        {editRecurring.isRecurring ? '🔄 Recurring' : '📅 One-time'}
+                      </div>
+                    </div>
+                    
+                    {/* Day of Week - Only show for recurring shifts */}
+                    {editRecurring.isRecurring && (
+                      <select value={editRecurring.dayOfWeek} onChange={e => setEditRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
+                        {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
+                      </select>
+                    )}
+                    
+                    {/* Date/Time inputs based on shift type */}
+                    {editRecurring.isRecurring ? (
+                      <>
+                        <input type="time" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                        <input type="time" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                      </>
+                    ) : (
+                      <>
+                        <input type="datetime-local" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                        <input type="datetime-local" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                      </>
+                    )}
                     
                     <select value={editRecurring.shiftCategoryId} onChange={e => setEditRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
                       <option value="">Select Category</option>

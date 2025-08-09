@@ -12,16 +12,48 @@ const convertUTCToHalifax = (utcTimeString: string): string => {
 };
 
 const convertHalifaxToUTC = (halifaxTimeString: string): string => {
-  // Create a date in Halifax timezone
-  const halifaxDate = new Date(halifaxTimeString + ':00');
-  const utcDate = new Date(halifaxDate.getTime() - (halifaxDate.getTimezoneOffset() * 60000));
-  return utcDate.toISOString();
+  try {
+    // If it's already a full datetime string, parse it directly
+    if (halifaxTimeString.includes('T') && halifaxTimeString.includes('-')) {
+      // It's already a datetime string, just return it as UTC
+      return new Date(halifaxTimeString).toISOString();
+    }
+    
+    // If it's just a time string (HH:MM), create a date with today's date
+    if (halifaxTimeString.includes(':') && !halifaxTimeString.includes('T')) {
+      const today = new Date();
+      const [hours, minutes] = halifaxTimeString.split(':');
+      const halifaxDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), parseInt(hours), parseInt(minutes));
+      
+      // Convert to UTC by subtracting the timezone offset
+      const utcDate = new Date(halifaxDate.getTime() - (halifaxDate.getTimezoneOffset() * 60000));
+      return utcDate.toISOString();
+    }
+    
+    // Default fallback
+    return new Date(halifaxTimeString).toISOString();
+  } catch (error) {
+    console.error('Error converting Halifax time to UTC:', error);
+    return new Date(halifaxTimeString).toISOString();
+  }
 };
 
 const extractTimeFromUTC = (utcTimeString: string): string => {
-  const utcDate = new Date(utcTimeString);
-  const halifaxDate = new Date(utcDate.toLocaleString("en-US", {timeZone: "America/Halifax"}));
-  return halifaxDate.toTimeString().slice(0, 5);
+  try {
+    const utcDate = new Date(utcTimeString);
+    if (isNaN(utcDate.getTime())) {
+      console.error('Invalid UTC time string:', utcTimeString);
+      return '00:00';
+    }
+    
+    // Convert to Halifax timezone
+    const halifaxDate = new Date(utcDate.toLocaleString("en-US", {timeZone: "America/Halifax"}));
+    const timeString = halifaxDate.toTimeString();
+    return timeString.slice(0, 5); // Return HH:MM format
+  } catch (error) {
+    console.error('Error extracting time from UTC:', error);
+    return '00:00';
+  }
 };
 
 interface ShiftDetails {

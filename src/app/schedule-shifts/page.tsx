@@ -58,6 +58,9 @@ export default function ScheduleShiftsPage() {
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'custom'>('today');
   const [customDate, setCustomDate] = useState<string>('');
 
+  // Add state for shift type filter
+  const [shiftTypeFilter, setShiftTypeFilter] = useState<'all' | 'recurring' | 'one-time'>('all');
+
   // Add a new state for the card tabs' selected category
   const [selectedCardCategory, setSelectedCardCategory] = useState<string>("");
 
@@ -586,7 +589,12 @@ export default function ScheduleShiftsPage() {
   ));
 
   // Helper for date filtering
-  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  const isSameDay = (d1: Date, d2: Date) => {
+    // Convert both dates to the same timezone (local) and compare
+    const date1 = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
+    const date2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
+    return date1.getTime() === date2.getTime();
+  };
   const isSameWeek = (d1: Date, d2: Date) => {
     const startOfWeek = (date: Date) => {
       const d = new Date(date);
@@ -605,6 +613,12 @@ export default function ScheduleShiftsPage() {
 
   // Helper to get next occurrence date for a recurring shift
   const getNextOccurrence = (rec: any) => {
+    if (!rec.isRecurring) {
+      // For one-time shifts, return the actual start time
+      return new Date(rec.startTime);
+    }
+    
+    // For recurring shifts, calculate the next occurrence
     const today = new Date();
     const todayDay = today.getDay();
     let dayDiff = rec.dayOfWeek - todayDay;
@@ -646,20 +660,47 @@ export default function ScheduleShiftsPage() {
     
     // Category filter
     if (selectedCardCategory && String(rec.shiftCategoryId) !== String(selectedCardCategory)) return false;
+    
+    // Shift type filter
+    if (shiftTypeFilter === 'recurring' && !rec.isRecurring) return false;
+    if (shiftTypeFilter === 'one-time' && rec.isRecurring) return false;
+    
     // Shift name filter - show all shifts with the same name regardless of timing
     if (selectedShiftName && rec.name !== selectedShiftName) return false;
-    // Date filter
+    
+    // Date filter - handle both recurring and one-time shifts
     if (dateFilter === 'today') {
-      if (rec.dayOfWeek !== todayDay) return false;
+      if (rec.isRecurring) {
+        // For recurring shifts, check day of week
+        if (rec.dayOfWeek !== todayDay) return false;
+      } else {
+        // For one-time shifts, check if the shift is today
+        const shiftDate = new Date(rec.startTime);
+        if (!isSameDay(shiftDate, new Date())) return false;
+      }
     } else if (dateFilter === 'week') {
-      if (!weekDays.includes(rec.dayOfWeek)) return false;
+      if (rec.isRecurring) {
+        // For recurring shifts, check if day is in this week
+        if (!weekDays.includes(rec.dayOfWeek)) return false;
+      } else {
+        // For one-time shifts, check if the shift is in this week
+        const shiftDate = new Date(rec.startTime);
+        if (!isSameWeek(shiftDate, new Date())) return false;
+      }
     } else if (dateFilter === 'custom' && customDate) {
-      // Use local midnight to avoid timezone issues
-      const customDay = new Date(customDate + 'T00:00:00').getDay();
-      if (rec.dayOfWeek !== customDay) return false;
+      if (rec.isRecurring) {
+        // For recurring shifts, check if day matches custom date
+        const customDay = new Date(customDate + 'T00:00:00').getDay();
+        if (rec.dayOfWeek !== customDay) return false;
+      } else {
+        // For one-time shifts, check if the shift is on the custom date
+        const shiftDate = new Date(rec.startTime);
+        const custom = new Date(customDate + 'T00:00:00');
+        if (!isSameDay(shiftDate, custom)) return false;
+      }
     } else if (selectedDay && selectedDay !== 'all') {
       // Day filter (if not using dateFilter)
-      if (rec.dayOfWeek !== Number(selectedDay)) return false;
+      if (rec.isRecurring && rec.dayOfWeek !== Number(selectedDay)) return false;
     }
     return true;
   });
@@ -813,7 +854,40 @@ export default function ScheduleShiftsPage() {
 
   // Modify the shift card rendering to include scheduled employees and the new button
   const renderShiftCard = (rec: any) => {
-    const nextDate = getNextOccurrence(rec);
+    // Calculate the occurrence date based on the current filter
+    let nextDate: Date;
+    
+    if (dateFilter === 'custom' && customDate) {
+      // For custom date, calculate the occurrence for that specific date
+      if (rec.isRecurring) {
+        // For recurring shifts, check if the custom date matches the day of week
+        const customDay = new Date(customDate + 'T00:00:00').getDay();
+        if (rec.dayOfWeek === customDay) {
+          // Create the date for the custom date
+          nextDate = new Date(customDate + 'T00:00:00');
+          // Set the time from the recurring shift
+          const recStart = new Date(rec.startTime);
+          nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
+        } else {
+          // This recurring shift doesn't occur on the custom date, so skip it
+          return null;
+        }
+      } else {
+        // For one-time shifts, check if the shift is on the custom date
+        const shiftDate = new Date(rec.startTime);
+        const custom = new Date(customDate + 'T00:00:00');
+        if (isSameDay(shiftDate, custom)) {
+          nextDate = shiftDate;
+        } else {
+          // This one-time shift is not on the custom date, so skip it
+          return null;
+        }
+      }
+    } else {
+      // Use the existing getNextOccurrence logic for today/week filters
+      nextDate = getNextOccurrence(rec);
+    }
+    
     // Match by shiftCategoryId, location, and isSameDay only
     const matchingShifts = shifts.filter(shift => {
       const shiftStart = new Date(shift.startTime);
@@ -840,12 +914,17 @@ export default function ScheduleShiftsPage() {
               shiftCategoryId: rec.shiftCategoryId,
               startTime: nextDate.toISOString(),
               endTime: (() => {
-                const end = new Date(nextDate);
-                end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
-                return end.toISOString();
+                if (rec.isRecurring) {
+                  const end = new Date(nextDate);
+                  end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
+                  return end.toISOString();
+                } else {
+                  return new Date(rec.endTime).toISOString();
+                }
               })(),
               location: rec.location,
-              slots: rec.slots
+              slots: rec.slots,
+              recurringShiftId: rec.id
             })
           });
           if (!res.ok) throw new Error('Failed to create shift');
@@ -951,58 +1030,89 @@ export default function ScheduleShiftsPage() {
               const dateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
               const signupUrl = `${window.location.origin}/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(rec.name)}?date=${dateStr}`;
               
-              // Check if shift exists in database, if not create it
-              let shiftExists = matchingShifts.length > 0;
-              
-              if (!shiftExists) {
-                try {
-                  const token = localStorage.getItem("token");
-                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({
-                      name: rec.name,
-                      shiftCategoryId: rec.shiftCategoryId,
-                      startTime: (() => {
+              try {
+                const token = localStorage.getItem("token");
+                
+                // Check if shift already exists by querying the backend directly
+                const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                if (checkRes.ok) {
+                  const allShifts = await checkRes.json();
+                  const existingShift = allShifts.find((shift: any) => {
+                    const shiftStart = new Date(shift.startTime);
+                    return (
+                      String(shift.shiftCategoryId) === String(rec.shiftCategoryId) &&
+                      shift.location === rec.location &&
+                      isSameDay(shiftStart, nextDate)
+                    );
+                  });
+                  
+                  if (existingShift) {
+                    toast.success('Signup link copied to clipboard!');
+                    navigator.clipboard.writeText(signupUrl).catch(() => {
+                      toast.error('Failed to copy link');
+                    });
+                    return;
+                  }
+                }
+                
+                // If no existing shift found, create a new one
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({
+                    name: rec.name,
+                    shiftCategoryId: rec.shiftCategoryId,
+                    startTime: (() => {
+                      if (rec.isRecurring) {
                         // Extract time from recurring shift and create in Halifax timezone
                         const recStart = new Date(rec.startTime);
                         const start = new Date(nextDate);
                         start.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
                         // Convert to Halifax timezone for storage
                         return start.toISOString();
-                      })(),
-                      endTime: (() => {
+                      } else {
+                        // For one-time shifts, use the actual start time
+                        return new Date(rec.startTime).toISOString();
+                      }
+                    })(),
+                    endTime: (() => {
+                      if (rec.isRecurring) {
                         // Extract time from recurring shift and create in Halifax timezone
                         const recEnd = new Date(rec.endTime);
                         const end = new Date(nextDate);
                         end.setHours(recEnd.getHours(), recEnd.getMinutes(), 0, 0);
                         // Convert to Halifax timezone for storage
                         return end.toISOString();
-                      })(),
-                      location: rec.location,
-                      slots: rec.slots
-                    })
-                  });
-                  
-                  if (res.ok) {
-                    // Refresh shifts list to include the newly created shift
-                    await fetchShifts();
-                    toast.success('Shift created and signup link copied to clipboard!');
-                  } else {
-                    throw new Error('Failed to create shift');
-                  }
-                } catch (err) {
-                  toast.error('Failed to create shift for this date');
-                  return;
+                      } else {
+                        // For one-time shifts, use the actual end time
+                        return new Date(rec.endTime).toISOString();
+                      }
+                    })(),
+                    location: rec.location,
+                    slots: rec.slots,
+                    recurringShiftId: rec.id // Link to the RecurringShift
+                  })
+                });
+                
+                if (res.ok) {
+                  // Refresh shifts list to include the newly created shift
+                  await fetchShifts();
+                  toast.success('Shift created and signup link copied to clipboard!');
+                } else {
+                  throw new Error('Failed to create shift');
                 }
-              } else {
-                toast.success('Signup link copied to clipboard!');
+                
+                // Copy to clipboard
+                navigator.clipboard.writeText(signupUrl).catch(() => {
+                  toast.error('Failed to copy link');
+                });
+              } catch (err) {
+                console.error('Error in copy link:', err);
+                toast.error('Failed to create shift for this date');
               }
-              
-              // Copy to clipboard
-              navigator.clipboard.writeText(signupUrl).catch(() => {
-                toast.error('Failed to copy link');
-              });
             }}
             style={{ 
               background: 'linear-gradient(90deg, #4caf50 60%, #66bb6a 100%)',
@@ -1676,6 +1786,68 @@ export default function ScheduleShiftsPage() {
               </div>
             </div>
 
+      {/* Shift Type Filter */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShiftTypeFilter('all')}
+            style={{
+              background: shiftTypeFilter === 'all' ? '#ff9800' : '#f5f5f5',
+              color: shiftTypeFilter === 'all' ? '#fff' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 14px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14,
+              minWidth: 80
+            }}
+          >
+            All Types
+          </button>
+          <button
+            onClick={() => setShiftTypeFilter('recurring')}
+            style={{
+              background: shiftTypeFilter === 'recurring' ? '#ff9800' : '#f5f5f5',
+              color: shiftTypeFilter === 'recurring' ? '#fff' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 14px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14,
+              minWidth: 80,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <span style={{ fontSize: 14 }}>📅</span>
+            Recurring
+          </button>
+          <button
+            onClick={() => setShiftTypeFilter('one-time')}
+            style={{
+              background: shiftTypeFilter === 'one-time' ? '#ff9800' : '#f5f5f5',
+              color: shiftTypeFilter === 'one-time' ? '#fff' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 14px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14,
+              minWidth: 80,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <span style={{ fontSize: 14 }}>⏰</span>
+            One-time
+          </button>
+        </div>
+      </div>
+
     
 
       {/* Shift Name Tabs */}
@@ -1796,7 +1968,7 @@ export default function ScheduleShiftsPage() {
           <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>No recurring shifts found for the selected filters.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filteredRecurring.map(rec => renderShiftCard(rec))}
+            {filteredRecurring.map(rec => renderShiftCard(rec)).filter(Boolean)}
           </div>
         )}
       </div>

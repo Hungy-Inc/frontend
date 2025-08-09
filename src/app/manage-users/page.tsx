@@ -450,12 +450,38 @@ export default function ManageUsersPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/gif'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      setAddUserError('Invalid file type. Only PDF, Word, text, and image files are allowed.');
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      setAddUserError('File too large. Maximum file size is 10MB.');
+      return;
+    }
+
     setAgreementFile(file);
     setUploadingAgreement(true);
     setAddUserError('');
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
       const formData = new FormData();
       formData.append('agreement', file);
 
@@ -469,15 +495,23 @@ export default function ManageUsersPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to upload agreement");
+        throw new Error(errorData.error || errorData.details || "Failed to upload agreement");
       }
 
       const result = await response.json();
+      if (!result.fileUrl) {
+        throw new Error('Upload successful but no file URL returned');
+      }
+      
       setAgreementFileUrl(result.fileUrl);
+      toast.success('Agreement document uploaded successfully!');
     } catch (err: any) {
-      setAddUserError(err.message || "Failed to upload agreement. Please try again.");
+      console.error('Error uploading agreement:', err);
+      const errorMessage = err.message || "Failed to upload agreement. Please try again.";
+      setAddUserError(errorMessage);
       setAgreementFile(null);
       setAgreementFileUrl('');
+      toast.error(errorMessage);
     } finally {
       setUploadingAgreement(false);
     }

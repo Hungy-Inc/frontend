@@ -54,6 +54,12 @@ export default function ManageShiftsPage() {
 
   // New state for enhanced features
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
+  
+  // New state for expandable shifts
+  const [expandedShifts, setExpandedShifts] = useState<Set<number>>(new Set());
+  const [shiftOccurrences, setShiftOccurrences] = useState<{[key: number]: any[]}>({});
+  const [loadingOccurrences, setLoadingOccurrences] = useState<{[key: number]: boolean}>({});
+  const [shifts, setShifts] = useState<any[]>([]);
 
   // Fetch shift categories for dropdown
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
@@ -83,7 +89,10 @@ export default function ManageShiftsPage() {
 
   useEffect(() => {
     if (tab === 'shiftcategory') fetchCategories();
-    if (tab === 'recurringshifts') fetchRecurringShifts();
+    if (tab === 'recurringshifts') {
+      fetchRecurringShifts();
+      fetchShifts(); // Also fetch shifts for occurrence status checking
+    }
     // eslint-disable-next-line
   }, [tab, filterActive]);
 
@@ -103,6 +112,21 @@ export default function ManageShiftsPage() {
       setCategories([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchShifts = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch shifts");
+      const data = await res.json();
+      setShifts(data);
+    } catch (err) {
+      console.error('Error fetching shifts:', err);
+      setShifts([]);
     }
   };
 
@@ -452,6 +476,176 @@ export default function ManageShiftsPage() {
     }
   };
 
+  // Calculate next 4 occurrences for a recurring shift
+  const calculateNextOccurrences = (shift: any) => {
+    if (!shift.isRecurring || shift.dayOfWeek === null) return [];
+    
+    const occurrences = [];
+    const today = new Date();
+    const todayDay = today.getDay();
+    let dayDiff = shift.dayOfWeek - todayDay;
+    
+    // If today is the recurring day, start from next week
+    if (dayDiff <= 0) dayDiff += 7;
+    
+    for (let i = 0; i < 4; i++) {
+      const occurrenceDate = new Date(today);
+      occurrenceDate.setDate(today.getDate() + dayDiff + (i * 7));
+      
+      // Set the time for this occurrence
+      const startTime = new Date(shift.startTime);
+      const endTime = new Date(shift.endTime);
+      
+      const occurrenceStart = new Date(occurrenceDate);
+      occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+      
+      const occurrenceEnd = new Date(occurrenceDate);
+      occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+      
+      occurrences.push({
+        date: occurrenceDate,
+        startTime: occurrenceStart,
+        endTime: occurrenceEnd,
+        dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
+      });
+    }
+    
+    return occurrences;
+  };
+
+  // Handle expand/collapse of shift occurrences
+  const handleToggleExpand = async (shiftId: number) => {
+    const newExpandedShifts = new Set(expandedShifts);
+    
+    if (newExpandedShifts.has(shiftId)) {
+      // Collapse
+      newExpandedShifts.delete(shiftId);
+      setExpandedShifts(newExpandedShifts);
+    } else {
+      // Expand - load occurrences
+      newExpandedShifts.add(shiftId);
+      setExpandedShifts(newExpandedShifts);
+      
+      // Set loading state
+      setLoadingOccurrences(prev => ({ ...prev, [shiftId]: true }));
+      
+      try {
+        // Calculate next 4 occurrences
+        const shift = recurringShifts.find(s => s.id === shiftId);
+        if (shift) {
+          const occurrences = calculateNextOccurrences(shift);
+          setShiftOccurrences(prev => ({ ...prev, [shiftId]: occurrences }));
+        }
+      } catch (error) {
+        console.error('Error calculating occurrences:', error);
+        toast.error('Failed to load shift occurrences');
+      } finally {
+        setLoadingOccurrences(prev => ({ ...prev, [shiftId]: false }));
+      }
+    }
+  };
+
+  // Get the current status of an occurrence
+  const getOccurrenceStatus = (shiftId: number, occurrenceDate: Date) => {
+    // Check if there's a shift for this occurrence in the shifts data
+    const existingShift = shifts.find((s: any) => {
+      if (s.recurringShiftId !== shiftId) return false;
+      const shiftDate = new Date(s.startTime);
+      // Compare dates using toDateString() for consistent comparison
+      return shiftDate.toDateString() === occurrenceDate.toDateString();
+    });
+    
+    // If no shift exists, it's considered active by default (will be created when toggled)
+    // If shift exists, return its isActive status
+    return existingShift ? existingShift.isActive : true;
+  };
+
+  // Toggle individual shift occurrence status
+  const toggleOccurrenceStatus = async (shiftId: number, occurrenceDate: Date) => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      // First, check if a shift exists for this occurrence
+      const shift = recurringShifts.find(s => s.id === shiftId);
+      if (!shift) throw new Error('Shift not found');
+      
+      // Check if shift exists for this date
+      const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (checkRes.ok) {
+        const existingShifts = await checkRes.json();
+        const existingShift = existingShifts.find((s: any) => {
+          const shiftDate = new Date(s.startTime);
+          // Use consistent date comparison
+          return shiftDate.toDateString() === occurrenceDate.toDateString() && s.recurringShiftId === shiftId;
+        });
+        
+        if (existingShift) {
+          // Update existing shift using the toggle-active endpoint
+          const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${existingShift.id}/toggle-active`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ isActive: !existingShift.isActive })
+          });
+          
+          if (!updateRes.ok) {
+            const errorData = await updateRes.json();
+            throw new Error(errorData.error || 'Failed to update shift status');
+          }
+          
+          toast.success(`Occurrence ${existingShift.isActive ? 'deactivated' : 'activated'} successfully`);
+        } else {
+          // No shift exists yet. Since the display shows as "active" by default when no shift exists,
+          // and the user clicked the toggle, they want to deactivate it (create as inactive)
+          const desiredStatus = false; // Create as inactive since user clicked to deactivate
+          
+          // Create new shift for this occurrence with the desired status
+          const startTime = new Date(occurrenceDate);
+          const shiftStart = new Date(shift.startTime);
+          startTime.setHours(shiftStart.getHours(), shiftStart.getMinutes(), 0, 0);
+          
+          const endTime = new Date(occurrenceDate);
+          const shiftEnd = new Date(shift.endTime);
+          endTime.setHours(shiftEnd.getHours(), shiftEnd.getMinutes(), 0, 0);
+          
+          const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              name: shift.name,
+              shiftCategoryId: shift.shiftCategoryId,
+              startTime: startTime.toISOString(),
+              endTime: endTime.toISOString(),
+              location: shift.location,
+              slots: shift.slots,
+              recurringShiftId: shiftId,
+              isActive: desiredStatus // Create as inactive since user clicked to deactivate
+            })
+          });
+          
+          if (!createRes.ok) {
+            const errorData = await createRes.json();
+            throw new Error(errorData.error || 'Failed to create shift');
+          }
+          
+          toast.success('Occurrence created and deactivated successfully');
+        }
+        
+        // Refresh the shifts data and occurrences
+        await fetchShifts();
+        const occurrences = calculateNextOccurrences(shift);
+        setShiftOccurrences(prev => ({ ...prev, [shiftId]: occurrences }));
+      } else {
+        throw new Error('Failed to fetch shifts');
+      }
+    } catch (error: any) {
+      console.error('Error toggling occurrence status:', error);
+      toast.error(error.message || 'Failed to update occurrence status');
+    }
+  };
+
   const isRecurringNameValid = /^[A-Za-z\s]+$/.test(addRecurring.name.trim());
   const isRecurringDayValid = addRecurring.isRecurring ? (typeof addRecurring.dayOfWeek === 'number' && addRecurring.dayOfWeek >= 0 && addRecurring.dayOfWeek <= 6) : true;
   const isRecurringStartTimeValid = !!addRecurring.startTime;
@@ -656,6 +850,7 @@ export default function ManageShiftsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#fafafa', color: '#888', fontWeight: 600 }}>
+                    <th style={{ textAlign: 'left', padding: '12px 0 12px 12px', width: '40px' }}></th>
                     <th style={{ textAlign: 'left', padding: '12px 0 12px 12px' }}>Category</th>
                     <th style={{ textAlign: 'left', padding: '12px 0' }}>Name</th>
                     <th style={{ textAlign: 'left', padding: 12 }}>Type</th>
@@ -674,85 +869,186 @@ export default function ManageShiftsPage() {
                     .filter(shift => filterDay === '' || (shift.dayOfWeek !== null && String(shift.dayOfWeek) === filterDay))
                     .filter(shift => !filterShiftName || shift.name.trim() === filterShiftName)
                     .map(shift => (
-                      <tr key={shift.id} style={{ borderBottom: '1px solid #f0f0f0', opacity: shift.isActive === false ? 0.6 : 1 }}>
-                        <td style={{ padding: '12px 0 12px 12px', whiteSpace: 'nowrap' }}>
-                          {shift.ShiftCategory?.icon || <span style={{ color: '#ccc' }}>-</span>}
-                          <span style={{ marginLeft: 0 }}>{shift.ShiftCategory?.name || '-'}</span>
-                        </td>
-                        <td style={{ padding: '12px 0' }}>{shift.name}</td>
-                        <td style={{ padding: 12 }}>
-                          <span style={{ 
-                            display: 'inline-flex', 
-                            alignItems: 'center', 
-                            gap: 4,
-                            padding: '2px 8px',
-                            borderRadius: 12,
-                            fontSize: 12,
-                            fontWeight: 500,
-                            background: shift.isRecurring ? '#e3f2fd' : '#fff3e0',
-                            color: shift.isRecurring ? '#1976d2' : '#f57c00'
-                          }}>
-                            {shift.isRecurring ? <FaCalendarAlt size={12} /> : <FaClock size={12} />}
-                            {shift.isRecurring ? 'Recurring' : 'One-time'}
-                          </span>
-                        </td>
-                        <td style={{ padding: 12 }}>
-                          {shift.isRecurring ? 
-                            ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek || 0] :
-                            new Date(shift.startTime).toLocaleDateString('en-CA', { 
-                              month: 'short', 
-                              day: 'numeric', 
-                              year: 'numeric',
-                              timeZone: 'America/Halifax'
-                            })
-                          }
-                        </td>
-                        <td style={{ padding: 12 }}>
-                          {shift.startTime ? new Date(shift.startTime).toLocaleTimeString('en-CA', { 
-                            hour: '2-digit', 
-                            minute: '2-digit', 
-                            hour12: false, 
-                            timeZone: 'America/Halifax' 
-                          }) : ''}
-                        </td>
-                        <td style={{ padding: 12 }}>
-                          {shift.endTime ? new Date(shift.endTime).toLocaleTimeString('en-CA', { 
-                            hour: '2-digit', 
-                            minute: '2-digit', 
-                            hour12: false, 
-                            timeZone: 'America/Halifax' 
-                          }) : ''}
-                        </td>
-                        <td style={{ padding: 12 }}>{shift.location}</td>
-                        <td style={{ padding: 12 }}>{shift.slots}</td>
-                        <td style={{ padding: 12, textAlign: 'center' }}>
-                          <button 
-                            onClick={() => toggleActive(shift.id, shift.isActive)}
-                            style={{ 
-                              background: 'none', 
-                              border: 'none', 
-                              color: shift.isActive ? '#4caf50' : '#9e9e9e', 
-                              cursor: 'pointer',
-                              fontSize: 16
-                            }} 
-                            title={shift.isActive ? 'Deactivate' : 'Activate'}
-                          >
-                            {shift.isActive ? <FaToggleOn /> : <FaToggleOff />}
-                          </button>
-                        </td>
-                        <td style={{ padding: 12, textAlign: 'center' }}>
-                          <button 
-                            style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} 
-                            title="Edit" 
-                            onClick={() => window.location.href = `/edit-shift/${shift.id}`}
-                          >
-                            <FaEdit />
-                          </button>
-                          <button style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer' }} title="Delete" onClick={() => handleDeleteRecurring(shift)}>
-                            <FaTrash />
-                          </button>
-                        </td>
-                      </tr>
+                      <React.Fragment key={shift.id}>
+                        <tr style={{ borderBottom: '1px solid #f0f0f0', opacity: shift.isActive === false ? 0.6 : 1 }}>
+                          <td style={{ padding: '12px 0 12px 12px', width: '40px' }}>
+                            {shift.isRecurring && (
+                              <button
+                                onClick={() => handleToggleExpand(shift.id)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#ff9800',
+                                  cursor: 'pointer',
+                                  fontSize: '16px',
+                                  padding: '4px',
+                                  borderRadius: '4px',
+                                  transition: 'transform 0.2s',
+                                  transform: expandedShifts.has(shift.id) ? 'rotate(90deg)' : 'rotate(0deg)'
+                                }}
+                                title={expandedShifts.has(shift.id) ? 'Collapse' : 'Expand'}
+                              >
+                                ▶
+                              </button>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 0 12px 12px', whiteSpace: 'nowrap' }}>
+                            {shift.ShiftCategory?.icon || <span style={{ color: '#ccc' }}>-</span>}
+                            <span style={{ marginLeft: 0 }}>{shift.ShiftCategory?.name || '-'}</span>
+                          </td>
+                          <td style={{ padding: '12px 0' }}>{shift.name}</td>
+                          <td style={{ padding: 12 }}>
+                            <span style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: 4,
+                              padding: '2px 8px',
+                              borderRadius: 12,
+                              fontSize: 12,
+                              fontWeight: 500,
+                              background: shift.isRecurring ? '#e3f2fd' : '#fff3e0',
+                              color: shift.isRecurring ? '#1976d2' : '#f57c00'
+                            }}>
+                              {shift.isRecurring ? <FaCalendarAlt size={12} /> : <FaClock size={12} />}
+                              {shift.isRecurring ? 'Recurring' : 'One-time'}
+                            </span>
+                          </td>
+                          <td style={{ padding: 12 }}>
+                            {shift.isRecurring ? 
+                              ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek || 0] :
+                              new Date(shift.startTime).toLocaleDateString('en-CA', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                year: 'numeric',
+                                timeZone: 'America/Halifax'
+                              })
+                            }
+                          </td>
+                          <td style={{ padding: 12 }}>
+                            {shift.startTime ? new Date(shift.startTime).toLocaleTimeString('en-CA', { 
+                              hour: '2-digit', 
+                              minute: '2-digit', 
+                              hour12: false, 
+                              timeZone: 'America/Halifax' 
+                            }) : ''}
+                          </td>
+                          <td style={{ padding: 12 }}>
+                            {shift.endTime ? new Date(shift.endTime).toLocaleTimeString('en-CA', { 
+                              hour: '2-digit', 
+                              minute: '2-digit', 
+                              hour12: false, 
+                              timeZone: 'America/Halifax' 
+                            }) : ''}
+                          </td>
+                          <td style={{ padding: 12 }}>{shift.location}</td>
+                          <td style={{ padding: 12 }}>{shift.slots}</td>
+                          <td style={{ padding: 12, textAlign: 'center' }}>
+                            <button 
+                              onClick={() => toggleActive(shift.id, shift.isActive)}
+                              style={{ 
+                                background: 'none', 
+                                border: 'none', 
+                                color: shift.isActive ? '#4caf50' : '#9e9e9e', 
+                                cursor: 'pointer',
+                                fontSize: 16
+                              }} 
+                              title={shift.isActive ? 'Deactivate' : 'Activate'}
+                            >
+                              {shift.isActive ? <FaToggleOn /> : <FaToggleOff />}
+                            </button>
+                          </td>
+                          <td style={{ padding: 12, textAlign: 'center' }}>
+                            <button 
+                              style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} 
+                              title="Edit" 
+                              onClick={() => window.location.href = `/edit-shift/${shift.id}`}
+                            >
+                              <FaEdit />
+                            </button>
+                            <button style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer' }} title="Delete" onClick={() => handleDeleteRecurring(shift)}>
+                              <FaTrash />
+                            </button>
+                          </td>
+                        </tr>
+                        {/* Expanded occurrences row */}
+                        {expandedShifts.has(shift.id) && shift.isRecurring && (
+                          <tr>
+                            <td colSpan={10} style={{ padding: 0, borderBottom: '1px solid #f0f0f0' }}>
+                              <div style={{ 
+                                background: '#f8f9fa', 
+                                padding: '16px 24px',
+                                borderLeft: '4px solid #ff9800'
+                              }}>
+                                <div style={{ 
+                                  fontWeight: 600, 
+                                  fontSize: 14, 
+                                  color: '#333', 
+                                  marginBottom: 12 
+                                }}>
+                                  Next 4 Occurrences
+                                </div>
+                                {loadingOccurrences[shift.id] ? (
+                                  <div style={{ textAlign: 'center', color: '#888', padding: '20px' }}>
+                                    Loading occurrences...
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
+                                    {shiftOccurrences[shift.id]?.map((occurrence, index) => (
+                                      <div key={index} style={{
+                                        background: '#fff',
+                                        border: '1px solid #e0e0e0',
+                                        borderRadius: '8px',
+                                        padding: '12px',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                      }}>
+                                        <div>
+                                          <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
+                                            {occurrence.dayName}, {occurrence.date.toLocaleDateString('en-CA', { 
+                                              month: 'short', 
+                                              day: 'numeric', 
+                                              year: 'numeric',
+                                              timeZone: 'America/Halifax'
+                                            })}
+                                          </div>
+                                          <div style={{ fontSize: 12, color: '#666', marginTop: '4px' }}>
+                                            {occurrence.startTime.toLocaleTimeString('en-CA', { 
+                                              hour: '2-digit', 
+                                              minute: '2-digit', 
+                                              hour12: false, 
+                                              timeZone: 'America/Halifax' 
+                                            })} - {occurrence.endTime.toLocaleTimeString('en-CA', { 
+                                              hour: '2-digit', 
+                                              minute: '2-digit', 
+                                              hour12: false, 
+                                              timeZone: 'America/Halifax' 
+                                            })}
+                                          </div>
+                                        </div>
+                                        <button
+                                          onClick={() => toggleOccurrenceStatus(shift.id, occurrence.date)}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: getOccurrenceStatus(shift.id, occurrence.date) ? '#4caf50' : '#9e9e9e',
+                                            cursor: 'pointer',
+                                            fontSize: 16,
+                                            padding: '4px'
+                                          }}
+                                          title={getOccurrenceStatus(shift.id, occurrence.date) ? 'Deactivate' : 'Activate'}
+                                        >
+                                          {getOccurrenceStatus(shift.id, occurrence.date) ? <FaToggleOn /> : <FaToggleOff />}
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                 </tbody>
               </table>

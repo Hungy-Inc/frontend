@@ -55,6 +55,9 @@ export default function ManageShiftsPage() {
   // New state for enhanced features
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
   
+  // Special Events toggle state
+  const [specialEventsMode, setSpecialEventsMode] = useState(false);
+  
   // New state for expandable shifts
   const [expandedShifts, setExpandedShifts] = useState<Set<number>>(new Set());
   const [shiftOccurrences, setShiftOccurrences] = useState<{[key: number]: any[]}>({});
@@ -66,6 +69,19 @@ export default function ManageShiftsPage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDay, setFilterDay] = useState('');
   const [filterShiftName, setFilterShiftName] = useState('');
+
+  // New state for month/year filtering of occurrences
+  const [occurrenceMonth, setOccurrenceMonth] = useState(new Date().getMonth());
+  const [occurrenceYear, setOccurrenceYear] = useState(new Date().getFullYear());
+  const [showOccurrenceFilters, setShowOccurrenceFilters] = useState(false);
+
+  // Individual shift occurrence filters
+  const [shiftOccurrenceFilters, setShiftOccurrenceFilters] = useState<{[key: number]: {
+    showActive: boolean;
+    showInactive: boolean;
+    searchText: string;
+    monthFilter: string;
+  }}>({});
 
   useEffect(() => {
     if (tab === 'recurringshifts' || showAddRecurring || editRecurringId) {
@@ -94,7 +110,22 @@ export default function ManageShiftsPage() {
       fetchShifts(); // Also fetch shifts for occurrence status checking
     }
     // eslint-disable-next-line
-  }, [tab, filterActive]);
+  }, [tab, filterActive, specialEventsMode]);
+
+  // Auto-select Special Events category when mode is active
+  useEffect(() => {
+    if (specialEventsMode && categoryOptions.length > 0) {
+      const specialEventsCategory = categoryOptions.find(cat => cat.name === 'Special Events');
+      if (specialEventsCategory) {
+        setAddRecurring(prev => ({ ...prev, shiftCategoryId: specialEventsCategory.id }));
+      }
+    } else if (!specialEventsMode) {
+      // Clear category selection when Special Events mode is turned off
+      setAddRecurring(prev => ({ ...prev, shiftCategoryId: '' }));
+    }
+  }, [specialEventsMode, categoryOptions]);
+
+
 
   const fetchCategories = async () => {
     setLoading(true);
@@ -140,7 +171,18 @@ export default function ManageShiftsPage() {
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
       const data = await res.json();
-      setRecurringShifts(data);
+      
+      // Filter by Special Events category if mode is active
+      let filteredData = data;
+      if (specialEventsMode) {
+        // Find the Special Events category
+        const specialEventsCategory = categoryOptions.find(cat => cat.name === 'Special Events');
+        if (specialEventsCategory) {
+          filteredData = data.filter((shift: any) => shift.shiftCategoryId === specialEventsCategory.id);
+        }
+      }
+      
+      setRecurringShifts(filteredData);
     } catch (err) {
       setErrorRecurring("Failed to load shifts.");
       setRecurringShifts([]);
@@ -476,38 +518,78 @@ export default function ManageShiftsPage() {
     }
   };
 
-  // Calculate next 4 occurrences for a recurring shift
-  const calculateNextOccurrences = (shift: any) => {
-    if (!shift.isRecurring || shift.dayOfWeek === null) return [];
+  // Calculate occurrences for a recurring shift
+  const calculateNextOccurrences = (shift: any, targetMonth?: number, targetYear?: number) => {
+    if (!shift || !shift.isRecurring || shift.dayOfWeek === null) return [];
     
     const occurrences = [];
-    const today = new Date();
-    const todayDay = today.getDay();
-    let dayDiff = shift.dayOfWeek - todayDay;
     
-    // If today is the recurring day, start from next week
-    if (dayDiff <= 0) dayDiff += 7;
-    
-    for (let i = 0; i < 4; i++) {
-      const occurrenceDate = new Date(today);
-      occurrenceDate.setDate(today.getDate() + dayDiff + (i * 7));
+    // If target month/year is specified, generate occurrences for that specific month only
+    if (targetMonth !== undefined && targetYear !== undefined) {
+      const startDate = new Date(targetYear, targetMonth, 1);
+      const endDate = new Date(targetYear, targetMonth + 1, 0); // Last day of the month
       
-      // Set the time for this occurrence
-      const startTime = new Date(shift.startTime);
-      const endTime = new Date(shift.endTime);
+      // Find the first occurrence of this day of week in the target month
+      let currentDate = new Date(startDate);
+      while (currentDate.getDay() !== shift.dayOfWeek) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
       
-      const occurrenceStart = new Date(occurrenceDate);
-      occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+      // Generate occurrences for this month only
+      while (currentDate <= endDate) {
+        // Set the time for this occurrence
+        const startTime = new Date(shift.startTime);
+        const endTime = new Date(shift.endTime);
+        
+        const occurrenceStart = new Date(currentDate);
+        occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+        
+        const occurrenceEnd = new Date(currentDate);
+        occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+        
+        occurrences.push({
+          date: new Date(currentDate),
+          startTime: occurrenceStart,
+          endTime: occurrenceEnd,
+          dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][currentDate.getDay()]
+        });
+        
+        // Move to next week
+        currentDate.setDate(currentDate.getDate() + 7);
+      }
+    } else {
+      // Default behavior: Generate 52 occurrences (one year) from current date
+      const today = new Date();
+      let startDate = new Date();
       
-      const occurrenceEnd = new Date(occurrenceDate);
-      occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+      const startDateDay = startDate.getDay();
+      let dayDiff = shift.dayOfWeek - startDateDay;
       
-      occurrences.push({
-        date: occurrenceDate,
-        startTime: occurrenceStart,
-        endTime: occurrenceEnd,
-        dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
-      });
+      // If start date is the recurring day, start from next week
+      if (dayDiff <= 0) dayDiff += 7;
+      
+      // Generate 52 occurrences (one year of weekly shifts)
+      for (let i = 0; i < 52; i++) {
+        const occurrenceDate = new Date(startDate);
+        occurrenceDate.setDate(startDate.getDate() + dayDiff + (i * 7));
+        
+        // Set the time for this occurrence
+        const startTime = new Date(shift.startTime);
+        const endTime = new Date(shift.endTime);
+        
+        const occurrenceStart = new Date(occurrenceDate);
+        occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+        
+        const occurrenceEnd = new Date(occurrenceDate);
+        occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+        
+        occurrences.push({
+          date: occurrenceDate,
+          startTime: occurrenceStart,
+          endTime: occurrenceEnd,
+          dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
+        });
+      }
     }
     
     return occurrences;
@@ -526,14 +608,17 @@ export default function ManageShiftsPage() {
       newExpandedShifts.add(shiftId);
       setExpandedShifts(newExpandedShifts);
       
+      // Initialize filters for this shift
+      initializeShiftFilters(shiftId);
+      
       // Set loading state
       setLoadingOccurrences(prev => ({ ...prev, [shiftId]: true }));
       
       try {
-        // Calculate next 4 occurrences
+        // Calculate next 52 occurrences (default behavior - no month filtering)
         const shift = recurringShifts.find(s => s.id === shiftId);
         if (shift) {
-          const occurrences = calculateNextOccurrences(shift);
+          const occurrences = calculateNextOccurrences(shift); // No month/year parameters = default 52 occurrences
           setShiftOccurrences(prev => ({ ...prev, [shiftId]: occurrences }));
         }
       } catch (error) {
@@ -646,6 +731,84 @@ export default function ManageShiftsPage() {
     }
   };
 
+
+
+  // Handle month/year navigation
+  const navigateOccurrencePeriod = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      if (occurrenceMonth === 0) {
+        setOccurrenceMonth(11);
+        setOccurrenceYear(occurrenceYear - 1);
+      } else {
+        setOccurrenceMonth(occurrenceMonth - 1);
+      }
+    } else {
+      if (occurrenceMonth === 11) {
+        setOccurrenceMonth(0);
+        setOccurrenceYear(occurrenceYear + 1);
+      } else {
+        setOccurrenceMonth(occurrenceMonth + 1);
+      }
+    }
+  };
+
+  // Set occurrence period to current month/year
+  const setToCurrentPeriod = () => {
+    const now = new Date();
+    setOccurrenceMonth(now.getMonth());
+    setOccurrenceYear(now.getFullYear());
+  };
+
+  // Generate all available months for the dropdown (current cycle + next 12 months)
+  const generateAvailableMonths = () => {
+    const months = [];
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    // Start from current month and go forward 12 months
+    for (let i = 0; i < 12; i++) {
+      const monthIndex = (currentMonth + i) % 12;
+      const year = currentYear + Math.floor((currentMonth + i) / 12);
+      months.push({
+        value: `${year}-${monthIndex}`,
+        label: `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][monthIndex]} ${year}`,
+        month: monthIndex,
+        year: year
+      });
+    }
+    
+    return months;
+  };
+
+  // Quick jump to specific month/year
+  const jumpToMonth = (monthYearValue: string) => {
+    const [year, month] = monthYearValue.split('-').map(Number);
+    setOccurrenceMonth(month);
+    setOccurrenceYear(year);
+  };
+
+  // Group occurrences by month for better organization
+  const groupOccurrencesByMonth = (occurrences: any[]) => {
+    const grouped: { [key: string]: any[] } = {};
+    
+    occurrences.forEach(occurrence => {
+      const monthKey = `${occurrence.date.getFullYear()}-${occurrence.date.getMonth()}`;
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = [];
+      }
+      grouped[monthKey].push(occurrence);
+    });
+    
+    return grouped;
+  };
+
+  // Get month name from month key
+  const getMonthNameFromKey = (monthKey: string) => {
+    const [year, month] = monthKey.split('-').map(Number);
+    return `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][month]} ${year}`;
+  };
+
   const isRecurringNameValid = /^[A-Za-z\s]+$/.test(addRecurring.name.trim());
   const isRecurringDayValid = addRecurring.isRecurring ? (typeof addRecurring.dayOfWeek === 'number' && addRecurring.dayOfWeek >= 0 && addRecurring.dayOfWeek <= 6) : true;
   const isRecurringStartTimeValid = !!addRecurring.startTime;
@@ -671,6 +834,126 @@ export default function ManageShiftsPage() {
       .values()
   ) as string[];
   shiftNameOptions.sort();
+
+  // Initialize filters for a specific shift
+  const initializeShiftFilters = (shiftId: number) => {
+    if (!shiftOccurrenceFilters[shiftId]) {
+      setShiftOccurrenceFilters(prev => ({
+        ...prev,
+        [shiftId]: {
+          showActive: true,
+          showInactive: true,
+          searchText: '',
+          monthFilter: ''
+        }
+      }));
+    }
+  };
+
+  // Filter occurrences for a specific shift
+  const getFilteredOccurrences = (shiftId: number, occurrences: any[], shift: any) => {
+    const filters = shiftOccurrenceFilters[shiftId];
+    if (!filters || !shift) return occurrences;
+
+    // If month filter is applied, regenerate occurrences for that specific month only
+    if (filters.monthFilter !== '') {
+      const [year, month] = filters.monthFilter.split('-').map(Number);
+      if (isNaN(year) || isNaN(month)) return occurrences; // Safety check for invalid month/year
+      const monthOccurrences = calculateNextOccurrences(shift, month, year);
+      
+      // Apply other filters to the month-specific occurrences
+      return monthOccurrences.filter(occurrence => {
+        // Don't show past occurrences (completed)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (occurrence.date < today) {
+          return false;
+        }
+
+        // Status filter
+        const isActive = getOccurrenceStatus(shiftId, occurrence.date);
+        if (filters.showActive && !filters.showInactive) {
+          if (!isActive) return false;
+        }
+        if (!filters.showActive && filters.showInactive) {
+          if (isActive) return false;
+        }
+
+        // Search text filter
+        if (filters.searchText) {
+          const searchLower = filters.searchText.toLowerCase();
+          const dayName = occurrence.dayName.toLowerCase();
+          const dateStr = occurrence.date.toLocaleDateString('en-CA', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric',
+            timeZone: 'America/Halifax'
+          }).toLowerCase();
+          
+          if (!dayName.includes(searchLower) && !dateStr.includes(searchLower)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    // No month filter - ensure we have the default 52 occurrences
+    // If the original occurrences array is empty or doesn't have 52 items, regenerate them
+    let defaultOccurrences = occurrences;
+    if (occurrences.length === 0 || occurrences.length < 52) {
+      defaultOccurrences = calculateNextOccurrences(shift); // Generate default 52 occurrences
+    }
+    
+    // Apply filters to the default occurrences
+    return defaultOccurrences.filter(occurrence => {
+      // Don't show past occurrences (completed)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (occurrence.date < today) {
+        return false;
+      }
+
+      // Status filter
+      const isActive = getOccurrenceStatus(shiftId, occurrence.date);
+      if (filters.showActive && !filters.showInactive) {
+        if (!isActive) return false;
+      }
+      if (!filters.showActive && filters.showInactive) {
+        if (isActive) return false;
+      }
+
+      // Search text filter
+      if (filters.searchText) {
+        const searchLower = filters.searchText.toLowerCase();
+        const dayName = occurrence.dayName.toLowerCase();
+        const dateStr = occurrence.date.toLocaleDateString('en-CA', { 
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric',
+          timeZone: 'America/Halifax'
+        }).toLowerCase();
+        
+        if (!dayName.includes(searchLower) && !dateStr.includes(searchLower)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  // Update filter for a specific shift
+  const updateShiftFilter = (shiftId: number, filterType: string, value: any) => {
+    setShiftOccurrenceFilters(prev => ({
+      ...prev,
+      [shiftId]: {
+        ...prev[shiftId],
+        [filterType]: value
+      }
+    }));
+  };
 
   return (
     <main style={{ padding: 32 }}>
@@ -708,6 +991,27 @@ export default function ManageShiftsPage() {
         >
           Shift Category
         </button>
+        
+        {/* Special Events Toggle Button - Only show on Recurring Shifts tab */}
+        {tab === 'recurringshifts' && (
+          <button
+            onClick={() => setSpecialEventsMode(!specialEventsMode)}
+            style={{
+              padding: '10px 24px',
+              borderRadius: 8,
+              border: '2px solid #ff9800',
+              background: specialEventsMode ? '#ff9800' : 'transparent',
+              color: specialEventsMode ? '#fff' : '#ff9800',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: specialEventsMode ? '0 2px 8px #ffd699' : 'none',
+              transition: 'all 0.15s',
+              marginLeft: 'auto' // Push to the right
+            }}
+          >
+            {specialEventsMode ? '🎉 Special Events ON' : '🎉 Special Events'}
+          </button>
+        )}
       </div>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, minHeight: 200, position: 'relative' }}>
         {tab === 'shiftcategory' && (
@@ -836,16 +1140,48 @@ export default function ManageShiftsPage() {
                   ))}
                 </select>
               </div>
-              <button onClick={() => setShowAddRecurring(true)} style={{ background: 'none', border: 'none', color: '#ff9800', fontSize: 28, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Add Shift">
+              <button onClick={() => {
+                setShowAddRecurring(true);
+                // Auto-select Special Events category if mode is active
+                if (specialEventsMode && categoryOptions.length > 0) {
+                  const specialEventsCategory = categoryOptions.find(cat => cat.name === 'Special Events');
+                  if (specialEventsCategory) {
+                    setAddRecurring(prev => ({ ...prev, shiftCategoryId: specialEventsCategory.id }));
+                  }
+                }
+              }} style={{ background: 'none', border: 'none', color: '#ff9800', fontSize: 28, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Add Shift">
                 <FaPlusCircle />
               </button>
             </div>
+
+
+            {/* Special Events Mode Indicator */}
+            {specialEventsMode && (
+              <div style={{ 
+                marginBottom: '16px',
+                padding: '12px 16px',
+                background: '#fff3e0',
+                borderRadius: '8px',
+                border: '1px solid #ffcc80',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '16px' }}>🎉</span>
+                <span style={{ fontWeight: '600', color: '#f57c00' }}>
+                  Special Events Mode Active
+                </span>
+              </div>
+            )}
+
             {loadingRecurring ? (
               <div style={{ textAlign: 'center', color: '#888' }}>Loading...</div>
             ) : errorRecurring ? (
               <div style={{ textAlign: 'center', color: 'red' }}>{errorRecurring}</div>
             ) : recurringShifts.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#888' }}>No recurring shifts found.</div>
+              <div style={{ textAlign: 'center', color: '#888' }}>
+                {specialEventsMode ? 'No Special Events shifts found.' : 'No recurring shifts found.'}
+              </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -979,21 +1315,207 @@ export default function ManageShiftsPage() {
                                 padding: '16px 24px',
                                 borderLeft: '4px solid #ff9800'
                               }}>
+
+                                
+                                {/* Occurrences Summary */}
+                                <div style={{ 
+                                  display: 'flex', 
+                                  gap: '16px', 
+                                  marginBottom: '16px',
+                                  padding: '12px',
+                                  background: '#fff',
+                                  borderRadius: '6px',
+                                  border: '1px solid #e0e0e0',
+                                  fontSize: '12px'
+                                }}>
+                                  <span style={{ color: '#666' }}>
+                                    Total: <strong>{shiftOccurrences[shift.id]?.length || 0}</strong> occurrences
+                                  </span>
+                                  <span style={{ color: '#4caf50' }}>
+                                    Active: <strong>{
+                                      shiftOccurrences[shift.id]?.filter(occ => getOccurrenceStatus(shift.id, occ.date)).length || 0
+                                    }</strong>
+                                  </span>
+                                  <span style={{ color: '#9e9e9e' }}>
+                                    Inactive: <strong>{
+                                      shiftOccurrences[shift.id]?.filter(occ => !getOccurrenceStatus(shift.id, occ.date)).length || 0
+                                    }</strong>
+                                  </span>
+                                  <span style={{ color: '#ff9800' }}>
+                                    Filtered: <strong>{
+                                      getFilteredOccurrences(shift.id, shiftOccurrences[shift.id] || [], shift).length
+                                    }</strong> shown
+                                  </span>
+                                </div>
+
+                                {/* Occurrence Filters - Inside each expanded section */}
+                                <div style={{ 
+                                  marginBottom: '16px',
+                                  padding: '16px',
+                                  background: '#fff',
+                                  borderRadius: '8px',
+                                  border: '1px solid #e0e0e0'
+                              }}>
                                 <div style={{ 
                                   fontWeight: 600, 
-                                  fontSize: 14, 
+                                    fontSize: '13px', 
                                   color: '#333', 
-                                  marginBottom: 12 
-                                }}>
-                                  Next 4 Occurrences
+                                    marginBottom: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                  }}>
+                                    🔍 Filter Occurrences
+                                  </div>
+                                  
+                                  {/* Simple Month Filter */}
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px',
+                                    marginBottom: '16px',
+                                    padding: '12px',
+                                    background: '#f8f9fa',
+                                    borderRadius: '6px',
+                                    border: '1px solid #e9ecef'
+                                  }}>
+                                    <span style={{ fontWeight: 600, color: '#666', fontSize: '12px' }}>Month Filter:</span>
+                                    
+                                    <select
+                                      value={shiftOccurrenceFilters[shift.id]?.monthFilter ?? ''}
+                                      onChange={(e) => updateShiftFilter(shift.id, 'monthFilter', e.target.value)}
+                                      style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        fontSize: '12px',
+                                        background: '#fff',
+                                        minWidth: '150px'
+                                      }}
+                                    >
+                                      <option value="">All Months (52 occurrences)</option>
+                                      {generateAvailableMonths().map((month) => (
+                                        <option key={month.value} value={month.value}>
+                                          {month.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    gap: '12px', 
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap'
+                                  }}>
+                                    {/* Status Filter */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <label style={{ fontSize: '12px', color: '#666' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={shiftOccurrenceFilters[shift.id]?.showActive ?? true}
+                                          onChange={(e) => updateShiftFilter(shift.id, 'showActive', e.target.checked)}
+                                          style={{ marginRight: '4px' }}
+                                        />
+                                        Active
+                                      </label>
+                                      <label style={{ fontSize: '12px', color: '#666' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={shiftOccurrenceFilters[shift.id]?.showInactive ?? true}
+                                          onChange={(e) => updateShiftFilter(shift.id, 'showInactive', e.target.checked)}
+                                          style={{ marginRight: '4px' }}
+                                        />
+                                        Inactive
+                                      </label>
+                                    </div>
+
+                                    {/* Search Filter */}
+                                    <input
+                                      type="text"
+                                      placeholder="Search by month or date..."
+                                      value={shiftOccurrenceFilters[shift.id]?.searchText ?? ''}
+                                      onChange={(e) => updateShiftFilter(shift.id, 'searchText', e.target.value)}
+                                      style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        fontSize: '12px',
+                                        minWidth: '180px'
+                                      }}
+                                    />
+
+                                    {/* Clear Filters */}
+                                    <button
+                                      onClick={() => {
+                                        setShiftOccurrenceFilters(prev => ({
+                                          ...prev,
+                                          [shift.id]: {
+                                            showActive: true,
+                                            showInactive: true,
+                                            searchText: '',
+                                            monthFilter: ''
+                                          }
+                                        }));
+                                      }}
+                                      style={{
+                                        padding: '6px 12px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        background: '#f8f9fa',
+                                        color: '#666',
+                                        fontSize: '12px',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+
+                                  {/* Filter Results Summary */}
+                                  <div style={{ 
+                                    marginTop: '12px',
+                                    padding: '8px 12px',
+                                    background: '#f0f8ff',
+                                    borderRadius: '4px',
+                                    border: '1px solid #b3d9ff',
+                                    fontSize: '11px',
+                                    color: '#0066cc'
+                                  }}>
+                                    Showing <strong>{
+                                      getFilteredOccurrences(shift.id, shiftOccurrences[shift.id] || [], shift).length
+                                    }</strong> of <strong>{shiftOccurrences[shift.id]?.length || 0}</strong> occurrences
+                                  </div>
                                 </div>
                                 {loadingOccurrences[shift.id] ? (
                                   <div style={{ textAlign: 'center', color: '#888', padding: '20px' }}>
                                     Loading occurrences...
                                   </div>
                                 ) : (
-                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
-                                    {shiftOccurrences[shift.id]?.map((occurrence, index) => (
+                                  <div>
+                                    {(() => {
+                                      const filteredOccurrences = getFilteredOccurrences(shift.id, shiftOccurrences[shift.id] || [], shift);
+                                      const groupedOccurrences = groupOccurrencesByMonth(filteredOccurrences);
+                                      return Object.entries(groupedOccurrences).map(([monthKey, monthOccurrences]) => (
+                                        <div key={monthKey} style={{ marginBottom: '20px' }}>
+                                          <div style={{ 
+                                            fontWeight: 600, 
+                                            fontSize: 13, 
+                                            color: '#666', 
+                                            marginBottom: '12px',
+                                            padding: '8px 12px',
+                                            background: '#fff',
+                                            borderRadius: '6px',
+                                            border: '1px solid #e0e0e0'
+                                          }}>
+                                            {getMonthNameFromKey(monthKey)} ({monthOccurrences.length} occurrences)
+                                          </div>
+                                          <div style={{ 
+                                            display: 'grid', 
+                                            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+                                            gap: '12px' 
+                                          }}>
+                                            {monthOccurrences.map((occurrence, index) => (
                                       <div key={index} style={{
                                         background: '#fff',
                                         border: '1px solid #e0e0e0',
@@ -1042,6 +1564,10 @@ export default function ManageShiftsPage() {
                                         </button>
                                       </div>
                                     ))}
+                                          </div>
+                                        </div>
+                                      ));
+                                    })()}
                                   </div>
                                 )}
                               </div>

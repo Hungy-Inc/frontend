@@ -34,6 +34,18 @@ type WeighingCategory = {
   pound_lb_: number;
 };
 
+type DetailDonationRow = {
+  donorId: number;
+  donorName: string;
+  [key: string]: string | number;
+};
+
+type DetailDonationData = {
+  donors: { id: number; name: string }[];
+  categories: { id: number; name: string }[];
+  tableData: DetailDonationRow[];
+};
+
 const getYearOptions = () => {
   const currentYear = new Date().getFullYear();
   // Show a range of years, e.g., 2020 to currentYear+1
@@ -44,7 +56,63 @@ const getYearOptions = () => {
   return years;
 };
 
+// EditableCell component for inline editing
+const EditableCell = ({ value, onSave }: { value: number; onSave: (value: string) => void }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value.toString());
+
+  const handleDoubleClick = () => {
+    setIsEditing(true);
+    setEditValue(value.toString());
+  };
+
+  const handleSave = () => {
+    onSave(editValue);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value.toString());
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <input
+        type="text"
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        autoFocus
+        style={{
+          width: '100%',
+          padding: '4px',
+          border: '1px solid #ff9800',
+          borderRadius: '4px',
+          fontSize: 'inherit'
+        }}
+      />
+    );
+  }
+
+  return (
+    <div onDoubleClick={handleDoubleClick} style={{ cursor: 'pointer' }}>
+      {value}
+    </div>
+  );
+};
+
 export default function IncomingStatsPage() {
+  const [activeTab, setActiveTab] = useState<'incoming' | 'detail'>('incoming');
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [selectedUnit, setSelectedUnit] = useState(baseUnits[0]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // Default to current year
@@ -56,6 +124,33 @@ export default function IncomingStatsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
+
+  // Detail Donations state
+  const [detailDonationsData, setDetailDonationsData] = useState<DetailDonationData | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // Helper function to get Halifax date in YYYY-MM-DD format
+  const getHalifaxDate = (date = new Date()) => {
+    return date.toLocaleDateString('en-CA', { 
+      timeZone: 'America/Halifax',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).split('/').reverse().join('-');
+  };
+
+  // Helper function to get Halifax date for yesterday
+  const getHalifaxDateYesterday = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return getHalifaxDate(yesterday);
+  };
+
+  // Initialize with Halifax date
+  useEffect(() => {
+    setSelectedDate(getHalifaxDate());
+  }, []);
 
   // Fetch weighing categories
   useEffect(() => {
@@ -81,42 +176,77 @@ export default function IncomingStatsPage() {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
+    if (activeTab === 'incoming') {
+      fetchIncomingStats();
+    } else {
+      fetchDetailDonations();
+    }
+  }, [activeTab, selectedMonth, selectedYear, selectedDate]);
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats?month=${selectedMonth}&year=${selectedYear}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch data');
-        }
-
-        const data = await response.json();
-        setDonors(data.donors || []);
-        setTableData(data.tableData || []);
-        setTotals(data.totals || {});
-        setRowTotals(data.rowTotals || []);
-        setGrandTotal(data.grandTotal || 0);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
+  const fetchIncomingStats = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
       }
-    };
 
-    fetchData();
-  }, [selectedMonth, selectedYear]);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats?month=${selectedMonth}&year=${selectedYear}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      const data = await response.json();
+      setDonors(data.donors || []);
+      setTableData(data.tableData || []);
+      setTotals(data.totals || {});
+      setRowTotals(data.rowTotals || []);
+      setGrandTotal(data.grandTotal || 0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDetailDonations = async () => {
+    try {
+      setDetailLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/detail-donations?date=${selectedDate}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch detail donations data');
+      }
+
+      const data = await response.json();
+      setDetailDonationsData(data);
+    } catch (err) {
+      console.error('Error fetching detail donations:', err);
+      toast.error('Failed to fetch detail donations data');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   // Helper to convert weight based on selected unit
   const convertWeight = (weight: number) => {
@@ -148,13 +278,16 @@ export default function IncomingStatsPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-CA', { 
+    // The dateStr is already in Halifax timezone format (e.g., "2025-08-15")
+    // We need to parse it correctly to avoid timezone shifts
+    const [year, month, day] = dateStr.split('-').map(Number);
+    
+    // Create date in Halifax timezone by using the components directly
+    // This avoids the timezone conversion issue
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'short', 
-      day: 'numeric',
-      timeZone: 'America/Halifax'
+      day: 'numeric'
     });
   };
 
@@ -255,112 +388,360 @@ export default function IncomingStatsPage() {
     return convertWeight(totals[col] || 0);
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  const renderIncomingStatsTab = () => {
+    if (loading) {
+      return <div>Loading...</div>;
+    }
 
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
+    if (error) {
+      return <div>Error: {error}</div>;
+    }
 
-  // Check if there's no data for the selected period
-  const hasNoData = !tableData || tableData.length === 0;
+    // Check if there's no data for the selected period
+    const hasNoData = !tableData || tableData.length === 0;
+
+    return (
+      <>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div className={styles.topBar} style={{ marginBottom: 0 }}>
+            <div>
+              <div className={styles.pageTitle}>Incoming Stats</div>
+              <div className={styles.pageSubtitle}>Track food donations by organization and date</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <select 
+              className={styles.select}
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              style={{ marginRight: 8 }}
+            >
+              {months.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <select 
+              className={styles.select}
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              style={{ marginRight: 8 }}
+            >
+              {getYearOptions().map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <select 
+              className={styles.select}
+              value={selectedUnit}
+              onChange={(e) => setSelectedUnit(e.target.value)}
+              style={{ marginRight: 8 }}
+            >
+              {[...baseUnits, ...weighingCategories.map(c => c.category)].map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+            <button className={styles.exportBtn} onClick={handleExport} style={{ marginRight: 8 }}>Export to Excel</button>
+          </div>
+        </div>
+        <div className={styles.tableWrapper}>
+          <div className={styles.tableTitle}>
+            Incoming Food Donations – <span className={styles.month}>
+              {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+            </span>
+          </div>
+          {hasNoData ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+              No donations found for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+            </div>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    {displayColumns.map(col => (
+                      <th key={col} className={col === 'Total' ? styles.totalCol : ''}>
+                        {col} {col !== firstCol && col !== 'Total' ? `(${getUnitLabel()})` : ''}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayData.map((row, i) => (
+                    <tr key={i}>
+                      {displayColumns.map((col, idx) => (
+                        <td
+                          key={col}
+                          className={idx === displayColumns.length - 1 ? styles.totalCol : ''}
+                        >
+                          {col === firstCol
+                            ? (firstCol === 'Date' ? formatDate(row['date'] as string) : row[col])
+                            : convertWeight(row[col] as number || 0)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className={styles.monthlyTotalRow}>
+                    {displayColumns.map((col) => (
+                      <td key={col} className={col === 'Total' ? styles.totalCol : ''} style={{ fontWeight: 700 }}>
+                        {calculateColumnTotal(col)}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
+
+  const renderDetailDonationsTab = () => {
+    if (detailLoading) {
+      return <div>Loading...</div>;
+    }
+
+    if (!detailDonationsData) {
+      return <div>No data available</div>;
+    }
+
+    const { donors, categories, tableData } = detailDonationsData;
+
+    const handleValueChange = async (donorId: number, categoryName: string, newValue: string) => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('No authentication token found');
+          return;
+        }
+
+        const weightKg = parseFloat(newValue);
+        if (isNaN(weightKg) || weightKg < 0) {
+          toast.error('Please enter a valid positive number');
+          return;
+        }
+
+        const category = categories.find(c => c.name === categoryName);
+        if (!category) {
+          toast.error('Category not found');
+          return;
+        }
+
+        if (weightKg === 0) {
+          // Delete the donation item
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/detail-donations/${donorId}/${category.id}?date=${selectedDate}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to delete donation');
+          }
+        } else {
+          // Create or update the donation item
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/detail-donations`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                date: selectedDate,
+                donorId,
+                categoryId: category.id,
+                weightKg
+              })
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to update donation');
+          }
+        }
+
+        // Refresh the data
+        fetchDetailDonations();
+        toast.success('Donation updated successfully');
+      } catch (err) {
+        console.error('Error updating donation:', err);
+        toast.error('Failed to update donation');
+      }
+    };
+
+    const setDateToToday = () => {
+      setSelectedDate(getHalifaxDate());
+    };
+
+    const setDateToYesterday = () => {
+      setSelectedDate(getHalifaxDateYesterday());
+    };
+
+    return (
+      <>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div className={styles.topBar} style={{ marginBottom: 0 }}>
+            <div>
+              <div className={styles.pageTitle}>Detail Donations</div>
+              <div className={styles.pageSubtitle}>View and manage donations by donor and category</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button 
+              className={styles.dateButton}
+              onClick={setDateToToday}
+              style={{ 
+                backgroundColor: selectedDate === getHalifaxDate() ? '#ff9800' : '#f0f0f0',
+                color: selectedDate === getHalifaxDate() ? '#fff' : '#333'
+              }}
+            >
+              Today
+            </button>
+            <button 
+              className={styles.dateButton}
+              onClick={setDateToYesterday}
+              style={{ 
+                backgroundColor: selectedDate === getHalifaxDateYesterday() ? '#ff9800' : '#f0f0f0',
+                color: selectedDate === getHalifaxDateYesterday() ? '#fff' : '#333'
+              }}
+            >
+              Yesterday
+            </button>
+            <input
+              type="date"
+              className={styles.select}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={{ marginRight: 8 }}
+            />
+            <button 
+              className={styles.exportBtn} 
+              onClick={() => toast.info('Export functionality coming soon!')}
+              style={{ marginRight: 8 }}
+            >
+              Export to Excel
+            </button>
+          </div>
+        </div>
+        <div className={styles.tableWrapper}>
+          <div className={styles.tableTitle}>
+            Detail Donations – <span className={styles.month}>{formatDate(selectedDate)}</span>
+          </div>
+          
+          {/* Instructions */}
+          <div style={{ 
+            background: '#fff5ed', 
+            border: '1px solid #ff9800', 
+            borderRadius: '8px', 
+            padding: '1rem', 
+            marginBottom: '1rem',
+            fontSize: '0.9rem',
+            color: '#666'
+          }}>
+            <strong>💡 How to use:</strong>
+            <ul style={{ margin: '0.5rem 0 0 1.5rem', padding: 0 }}>
+              <li>Double-click on any value in the table to edit it</li>
+              <li>Enter a new weight value and press Enter to save</li>
+              <li>Enter 0 to remove a donation item</li>
+              {/* <li>Use Today/Yesterday buttons for quick date navigation</li>
+              <li>All changes are saved automatically</li> */}
+            </ul>
+            
+            {/* Debug info - remove this after testing */}
+            {/* <div style={{ 
+              marginTop: '1rem', 
+              padding: '0.5rem', 
+              background: '#f0f0f0', 
+              borderRadius: '4px',
+              fontSize: '0.8rem'
+            }}>
+              <strong>🔍 Debug Info:</strong><br/>
+              Selected Date: {selectedDate}<br/>
+              Halifax Today: {getHalifaxDate()}<br/>
+              Halifax Yesterday: {getHalifaxDateYesterday()}<br/>
+              UTC Today: {new Date().toISOString().split('T')[0]}
+            </div> */}
+          </div>
+
+          <div className={styles.tableContainer}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Donor</th>
+                  {categories.map(category => (
+                    <th key={category.id}>{category.name} (kg)</th>
+                  ))}
+                  <th className={styles.totalCol}>Total (kg)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableData.map((row, index) => (
+                  <tr key={index}>
+                    <td style={{ fontWeight: 600, textAlign: 'left' }}>{row.donorName}</td>
+                    {categories.map(category => (
+                      <td key={category.id}>
+                        <EditableCell
+                          value={row[category.name] || 0}
+                          onSave={(newValue) => handleValueChange(row.donorId, category.name, newValue)}
+                        />
+                      </td>
+                    ))}
+                    <td className={styles.totalCol} style={{ fontWeight: 700 }}>
+                      {categories.reduce((sum, category) => sum + (Number(row[category.name]) || 0), 0).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className={styles.monthlyTotalRow}>
+                  <td style={{ fontWeight: 700 }}>Category Totals</td>
+                  {categories.map(category => (
+                    <td key={category.id} style={{ fontWeight: 700 }}>
+                      {tableData.reduce((sum, row) => sum + (Number(row[category.name]) || 0), 0).toFixed(2)}
+                    </td>
+                  ))}
+                  <td className={styles.totalCol} style={{ fontWeight: 700 }}>
+                    {tableData.reduce((sum, row) => 
+                      sum + categories.reduce((catSum, category) => catSum + (Number(row[category.name]) || 0), 0), 0
+                    ).toFixed(2)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>
+    );
+  };
 
   // Combine base units with weighing categories for dropdown
   const allUnits = [...baseUnits, ...weighingCategories.map(c => c.category)];
 
   return (
     <main className={styles.main}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div className={styles.topBar} style={{ marginBottom: 0 }}>
-          <div>
-            <div className={styles.pageTitle}>Incoming Stats</div>
-            <div className={styles.pageSubtitle}>Track food donations by organization and date</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <select 
-            className={styles.select}
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-            style={{ marginRight: 8 }}
-          >
-            {months.map(m => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
-          </select>
-          <select 
-            className={styles.select}
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            style={{ marginRight: 8 }}
-          >
-            {getYearOptions().map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <select 
-            className={styles.select}
-            value={selectedUnit}
-            onChange={(e) => setSelectedUnit(e.target.value)}
-            style={{ marginRight: 8 }}
-          >
-            {allUnits.map(u => (
-              <option key={u} value={u}>{u}</option>
-            ))}
-          </select>
-          <button className={styles.exportBtn} onClick={handleExport} style={{ marginRight: 8 }}>Export to Excel</button>
-        </div>
+      {/* Tab Navigation */}
+      <div className={styles.tabContainer}>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'incoming' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('incoming')}
+        >
+          Incoming Stats
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'detail' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('detail')}
+        >
+          Detail Donations
+        </button>
       </div>
-      <div className={styles.tableWrapper}>
-        <div className={styles.tableTitle}>
-          Incoming Food Donations – <span className={styles.month}>
-            {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
-          </span>
-        </div>
-        {hasNoData ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-            No donations found for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
-          </div>
-        ) : (
-          <div className={styles.tableContainer}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  {displayColumns.map(col => (
-                    <th key={col} className={col === 'Total' ? styles.totalCol : ''}>
-                      {col} {col !== firstCol && col !== 'Total' ? `(${getUnitLabel()})` : ''}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displayData.map((row, i) => (
-                  <tr key={i}>
-                    {displayColumns.map((col, idx) => (
-                      <td
-                        key={col}
-                        className={idx === displayColumns.length - 1 ? styles.totalCol : ''}
-                      >
-                        {col === firstCol
-                          ? (firstCol === 'Date' ? formatDate(row['date'] as string) : row[col])
-                          : convertWeight(row[col] as number || 0)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                <tr className={styles.monthlyTotalRow}>
-                  {displayColumns.map((col) => (
-                    <td key={col} className={col === 'Total' ? styles.totalCol : ''} style={{ fontWeight: 700 }}>
-                      {calculateColumnTotal(col)}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'incoming' ? renderIncomingStatsTab() : renderDetailDonationsTab()}
     </main>
   );
 } 

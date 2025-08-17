@@ -81,6 +81,14 @@ export default function ScheduleShiftsPage() {
   const [selectedEmployees, setSelectedEmployees] = useState<any[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
 
+  // Add state for manage modal search
+  const [scheduledSearchTerm, setScheduledSearchTerm] = useState('');
+  const [unscheduledSearchTerm, setUnscheduledSearchTerm] = useState('');
+  
+  // Add state for copy link feedback
+  const [lastCopiedUrl, setLastCopiedUrl] = useState<string>('');
+  const [showUrlDisplay, setShowUrlDisplay] = useState(false);
+
   // Add state for open employee dropdowns
   const [openEmployeeDropdown, setOpenEmployeeDropdown] = useState<{[shiftId: number]: boolean}>({});
 
@@ -104,6 +112,58 @@ export default function ScheduleShiftsPage() {
   // Add state for shift name filter
   const [selectedShiftName, setSelectedShiftName] = useState<string>("");
 
+  // Detect Safari browser
+  const isSafari = () => {
+    const userAgent = navigator.userAgent;
+    return /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+  };
+
+  // Clipboard utility function with fallbacks
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    try {
+      // Method 1: Modern Clipboard API (most reliable)
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (clipboardErr) {
+          console.log('Modern clipboard API failed, trying fallback...');
+          // Continue to fallback method
+        }
+      }
+      
+      // Method 2: Fallback for older browsers, non-secure contexts, or Safari issues
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      textArea.style.opacity = '0';
+      textArea.style.pointerEvents = 'none';
+      textArea.style.zIndex = '-1';
+      textArea.style.fontSize = '12pt'; // Required for iOS Safari
+      
+      document.body.appendChild(textArea);
+      
+      // Focus and select - important for Safari
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return successful;
+      } catch (err) {
+        document.body.removeChild(textArea);
+        console.error('execCommand copy failed:', err);
+        return false;
+      }
+    } catch (err) {
+      console.error('Clipboard copy failed:', err);
+      return false;
+    }
+  };
+
   const handleToggleEmployeeDropdown = (shiftId: number) => {
     setOpenEmployeeDropdown(prev => ({
       ...prev,
@@ -116,6 +176,10 @@ export default function ScheduleShiftsPage() {
     fetchUsers();
     fetchCategories();
     fetchRecurringShifts();
+    
+    // Clear URL display on page refresh
+    setShowUrlDisplay(false);
+    setLastCopiedUrl('');
     
     // Smart refresh - check for changes every 10 seconds
     const interval = setInterval(async () => {
@@ -1050,10 +1114,15 @@ export default function ScheduleShiftsPage() {
                   });
                   
                   if (existingShift) {
-                    toast.success('Signup link copied to clipboard!');
-                    navigator.clipboard.writeText(signupUrl).catch(() => {
-                      toast.error('Failed to copy link');
-                    });
+                    const copySuccess = await copyToClipboard(signupUrl);
+                    if (copySuccess) {
+                      toast.success('Signup link copied to clipboard!');
+                    } else {
+                      // Show URL display for manual copying
+                      setLastCopiedUrl(signupUrl);
+                      setShowUrlDisplay(true);
+                      toast.error('Failed to copy link. URL displayed below for manual copying.');
+                    }
                     return;
                   }
                 }
@@ -1106,9 +1175,13 @@ export default function ScheduleShiftsPage() {
                 }
                 
                 // Copy to clipboard
-                navigator.clipboard.writeText(signupUrl).catch(() => {
-                  toast.error('Failed to copy link');
-                });
+                const copySuccess = await copyToClipboard(signupUrl);
+                if (!copySuccess) {
+                  // Show URL display for manual copying
+                  setLastCopiedUrl(signupUrl);
+                  setShowUrlDisplay(true);
+                  toast.error('Failed to copy link. URL displayed below for manual copying.');
+                }
               } catch (err) {
                 console.error('Error in copy link:', err);
                 toast.error('Failed to create shift for this date');
@@ -1572,6 +1645,9 @@ export default function ScheduleShiftsPage() {
     setManageModalLoading(true);
     setManageModalOpen(true);
     setManageModalShift(shift);
+    // Clear search terms when opening modal
+    setScheduledSearchTerm('');
+    setUnscheduledSearchTerm('');
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-employees?shiftId=${shift.id}`, {
@@ -1628,6 +1704,17 @@ export default function ScheduleShiftsPage() {
       setManageModalOpen(false);
       await fetchShifts(); // Refresh shifts data after closing modal
     };
+
+    // Filter scheduled employees based on search term
+    const filteredScheduled = manageModalData?.scheduled.filter(emp => 
+      emp.name.toLowerCase().includes(scheduledSearchTerm.toLowerCase())
+    ) || [];
+
+    // Filter unscheduled employees based on search term
+    const filteredUnscheduled = manageModalData?.unscheduled.filter(emp => 
+      emp.name.toLowerCase().includes(unscheduledSearchTerm.toLowerCase())
+    ) || [];
+
     return (
       <div style={{
         position: 'fixed',
@@ -1658,13 +1745,69 @@ export default function ScheduleShiftsPage() {
           <div style={{ display: 'flex', gap: 32 }}>
             {/* Scheduled Employees */}
             <div style={{ flex: 1, minWidth: 200, background: '#f8f8f8', borderRadius: 10, padding: 18 }}>
-              <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 10 }}>Scheduled ({manageModalData?.booked ?? 0}/{manageModalData?.slots ?? 0})</div>
+              <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 10 }}>
+                Scheduled ({manageModalData?.booked ?? 0}/{manageModalData?.slots ?? 0})
+                {scheduledSearchTerm && (
+                  <span style={{ fontSize: 14, color: '#666', fontWeight: 400, marginLeft: 8 }}>
+                    ({filteredScheduled.length} found)
+                  </span>
+                )}
+              </div>
+              
+              {/* Search input for scheduled employees */}
+              <div style={{ marginBottom: 16, position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Search scheduled employees..."
+                  value={scheduledSearchTerm}
+                  onChange={(e) => setScheduledSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    paddingRight: scheduledSearchTerm ? '40px' : '12px',
+                    borderRadius: 6,
+                    border: '1px solid #ddd',
+                    fontSize: 14,
+                    outline: 'none',
+                    background: '#fff'
+                  }}
+                />
+                {scheduledSearchTerm && (
+                  <button
+                    onClick={() => setScheduledSearchTerm('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '18px',
+                      color: '#999',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
               {manageModalLoading ? <div>Loading...</div> : (
                 <>
-                  {manageModalData?.scheduled.length === 0 ? (
-                    <div style={{ color: '#888', fontSize: 15 }}>No employees scheduled.</div>
+                  {filteredScheduled.length === 0 ? (
+                    <div style={{ color: '#888', fontSize: 15 }}>
+                      {scheduledSearchTerm ? 'No employees match your search.' : 'No employees scheduled.'}
+                    </div>
                   ) : (
-                    manageModalData?.scheduled.map(emp => (
+                    filteredScheduled.map(emp => (
                       <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
                         <span style={{ fontSize: 16 }}>{emp.name}</span>
                         <button onClick={() => handleRemoveEmployee(emp.signupId)} style={{ background: '#fff', color: '#e53935', border: '1px solid #e53935', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>Remove</button>
@@ -1676,13 +1819,69 @@ export default function ScheduleShiftsPage() {
             </div>
             {/* Unscheduled Employees */}
             <div style={{ flex: 1, minWidth: 200, background: '#f8f8f8', borderRadius: 10, padding: 18 }}>
-              <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 10 }}>Available to Schedule</div>
+              <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 10 }}>
+                Available to Schedule
+                {unscheduledSearchTerm && (
+                  <span style={{ fontSize: 14, color: '#666', fontWeight: 400, marginLeft: 8 }}>
+                    ({filteredUnscheduled.length} found)
+                  </span>
+                )}
+              </div>
+              
+              {/* Search input for unscheduled employees */}
+              <div style={{ marginBottom: 16, position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Search available employees..."
+                  value={unscheduledSearchTerm}
+                  onChange={(e) => setUnscheduledSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    paddingRight: unscheduledSearchTerm ? '40px' : '12px',
+                    borderRadius: 6,
+                    border: '1px solid #ddd',
+                    fontSize: 14,
+                    outline: 'none',
+                    background: '#fff'
+                  }}
+                />
+                {unscheduledSearchTerm && (
+                  <button
+                    onClick={() => setUnscheduledSearchTerm('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '18px',
+                      color: '#999',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
               {manageModalLoading ? <div>Loading...</div> : (
                 <>
-                  {manageModalData?.unscheduled.length === 0 ? (
-                    <div style={{ color: '#888', fontSize: 15 }}>No available employees.</div>
+                  {filteredUnscheduled.length === 0 ? (
+                    <div style={{ color: '#888', fontSize: 15 }}>
+                      {unscheduledSearchTerm ? 'No employees match your search.' : 'No available employees.'}
+                    </div>
                   ) : (
-                    manageModalData?.unscheduled.map(emp => (
+                    filteredUnscheduled.map(emp => (
                       <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
                         <span style={{ fontSize: 16 }}>{emp.name}</span>
                         <button
@@ -1972,6 +2171,149 @@ export default function ScheduleShiftsPage() {
           </div>
         )}
       </div>
+
+      {/* URL Display Modal for Failed Clipboard Operations */}
+      {showUrlDisplay && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: 32,
+            width: '90%',
+            maxWidth: 600,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: 24,
+              paddingBottom: 16,
+              borderBottom: '1px solid #eee'
+            }}>
+              <h2 style={{ 
+                fontSize: 24, 
+                fontWeight: 700,
+                color: '#333',
+                margin: 0
+              }}>
+                Copy Link Manually
+              </h2>
+              <button
+                onClick={() => {
+                  setShowUrlDisplay(false);
+                  setLastCopiedUrl('');
+                }}
+                style={{ 
+                  background: 'none',
+                  border: 'none', 
+                  fontSize: 24,
+                  color: '#666',
+                  cursor: 'pointer',
+                  padding: 4
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ color: '#666', fontSize: 16, marginBottom: 16 }}>
+                The link couldn't be copied to your clipboard automatically. Please copy it manually:
+              </p>
+              
+              <div style={{
+                background: '#f8f8f8',
+                border: '1px solid #ddd',
+                borderRadius: 8,
+                padding: '16px',
+                marginBottom: 20,
+                position: 'relative'
+              }}>
+                <input
+                  type="text"
+                  value={lastCopiedUrl}
+                  readOnly
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: 'none',
+                    background: 'transparent',
+                    fontSize: 14,
+                    color: '#333',
+                    outline: 'none',
+                    fontFamily: 'monospace'
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.value = lastCopiedUrl;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(input);
+                    toast.success('Link copied using fallback method!');
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: '#ff9800',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '8px 16px',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    fontWeight: 600
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              gap: 16
+            }}>
+              <button
+                onClick={() => {
+                  setShowUrlDisplay(false);
+                  setLastCopiedUrl('');
+                }}
+                style={{
+                  padding: '12px 24px',
+                  background: '#f5f5f5',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: '#666',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {renderEmployeePopup()}
       {renderManageModal()}

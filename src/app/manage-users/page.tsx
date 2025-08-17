@@ -81,7 +81,7 @@ const statusIcons = {
 
 export default function ManageUsersPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'users' | 'permissions'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'permissions' | 'defaultPermissions'>('users');
   
   // User Management State
   const [users, setUsers] = useState<User[]>([]);
@@ -120,6 +120,12 @@ export default function ManageUsersPage() {
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [permissionSearchTerm, setPermissionSearchTerm] = useState('');
   const [permissionFilterTerm, setPermissionFilterTerm] = useState('');
+
+  // Default Permissions State
+  const [defaultRolePermissions, setDefaultRolePermissions] = useState<Record<string, any[]>>({});
+  const [defaultPermissionsLoading, setDefaultPermissionsLoading] = useState(false);
+  const [savingDefaultPermissions, setSavingDefaultPermissions] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>('ADMIN');
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -187,10 +193,89 @@ export default function ManageUsersPage() {
     }
   };
 
+  // Fetch default role permissions
+  const fetchDefaultRolePermissions = async () => {
+    try {
+      setDefaultPermissionsLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/roles/default-permissions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch default role permissions");
+      }
+      const data = await response.json();
+      setDefaultRolePermissions(data);
+    } catch (err) {
+      console.error("Failed to load default role permissions:", err);
+      setDefaultRolePermissions({});
+    } finally {
+      setDefaultPermissionsLoading(false);
+    }
+  };
+
+  // Update default permissions for a role
+  const updateDefaultRolePermissions = async (role: string, permissions: any[]) => {
+    try {
+      setSavingDefaultPermissions(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/roles/${role}/default-permissions`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ permissions })
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update default role permissions");
+      }
+      await fetchDefaultRolePermissions();
+      toast.success(`Default permissions for ${role} role updated successfully!`);
+    } catch (err) {
+      console.error("Failed to update default role permissions:", err);
+      toast.error("Failed to update default role permissions. Please try again.");
+    } finally {
+      setSavingDefaultPermissions(false);
+    }
+  };
+
+  // Toggle default permission for a module
+  const toggleDefaultPermission = (role: string, moduleId: number) => {
+    setDefaultRolePermissions(prev => {
+      const rolePermissions = prev[role] || [];
+      const updatedPermissions = rolePermissions.map(permission => 
+        permission.moduleId === moduleId 
+          ? { ...permission, canAccess: !permission.canAccess }
+          : permission
+      );
+      return { ...prev, [role]: updatedPermissions };
+    });
+  };
+
+  // Enable all default permissions for a role
+  const enableAllDefaultPermissions = (role: string) => {
+    setDefaultRolePermissions(prev => {
+      const rolePermissions = prev[role] || [];
+      const updatedPermissions = rolePermissions.map(permission => ({ ...permission, canAccess: true }));
+      return { ...prev, [role]: updatedPermissions };
+    });
+  };
+
+  // Disable all default permissions for a role
+  const disableAllDefaultPermissions = (role: string) => {
+    setDefaultRolePermissions(prev => {
+      const rolePermissions = prev[role] || [];
+      const updatedPermissions = rolePermissions.map(permission => ({ ...permission, canAccess: false }));
+      return { ...prev, [role]: updatedPermissions };
+    });
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchPermissionUsers();
     fetchModules();
+    fetchDefaultRolePermissions();
   }, []);
 
   // User approval/denial functions
@@ -693,6 +778,21 @@ export default function ManageUsersPage() {
             <FaShieldAlt className="inline mr-2" />
             Permission Management
         </button>
+          <button
+            onClick={() => setActiveTab('defaultPermissions')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'defaultPermissions'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+            style={{
+              borderBottomColor: activeTab === 'defaultPermissions' ? '#EF5C11' : 'transparent',
+              color: activeTab === 'defaultPermissions' ? '#EF5C11' : undefined
+            }}
+          >
+            <FaUserCog className="inline mr-2" />
+            Default Permissions
+        </button>
         </nav>
       </div>
 
@@ -1156,6 +1256,122 @@ export default function ManageUsersPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Default Permissions Tab */}
+      {activeTab === 'defaultPermissions' && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Default Role Permissions</h2>
+            <p className="text-gray-600">Configure default permissions that will be automatically assigned to new users based on their role.</p>
+          </div>
+
+          {defaultPermissionsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: '#EF5C11' }}></div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Role Selection */}
+              <div className="flex space-x-4">
+                {roles.map(role => (
+                  <button
+                    key={role}
+                    onClick={() => setSelectedRole(role)}
+                    className={`px-4 py-2 rounded-lg font-medium ${
+                      selectedRole === role
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    style={selectedRole === role ? { backgroundColor: '#EF5C11' } : undefined}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+
+              {/* Role Permissions */}
+              {defaultRolePermissions[selectedRole] ? (
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-gray-900">
+                        Default Permissions for {selectedRole} Role
+                      </h3>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => enableAllDefaultPermissions(selectedRole)}
+                          className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-md hover:bg-green-200"
+                        >
+                          Enable All
+                        </button>
+                        <button
+                          onClick={() => disableAllDefaultPermissions(selectedRole)}
+                          className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200"
+                        >
+                          Disable All
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-6">
+                    <div className="space-y-4">
+                      {defaultRolePermissions[selectedRole].map((permission) => (
+                        <div key={permission.moduleId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900">{permission.moduleName}</h4>
+                            <p className="text-sm text-gray-500">{permission.moduleDescription}</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={permission.canAccess}
+                              onChange={() => toggleDefaultPermission(selectedRole, permission.moduleId)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
+                              style={{
+                                '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
+                                backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
+                              } as React.CSSProperties}></div>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-gray-500">
+                          {defaultRolePermissions[selectedRole].filter(p => p.canAccess).length} of {defaultRolePermissions[selectedRole].length} permissions enabled
+                        </div>
+                        <button
+                          onClick={() => updateDefaultRolePermissions(selectedRole, defaultRolePermissions[selectedRole])}
+                          disabled={savingDefaultPermissions}
+                          className="px-4 py-2 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
+                          style={{ 
+                            backgroundColor: '#EF5C11'
+                          } as React.CSSProperties}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                        >
+                          {savingDefaultPermissions && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                          Save Changes
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <FaUserCog className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No default permissions found</h3>
+                  <p className="mt-1 text-sm text-gray-500">Default permissions for the selected role are not configured.</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

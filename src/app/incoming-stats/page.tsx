@@ -688,7 +688,8 @@ export default function IncomingStatsPage() {
                     {categories.map(category => (
                       <td key={category.id}>
                         <EditableCell
-                          value={row[category.name] || 0}
+                          value={Number(row[category.name]) || 0}
+                          
                           onSave={(newValue) => handleValueChange(row.donorId, category.name, newValue)}
                         />
                       </td>

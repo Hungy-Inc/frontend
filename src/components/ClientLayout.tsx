@@ -16,7 +16,8 @@ export default function ClientLayout({
   const isLoginPage = pathname === '/login';
   const isForgotPasswordPage = pathname === '/forgot-password';
   const isShiftSignupPage = pathname.startsWith('/shift-signup');
-  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage;
+  const isContactPage = pathname === '/contact';
+  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage && !isContactPage;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#f7f7f9" }}>

@@ -111,12 +111,15 @@ export default function Home() {
             <p className="text-lg md:text-xl text-black/80 mb-2">Eliminate paperwork, manage volunteers with ease, and track meals in real-time.<br/>No tech skills needed.</p>
             <div className="flex flex-col md:flex-row gap-4 justify-center mt-8 mb-4">
               <Link href="/contact" className="flex items-center gap-2 w-full md:w-auto bg-[#ff9800] hover:bg-[#ff9800] text-white font-semibold rounded-lg py-4 px-8 text-lg mt-0 transition focus:outline-none focus:ring-2 focus:ring-orange-300 shadow disabled:opacity-60 disabled:cursor-not-allowed">
-                <ArrowIcon /> Contact Us
+                <ArrowIcon /> Get Started
               </Link>
               <button onClick={() => scrollToSection('benefits')} className="flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-semibold shadow hover:bg-gray-900 transition">
                 <StarIcon /> More Info
               </button>
             </div>
+            <p className="text-sm text-black/60 mt-2">
+              Organizations must contact us to create accounts - we'll set you up with everything you need!
+            </p>
             <p className="text-base italic text-black/50 mt-4">Trusted by kitchens, built for impact — track, manage, and serve with zero hassle.</p>
           </div>
         </section>
@@ -272,6 +275,8 @@ export default function Home() {
             <div className="flex gap-8">
               <Link href="#" className="text-gray-500 hover:text-orange-500 transition text-sm">Product</Link>
               <Link href="#" className="text-gray-500 hover:text-orange-500 transition text-sm">Benefits</Link>
+              <Link href="/privacy-policy" className="text-gray-500 hover:text-orange-500 transition text-sm">Privacy Policy</Link>
+              <Link href="/terms-of-service" className="text-gray-500 hover:text-orange-500 transition text-sm">Terms of Service</Link>
             </div>
             {/* Right: Log in button */}
             <Link href="/login" className="flex items-center gap-2 bg-white border px-4 py-2 rounded-lg text-gray-500 hover:text-black hover:border-black transition text-sm shadow-sm">

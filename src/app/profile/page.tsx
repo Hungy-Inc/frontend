@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaUser, FaEnvelope, FaPhone, FaBuilding, FaUserShield, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -34,6 +34,39 @@ export default function ProfilePage() {
   });
   const [saveError, setSaveError] = useState('');
 
+  // Move validation logic to useMemo to prevent unnecessary recalculations and add null checks
+  const validation = useMemo(() => {
+    const name = editedFields.name || '';
+    const email = editedFields.email || '';
+    const phone = editedFields.phone || '';
+
+    // Only validate if we're editing and have some data
+    if (!isEditing) {
+      return {
+        isNameValid: true,
+        isPhoneValid: true,
+        isEmailValid: true,
+        allFieldsFilled: true,
+        canSave: false
+      };
+    }
+
+    const isNameValid = /^[A-Za-z ]+$/.test(name.trim());
+    // More flexible phone validation - allows digits, spaces, dashes, parentheses, and plus sign
+    const isPhoneValid = /^[\d\s\-\(\)\+]+$/.test(phone.trim()) && phone.trim().length >= 10;
+    const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const allFieldsFilled = name.trim() && email.trim() && phone.trim();
+    const canSave = isNameValid && isPhoneValid && isEmailValid && allFieldsFilled;
+
+    return {
+      isNameValid,
+      isPhoneValid,
+      isEmailValid,
+      allFieldsFilled,
+      canSave
+    };
+  }, [editedFields, isEditing]);
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -48,7 +81,18 @@ export default function ProfilePage() {
         const user = JSON.parse(userStr);
         console.log('User data from localStorage:', user);
         
-        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.userId}`, {
+        // Check if API URL is configured
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        console.log('Environment variables:', {
+          NEXT_PUBLIC_API_URL: apiUrl,
+          NODE_ENV: process.env.NODE_ENV
+        });
+        
+        if (!apiUrl) {
+          throw new Error('API URL not configured. Please contact administrator.');
+        }
+        
+        const userResponse = await fetch(`${apiUrl}/api/users/${user.userId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -61,18 +105,28 @@ export default function ProfilePage() {
 
         setProfile({
           id: userData.id,
-          name: userData.name,
-          email: userData.email,
+          name: userData.firstName && userData.lastName ? `${userData.firstName} ${userData.lastName}` : userData.name || 'Unknown',
+          email: userData.email || 'No email',
           phone: userData.phone || 'Not provided',
-          role: userData.role,
+          role: userData.role || 'Unknown',
           organizationId: userData.organizationId,
-          organizationName: userData.organizationName
+          organizationName: userData.organizationName || 'Unknown Organization'
         });
 
         setEditedFields({
-          name: userData.name,
-          email: userData.email,
+          name: userData.firstName && userData.lastName ? `${userData.firstName} ${userData.lastName}` : userData.name || '',
+          email: userData.email || '',
           phone: userData.phone || ''
+        });
+        
+        console.log('Profile data loaded:', {
+          name: userData.name,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          email: userData.email,
+          phone: userData.phone,
+          role: userData.role,
+          organizationName: userData.organizationName
         });
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -91,6 +145,12 @@ export default function ProfilePage() {
   };
 
   const handleCancel = () => {
+    console.log('Canceling edit, resetting to profile data:', {
+      name: profile?.name || '',
+      email: profile?.email || '',
+      phone: profile?.phone || ''
+    });
+    
     setIsEditing(false);
     setEditedFields({
       name: profile?.name || '',
@@ -100,49 +160,75 @@ export default function ProfilePage() {
     setSaveError('');
   };
 
-  const isNameValid = /^[A-Za-z ]+$/.test(editedFields.name.trim());
-  const isPhoneValid = /^[0-9]+$/.test(editedFields.phone.trim());
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedFields.email.trim());
-  const allFieldsFilled = editedFields.name.trim() && editedFields.email.trim() && editedFields.phone.trim();
-  const canSave = isNameValid && isPhoneValid && isEmailValid && allFieldsFilled;
-
   const handleSave = async () => {
-    if (!canSave) {
-      const errorMessage = 'Please fill all fields correctly. Name: letters only, Phone: numbers only, Email: valid format.';
+    if (!validation.canSave) {
+      const errorMessage = 'Please fill all fields correctly. Name: letters only, Phone: valid phone number format, Email: valid format.';
       setSaveError(errorMessage);
       toast.error(errorMessage);
       return;
     }
+    
     try {
       const token = localStorage.getItem("token");
       if (!token || !profile) return;
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${profile.id}`, {
+      
+      // Check if API URL is configured
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!apiUrl) {
+        throw new Error('API URL not configured. Please contact administrator.');
+      }
+      
+      // Split the name into firstName and lastName for the backend
+      const nameParts = editedFields.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      console.log('Sending update request:', {
+        apiUrl,
+        userId: profile.id,
+        firstName,
+        lastName,
+        email: editedFields.email.trim(),
+        phone: editedFields.phone.trim()
+      });
+      
+      const response = await fetch(`${apiUrl}/api/users/${profile.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          name: editedFields.name.trim() || profile.name,
-          email: editedFields.email.trim() || profile.email,
-          phone: editedFields.phone.trim() || profile.phone
+          firstName,
+          lastName,
+          email: editedFields.email.trim(),
+          phone: editedFields.phone.trim()
         })
       });
+      
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
+      
+      const updatedUser = await response.json();
+      console.log('Profile update successful:', updatedUser);
+      
+      // Update the local profile state with the new data
       setProfile(prev => prev ? {
         ...prev,
-        name: editedFields.name,
-        email: editedFields.email,
-        phone: editedFields.phone
+        name: editedFields.name.trim(),
+        email: editedFields.email.trim(),
+        phone: editedFields.phone.trim()
       } : null);
+      
       setIsEditing(false);
       setSaveError('');
       toast.success('Profile updated successfully!');
+      
     } catch (err) {
       console.error('Error saving profile:', err);
-      const errorMessage = 'Failed to save changes';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save changes';
       setSaveError(errorMessage);
       toast.error(errorMessage);
     }
@@ -205,17 +291,17 @@ export default function ProfilePage() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  background: canSave ? '#ff9800' : '#ccc',
+                  background: validation.canSave ? '#ff9800' : '#ccc',
                   color: '#fff',
                   border: 'none',
                   padding: '8px 16px',
                   borderRadius: 6,
-                  cursor: canSave ? 'pointer' : 'not-allowed',
+                  cursor: validation.canSave ? 'pointer' : 'not-allowed',
                   fontWeight: 500,
                   transition: 'all 0.2s ease',
-                  opacity: canSave ? 1 : 0.7
+                  opacity: validation.canSave ? 1 : 0.7
                 }}
-                disabled={!canSave}
+                disabled={!validation.canSave}
               >
                 <FaSave size={16} />
                 Save Changes
@@ -277,7 +363,7 @@ export default function ProfilePage() {
                     fontSize: '1rem'
                   }}
                 />
-                {isEditing && !isNameValid && (
+                {isEditing && !validation.isNameValid && (
                   <div style={{ color: 'red', fontSize: 13 }}>Name must contain only letters and spaces.</div>
                 )}
               </div>
@@ -295,7 +381,7 @@ export default function ProfilePage() {
                     fontSize: '1rem'
                   }}
                 />
-                {isEditing && !isEmailValid && (
+                {isEditing && !validation.isEmailValid && (
                   <div style={{ color: 'red', fontSize: 13 }}>Email must be in a valid format.</div>
                 )}
               </div>
@@ -313,8 +399,8 @@ export default function ProfilePage() {
                     fontSize: '1rem'
                   }}
                 />
-                {isEditing && !isPhoneValid && (
-                  <div style={{ color: 'red', fontSize: 13 }}>Phone must contain only numbers.</div>
+                {isEditing && !validation.isPhoneValid && (
+                  <div style={{ color: 'red', fontSize: 13 }}>Phone must be a valid phone number (at least 10 characters, can include spaces, dashes, parentheses, and plus sign).</div>
                 )}
               </div>
             </div>

@@ -3,13 +3,19 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import { toast } from 'react-toastify';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,17 +77,55 @@ export default function LoginPage() {
         </div>
         <div style={{ marginBottom: '1rem' }}>
           <label htmlFor="password" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            style={{ width: '100%', padding: '0.75rem', borderRadius: 6, border: '1px solid #eee', fontSize: '1rem', marginBottom: 4 }}
-            placeholder="Password"
-            autoComplete="current-password"
-            required
-            disabled={loading}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              style={{ 
+                width: '100%', 
+                padding: '0.75rem', 
+                paddingRight: '3rem',
+                borderRadius: 6, 
+                border: '1px solid #eee', 
+                fontSize: '1rem', 
+                marginBottom: 4 
+              }}
+              placeholder="Password"
+              autoComplete="current-password"
+              required
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                color: '#666',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ff9800';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#666';
+              }}
+              disabled={loading}
+            >
+              {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+            </button>
+          </div>
         </div>
         {error && <div style={{ color: 'var(--primary)', marginBottom: 12, fontSize: '0.95rem' }}>{error}</div>}
         <button

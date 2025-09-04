@@ -114,7 +114,7 @@ const EditableCell = ({ value, onSave }: { value: number; onSave: (value: string
 export default function IncomingStatsPage() {
   const [activeTab, setActiveTab] = useState<'incoming' | 'detail'>('incoming');
   const [selectedMonth, setSelectedMonth] = useState(0);
-  const [selectedUnit, setSelectedUnit] = useState(baseUnits[0]);
+  const [selectedUnit, setSelectedUnit] = useState(baseUnits[1]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // Default to current year
   const [donors, setDonors] = useState<string[]>([]);
   const [tableData, setTableData] = useState<TableRow[]>([]);
@@ -507,6 +507,47 @@ export default function IncomingStatsPage() {
 
     const { donors, categories, tableData } = detailDonationsData;
 
+    // Unit conversion functions for detail donations
+    const convertWeightForDetail = (weightKg: number) => {
+      if (weightKg == null || isNaN(weightKg)) return 0;
+      
+      // Handle base units
+      if (selectedUnit === 'Pounds (lb)') {
+        return (weightKg * 2.20462).toFixed(2);
+      }
+      if (selectedUnit === 'Kilograms (kg)') {
+        return weightKg.toFixed(2);
+      }
+      
+      // Handle custom weighing categories
+      const category = weighingCategories.find(c => c.category === selectedUnit);
+      if (category && category.kilogram_kg_ > 0) {
+        // Convert kg to custom unit (divide by kg per unit)
+        return (weightKg / category.kilogram_kg_).toFixed(2);
+      }
+      
+      return weightKg.toFixed(2);
+    };
+
+    const convertDisplayToKg = (displayValue: number) => {
+      // Handle base units
+      if (selectedUnit === 'Pounds (lb)') {
+        return displayValue / 2.20462;
+      }
+      if (selectedUnit === 'Kilograms (kg)') {
+        return displayValue;
+      }
+      
+      // Handle custom weighing categories
+      const category = weighingCategories.find(c => c.category === selectedUnit);
+      if (category && category.kilogram_kg_ > 0) {
+        // Convert custom unit to kg (multiply by kg per unit)
+        return displayValue * category.kilogram_kg_;
+      }
+      
+      return displayValue;
+    };
+
     const handleValueChange = async (donorId: number, categoryName: string, newValue: string) => {
       try {
         const token = localStorage.getItem('token');
@@ -515,11 +556,14 @@ export default function IncomingStatsPage() {
           return;
         }
 
-        const weightKg = parseFloat(newValue);
-        if (isNaN(weightKg) || weightKg < 0) {
+        const displayValue = parseFloat(newValue);
+        if (isNaN(displayValue) || displayValue < 0) {
           toast.error('Please enter a valid positive number');
           return;
         }
+
+        // Convert from display unit to KG for database storage
+        const weightKg = convertDisplayToKg(displayValue);
 
         const category = categories.find(c => c.name === categoryName);
         if (!category) {
@@ -621,6 +665,16 @@ export default function IncomingStatsPage() {
               onChange={(e) => setSelectedDate(e.target.value)}
               style={{ marginRight: 8 }}
             />
+            <select 
+              className={styles.select}
+              value={selectedUnit}
+              onChange={(e) => setSelectedUnit(e.target.value)}
+              style={{ marginRight: 8 }}
+            >
+              {[...baseUnits, ...weighingCategories.map(c => c.category)].map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
             <button 
               className={styles.exportBtn} 
               onClick={() => toast.info('Export functionality coming soon!')}
@@ -676,9 +730,9 @@ export default function IncomingStatsPage() {
                 <tr>
                   <th>Donor</th>
                   {categories.map(category => (
-                    <th key={category.id}>{category.name} (kg)</th>
+                    <th key={category.id}>{category.name} ({getUnitLabel()})</th>
                   ))}
-                  <th className={styles.totalCol}>Total (kg)</th>
+                  <th className={styles.totalCol}>Total ({getUnitLabel()})</th>
                 </tr>
               </thead>
               <tbody>
@@ -688,14 +742,13 @@ export default function IncomingStatsPage() {
                     {categories.map(category => (
                       <td key={category.id}>
                         <EditableCell
-                          value={Number(row[category.name]) || 0}
-                          
+                          value={Number(convertWeightForDetail(Number(row[category.name]) || 0))}
                           onSave={(newValue) => handleValueChange(row.donorId, category.name, newValue)}
                         />
                       </td>
                     ))}
                     <td className={styles.totalCol} style={{ fontWeight: 700 }}>
-                      {categories.reduce((sum, category) => sum + (Number(row[category.name]) || 0), 0).toFixed(2)}
+                      {convertWeightForDetail(categories.reduce((sum, category) => sum + (Number(row[category.name]) || 0), 0))}
                     </td>
                   </tr>
                 ))}
@@ -703,13 +756,13 @@ export default function IncomingStatsPage() {
                   <td style={{ fontWeight: 700 }}>Category Totals</td>
                   {categories.map(category => (
                     <td key={category.id} style={{ fontWeight: 700 }}>
-                      {tableData.reduce((sum, row) => sum + (Number(row[category.name]) || 0), 0).toFixed(2)}
+                      {convertWeightForDetail(tableData.reduce((sum, row) => sum + (Number(row[category.name]) || 0), 0))}
                     </td>
                   ))}
                   <td className={styles.totalCol} style={{ fontWeight: 700 }}>
-                    {tableData.reduce((sum, row) => 
+                    {convertWeightForDetail(tableData.reduce((sum, row) => 
                       sum + categories.reduce((catSum, category) => catSum + (Number(row[category.name]) || 0), 0), 0
-                    ).toFixed(2)}
+                    ))}
                   </td>
                 </tr>
               </tbody>

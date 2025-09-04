@@ -9,7 +9,7 @@ interface DashboardFiltersProps {
 export default function DashboardFilters({ onFilterChange }: DashboardFiltersProps) {
   const [month, setMonth] = useState('0'); // 0 for All months
   const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [unit, setUnit] = useState('Kilograms (kg)');
+  const [unit, setUnit] = useState('Pounds (lb)');
 
   const months = [
     { value: '0', label: 'All months' },

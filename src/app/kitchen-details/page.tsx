@@ -60,7 +60,7 @@ export default function KitchenDetailsPage() {
   const [incomingDollarValue, setIncomingDollarValue] = useState<number>(0);
   const [isEditingIncomingValue, setIsEditingIncomingValue] = useState(false);
   const [editingIncomingValue, setEditingIncomingValue] = useState<string>("");
-  const [incomingValueUnit, setIncomingValueUnit] = useState<"kg" | "lb">("kg");
+  const [incomingValueUnit, setIncomingValueUnit] = useState<"kg" | "lb">("lb");
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
@@ -74,7 +74,7 @@ export default function KitchenDetailsPage() {
   // Add category form state
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryWeight, setNewCategoryWeight] = useState("");
-  const [newCategoryUnit, setNewCategoryUnit] = useState<"kg" | "lb">("kg");
+  const [newCategoryUnit, setNewCategoryUnit] = useState<"kg" | "lb">("lb");
 
   
   // Add weighing form state

@@ -24,7 +24,7 @@ export default function Dashboard() {
   // Filter state (default to current month and year)
   const [period, setPeriod] = useState(currentMonthName);
   const [year, setYear] = useState(currentYear);
-  const [unit, setUnit] = useState('Kilograms (kg)');
+  const [unit, setUnit] = useState('Pounds (lb)');
 
   // Incoming stats state
   const [orgTotals, setOrgTotals] = useState<{ [org: string]: { weight: number, value: number } }>({});
@@ -244,7 +244,7 @@ export default function Dashboard() {
 
   // Custom units state (move these above helpers)
   const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);
-  const [selectedUnit, setSelectedUnit] = useState<'kg' | 'lb' | string>('kg');
+  const [selectedUnit, setSelectedUnit] = useState<'kg' | 'lb' | string>('lb');
 
   // Fetch custom units on mount
   useEffect(() => {

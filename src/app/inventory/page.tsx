@@ -468,53 +468,23 @@ export default function InventoryPage() {
 
   return (
     <main className={styles.main}>
-      {/* Tabs */}
-      <div style={{ display: 'flex', marginBottom: 24, borderBottom: '1px solid #e5e7eb' }}>
+      {/* Tab Navigation */}
+      <div className={styles.tabContainer}>
         <button
+          className={`${styles.tabButton} ${activeTab === 'inventory' ? styles.activeTab : ''}`}
           onClick={() => setActiveTab('inventory')}
-          style={{
-            padding: '12px 24px',
-            border: 'none',
-            background: activeTab === 'inventory' ? '#ff9800' : 'transparent',
-            color: activeTab === 'inventory' ? 'white' : '#ff9800',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'inventory' ? '2px solid #ff9800' : '2px solid transparent',
-            fontWeight: activeTab === 'inventory' ? '600' : '400',
-            borderRadius: '8px 8px 0 0',
-            transition: 'background 0.2s, color 0.2s',
-          }}
         >
           Inventory
         </button>
         <button
+          className={`${styles.tabButton} ${activeTab === 'categories' ? styles.activeTab : ''}`}
           onClick={() => setActiveTab('categories')}
-          style={{
-            padding: '12px 24px',
-            border: 'none',
-            background: activeTab === 'categories' ? '#ff9800' : 'transparent',
-            color: activeTab === 'categories' ? 'white' : '#ff9800',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'categories' ? '2px solid #ff9800' : '2px solid transparent',
-            fontWeight: activeTab === 'categories' ? '600' : '400',
-            borderRadius: '8px 8px 0 0',
-            transition: 'background 0.2s, color 0.2s',
-          }}
         >
           Donation Categories
         </button>
         <button
+          className={`${styles.tabButton} ${activeTab === 'donors' ? styles.activeTab : ''}`}
           onClick={() => setActiveTab('donors')}
-          style={{
-            padding: '12px 24px',
-            border: 'none',
-            background: activeTab === 'donors' ? '#ff9800' : 'transparent',
-            color: activeTab === 'donors' ? 'white' : '#ff9800',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'donors' ? '2px solid #ff9800' : '2px solid transparent',
-            fontWeight: activeTab === 'donors' ? '600' : '400',
-            borderRadius: '8px 8px 0 0',
-            transition: 'background 0.2s, color 0.2s',
-          }}
         >
           Donors
         </button>

@@ -454,8 +454,8 @@ export default function IncomingStatsPage() {
               No donations found for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
             </div>
           ) : (
-            <div className={styles.tableContainer}>
-              <table className={styles.table}>
+            <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+              <table className={styles.table} style={{ minWidth: '800px' }}>
                 <thead>
                   <tr>
                     {displayColumns.map(col => (
@@ -724,8 +724,8 @@ export default function IncomingStatsPage() {
             </div> */}
           </div>
 
-          <div className={styles.tableContainer}>
-            <table className={styles.table}>
+          <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+            <table className={styles.table} style={{ minWidth: '800px' }}>
               <thead>
                 <tr>
                   <th>Donor</th>

@@ -61,6 +61,11 @@ export default function KitchenDetailsPage() {
   const [isEditingIncomingValue, setIsEditingIncomingValue] = useState(false);
   const [editingIncomingValue, setEditingIncomingValue] = useState<string>("");
   const [incomingValueUnit, setIncomingValueUnit] = useState<"kg" | "lb">("lb");
+  
+  // Meals value state
+  const [mealsValue, setMealsValue] = useState<number>(10);
+  const [isEditingMealsValue, setIsEditingMealsValue] = useState(false);
+  const [editingMealsValue, setEditingMealsValue] = useState<string>("");
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
@@ -138,9 +143,12 @@ export default function KitchenDetailsPage() {
       
       // Load incoming dollar value from organization data
       const incomingValue = userOrg.incoming_dollar_value || 0;
+      const mealsVal = userOrg.mealsvalue || 10;
       console.log('Organization data:', userOrg);
       console.log('Incoming dollar value loaded:', incomingValue);
+      console.log('Meals value loaded:', mealsVal);
       setIncomingDollarValue(incomingValue);
+      setMealsValue(mealsVal);
 
       // Set addresses from already parsed data
       setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
@@ -301,7 +309,7 @@ export default function KitchenDetailsPage() {
     // Convert stored kg value to display unit
     const displayValue = incomingValueUnit === "kg" 
       ? incomingDollarValue 
-      : incomingDollarValue * 2.20462; // Convert $/kg to $/lb
+      : incomingDollarValue / 2.20462; // Convert $/kg to $/lb (divide, not multiply)
     setEditingIncomingValue(displayValue.toFixed(2));
   };
 
@@ -374,6 +382,75 @@ export default function KitchenDetailsPage() {
   const handleCancelEditIncomingValue = () => {
     setIsEditingIncomingValue(false);
     setEditingIncomingValue("");
+  };
+
+  const handleStartEditMealsValue = () => {
+    setIsEditingMealsValue(true);
+    setEditingMealsValue(mealsValue.toFixed(2));
+  };
+
+  const handleSaveMealsValue = async () => {
+    const inputValue = parseFloat(editingMealsValue);
+    if (isNaN(inputValue) || inputValue < 0) {
+      toast.error('Please enter a valid positive number');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+
+      console.log('Saving meals value:', inputValue);
+      console.log('Organization ID:', organization.id);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/meals-value`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          mealsvalue: inputValue
+        }),
+      });
+
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.error || 'Failed to update meals value');
+        return;
+      }
+      
+      const updatedOrg = await res.json();
+      console.log('Updated organization:', updatedOrg);
+
+      // Update both the organization state and the meals value display state
+      setOrganization((prev: any) => ({
+        ...prev,
+        mealsvalue: updatedOrg.mealsvalue
+      }));
+      
+      // Update the display value state
+      setMealsValue(updatedOrg.mealsvalue);
+
+      setIsEditingMealsValue(false);
+      setEditingMealsValue("");
+      toast.success('Meals value updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating meals value:', error);
+      toast.error('Failed to update meals value. Please try again.');
+    }
+  };
+
+  const handleCancelEditMealsValue = () => {
+    setIsEditingMealsValue(false);
+    setEditingMealsValue("");
   };
 
   // Weighing category functions
@@ -977,7 +1054,7 @@ export default function KitchenDetailsPage() {
                     ${(() => {
                       const displayValue = incomingValueUnit === "kg" 
                         ? incomingDollarValue 
-                        : incomingDollarValue * 2.20462;
+                        : incomingDollarValue / 2.20462; // Convert $/kg to $/lb (divide, not multiply)
                       return displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     })()}
                   </div>
@@ -1001,32 +1078,110 @@ export default function KitchenDetailsPage() {
               </div>
             </div>
 
-            {/* Weighing Statistics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 24 }}>
-              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#f44336', marginBottom: 8 }}>
-                  {weighingStats?.totalWeighings || 0}
-                </div>
-                <div style={{ fontSize: 14, color: '#666' }}>Total Weighings</div>
+            {/* Meals Value Section */}
+            <div style={{ 
+              background: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 24, 
+              marginBottom: 24,
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Meals Value (per meal)</h3>
+                <button
+                  onClick={handleStartEditMealsValue}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #dee2e6',
+                    color: '#666',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
+                >
+                  <FaEdit />
+                  Edit
+                </button>
               </div>
-              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#e91e63', marginBottom: 8 }}>
-                  {weighingStats?.totalCategories || 0}
+              
+              {isEditingMealsValue ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>$</div>
+                    <input
+                      type="number"
+                      value={editingMealsValue}
+                      onChange={(e) => setEditingMealsValue(e.target.value)}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: '#333',
+                        width: '150px',
+                        outline: 'none'
+                      }}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                    <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                      per meal
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleSaveMealsValue}
+                      style={{
+                        background: '#28a745',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      onClick={handleCancelEditMealsValue}
+                      style={{
+                        background: '#dc3545',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontSize: 14, color: '#666' }}>Categories</div>
-              </div>
-              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#ff5722', marginBottom: 8 }}>
-                  {weighingStats?.categoryStats?.length || 0}
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                    ${mealsValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                    per meal
+                  </div>
                 </div>
-                <div style={{ fontSize: 14, color: '#666' }}>Active Categories</div>
-              </div>
-              <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: 8 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#795548', marginBottom: 8 }}>
-                  {weighingRecords.length > 0 ? weighingRecords.length : 0}
-                </div>
-                <div style={{ fontSize: 14, color: '#666' }}>Recent Records</div>
-              </div>
+              )}
             </div>
 
             {/* Action Buttons */}

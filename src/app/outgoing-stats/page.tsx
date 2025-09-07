@@ -23,12 +23,6 @@ type OutgoingRow = {
   [key: string]: string | number;
 };
 
-type WeighingCategory = {
-  id: number;
-  category: string;
-  kilogram_kg_: number;
-  pound_lb_: number;
-};
 
 const getYearOptions = () => {
   const currentYear = new Date().getFullYear();
@@ -46,31 +40,7 @@ export default function OutgoingStatsPage() {
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedUnit, setSelectedUnit] = useState('Meals');
-  const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
 
-  // Fetch weighing categories
-  useEffect(() => {
-    const fetchWeighingCategories = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setWeighingCategories(data || []);
-        }
-      } catch (err) {
-        console.error('Error fetching weighing categories:', err);
-      }
-    };
-    
-    fetchWeighingCategories();
-  }, []);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -117,7 +87,7 @@ export default function OutgoingStatsPage() {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/filtered/export?month=${selectedMonth}&year=${selectedYear}&unit=${selectedUnit}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/filtered/export?month=${selectedMonth}&year=${selectedYear}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -140,57 +110,6 @@ export default function OutgoingStatsPage() {
     }
   };
 
-  // Helper to convert weight based on selected unit
-  const convertWeight = (value: number | string) => {
-    if (typeof value !== 'number') return value;
-    
-    // Handle base units
-    if (selectedUnit === 'kg') {
-      return value.toFixed(2);
-    }
-    
-    if (selectedUnit === 'lb') {
-      return (value * 2.20462).toFixed(2);
-    }
-    
-    // Handle custom weighing categories
-    const category = weighingCategories.find(c => c.category === selectedUnit);
-    if (category && category.kilogram_kg_ > 0) {
-      // Convert kg to custom unit (divide by kg per unit)
-      return (value / category.kilogram_kg_).toFixed(2);
-    }
-    
-    return value.toFixed(2);
-  };
-
-  // Helper to convert weight for calculations (returns number)
-  const convertWeightForCalculation = (value: number | string) => {
-    if (typeof value !== 'number') return 0;
-    
-    // Handle base units
-    if (selectedUnit === 'kg') {
-      return value;
-    }
-    
-    if (selectedUnit === 'lb') {
-      return value * 2.20462;
-    }
-    
-    // Handle custom weighing categories
-    const category = weighingCategories.find(c => c.category === selectedUnit);
-    if (category && category.kilogram_kg_ > 0) {
-      return value / category.kilogram_kg_;
-    }
-    
-    return value;
-  };
-
-  // Helper to get unit label for display
-  const getUnitLabel = () => {
-    if (selectedUnit === 'kg') return 'kg';
-    if (selectedUnit === 'lb') return 'lb';
-    return selectedUnit;
-  };
 
   // Modify getDisplayData to handle meal conversion
   const getDisplayData = () => {
@@ -201,12 +120,7 @@ export default function OutgoingStatsPage() {
       data: tableData.map(row => {
         const newRow = { ...row };
         delete newRow['Collections'];
-        // Convert weight columns
-        Object.keys(newRow).forEach(key => {
-          if (key !== 'Date' && typeof newRow[key] === 'number') {
-            newRow[key] = convertWeight(newRow[key]);
-          }
-        });
+        // Meals are just numbers, no conversion needed
         return newRow;
       }), 
       firstCol: 'Date' 
@@ -231,22 +145,14 @@ export default function OutgoingStatsPage() {
         }
       });
     });
-    // Build display data for all months and convert meals
-    const displayData = Object.values(monthMap).map(monthData => {
-      const convertedData = { ...monthData };
-      Object.keys(convertedData).forEach(key => {
-        if (key !== 'Month' && typeof convertedData[key] === 'number') {
-          convertedData[key] = convertWeight(convertedData[key]);
-        }
-      });
-      return convertedData;
-    });
+    // Return display data for all months (meals are just numbers, no conversion needed)
+    const displayData = Object.values(monthMap);
     const newColumns = ['Month', ...filteredColumns.filter(col => col !== 'Date')];
     return { columns: newColumns, data: displayData, firstCol: 'Month' };
   };
   const { columns: displayColumns, data: displayData, firstCol } = getDisplayData();
 
-  // Calculate totals from original data (before conversion to strings)
+  // Calculate totals (meals are just numbers, no conversion needed)
   const calculateTotals = () => {
     if (selectedMonth !== 0) {
       // For monthly view, sum the original tableData
@@ -256,7 +162,7 @@ export default function OutgoingStatsPage() {
           totals[col] = tableData.reduce((sum, row) => {
             const value = row[col];
             if (typeof value === 'number') {
-              return sum + convertWeightForCalculation(value);
+              return sum + value;
             }
             return sum;
           }, 0);
@@ -264,7 +170,7 @@ export default function OutgoingStatsPage() {
       });
       return totals;
     } else {
-      // For yearly view, sum the monthly aggregated data before conversion
+      // For yearly view, sum the monthly aggregated data
       const totals: { [key: string]: number } = {};
       displayColumns.forEach(col => {
         if (col !== firstCol) {
@@ -273,7 +179,7 @@ export default function OutgoingStatsPage() {
           tableData.forEach(row => {
             const d = new Date(row['Date'] as string);
             if (!isNaN(d.getTime()) && typeof row[col] === 'number') {
-              totals[col] += convertWeightForCalculation(row[col]);
+              totals[col] += row[col];
             }
           });
         }
@@ -284,9 +190,6 @@ export default function OutgoingStatsPage() {
 
   const totals = calculateTotals();
 
-  // Combine base units with weighing categories for dropdown
-  const baseUnits = ['kg', 'lb'];
-  const allUnits = [...baseUnits, ...weighingCategories.map(c => c.category)];
 
   return (
     <main className={styles.main}>
@@ -318,16 +221,6 @@ export default function OutgoingStatsPage() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
-          <select
-            className={styles.select}
-            value={selectedUnit}
-            onChange={e => setSelectedUnit(e.target.value)}
-            style={{ minWidth: 100 }}
-          >
-            {allUnits.map(u => (
-              <option key={u} value={u}>{u}</option>
-            ))}
-          </select>
           <button className={styles.exportBtn} onClick={handleExport} type="button">
             Export to Excel
           </button>
@@ -347,7 +240,7 @@ export default function OutgoingStatsPage() {
                 <tr>
                   {displayColumns.map(col => (
                     <th key={col}>
-                      {col} {col !== firstCol ? `(${getUnitLabel()})` : ''}
+                      {col}
                     </th>
                   ))}
                 </tr>
@@ -372,7 +265,7 @@ export default function OutgoingStatsPage() {
                   {displayColumns.map((col, idx) => {
                     if (col === firstCol) return <td key={col} className={styles.totalCol}>{firstCol === 'Month' ? 'Yearly Total' : 'Monthly Total'}</td>;
                     const total = totals[col] || 0;
-                    return <td key={col} className={idx === displayColumns.length - 1 ? styles.totalCol : ''}>{total.toFixed(2)}</td>;
+                    return <td key={col} className={idx === displayColumns.length - 1 ? styles.totalCol : ''}>{total}</td>;
                   })}
                 </tr>
               </tbody>

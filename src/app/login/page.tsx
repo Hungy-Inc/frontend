@@ -4,11 +4,13 @@ import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import { toast } from 'react-toastify';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import Head from 'next/head';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -25,7 +27,7 @@ export default function LoginPage() {
       const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, rememberMe })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -35,13 +37,18 @@ export default function LoginPage() {
       } else {
         if (data.token) {
           localStorage.setItem('token', data.token);
+          // Store remember me preference
+          localStorage.setItem('rememberMe', rememberMe.toString());
           // Decode JWT to get user info
           const user = jwtDecode(data.token);
           localStorage.setItem('user', JSON.stringify(user));
+          
+          // Show success message with expiration info
+          const expirationText = rememberMe ? '30 days' : '7 days';
+          toast.success(`Login successful! Session expires in ${expirationText}. Redirecting...`);
         }
         // Small delay to ensure token is stored and show success message
         setTimeout(() => {
-          toast.success('Login successful! Redirecting...');
           router.push('/dashboard');
         }, 50);
       }
@@ -55,8 +62,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <form onSubmit={handleSubmit} style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 10px var(--shadow)', padding: '2rem', minWidth: 320, maxWidth: 360, width: '100%' }}>
+    <>
+      <Head>
+        <title>Login - HÜNGY Admin</title>
+        <meta name="description" content="HÜNGY Admin Login" />
+        <meta name="robots" content="noindex, nofollow" />
+      </Head>
+      <div style={{ minHeight: '100vh', background: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <form 
+        onSubmit={handleSubmit} 
+        method="POST"
+        action="/login"
+        data-testid="login-form"
+        style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 10px var(--shadow)', padding: '2rem', minWidth: 320, maxWidth: 360, width: '100%' }}
+      >
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <h1 style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '2rem', letterSpacing: 1 }}>HÜNGY</h1>
           <div className="text-dark-text" style={{ fontWeight: 600, fontSize: '1.1rem', marginTop: 8 }}>Admin Login</div>
@@ -65,6 +84,7 @@ export default function LoginPage() {
           <label htmlFor="email" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>Email</label>
           <input
             id="email"
+            name="email"
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -80,6 +100,7 @@ export default function LoginPage() {
           <div style={{ position: 'relative' }}>
             <input
               id="password"
+              name="password"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -127,6 +148,39 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
+        
+        {/* Hidden input for password managers */}
+        <input type="hidden" name="rememberMe" value={rememberMe.toString()} />
+        
+        {/* Remember Me checkbox */}
+        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="checkbox"
+            id="rememberMe"
+            name="rememberMeCheckbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            style={{
+              width: 16,
+              height: 16,
+              accentColor: '#ff9800',
+              cursor: 'pointer'
+            }}
+            disabled={loading}
+          />
+          <label 
+            htmlFor="rememberMe" 
+            style={{ 
+              fontSize: '0.9rem', 
+              color: '#666', 
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+          >
+            Remember me for 30 days
+          </label>
+        </div>
+        
         {error && <div style={{ color: 'var(--primary)', marginBottom: 12, fontSize: '0.95rem' }}>{error}</div>}
         <button
           type="submit"
@@ -149,6 +203,7 @@ export default function LoginPage() {
           </a>
         </div>
       </form>
-    </div>
+      </div>
+    </>
   );
 } 

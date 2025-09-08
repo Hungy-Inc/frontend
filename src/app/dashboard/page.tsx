@@ -113,6 +113,7 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('rememberMe');
     router.push('/login');
   };
 
@@ -222,14 +223,44 @@ export default function Dashboard() {
   }, [period, year, unit]);
 
   useEffect(() => {
-    // Redirect to login if not authenticated
+    // Auto-login check and redirect to login if not authenticated
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
       const user = localStorage.getItem('user');
+      const rememberMe = localStorage.getItem('rememberMe') === 'true';
+      
       if (!token || !user) {
         router.push('/login');
         return;
       }
+      
+      // Check if token is still valid by trying to decode it
+      try {
+        const decodedToken = JSON.parse(atob(token.split('.')[1]));
+        const currentTime = Math.floor(Date.now() / 1000);
+        
+        // If token is expired, clear storage and redirect to login
+        if (decodedToken.exp < currentTime) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('rememberMe');
+          router.push('/login');
+          return;
+        }
+        
+        // Token is valid, show success message for auto-login
+        if (rememberMe) {
+          toast.success('Welcome back! You were automatically logged in.');
+        }
+      } catch (error) {
+        // Invalid token format, clear storage and redirect
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('rememberMe');
+        router.push('/login');
+        return;
+      }
+      
       // Set initial loading to false after auth check
       setInitialLoading(false);
     }

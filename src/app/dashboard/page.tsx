@@ -68,6 +68,18 @@ export default function Dashboard() {
 
   const router = useRouter();
 
+  // Retry function for failed API calls
+  const retryApiCall = async (apiCall: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await apiCall();
+      } catch (error) {
+        if (i === maxRetries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+      }
+    }
+  };
+
   // User/org info for header
   const [orgName, setOrgName] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
@@ -91,6 +103,25 @@ export default function Dashboard() {
       }
     };
     fetchRecurringShifts();
+  }, []);
+
+  // Keep-alive ping to prevent cold starts
+  useEffect(() => {
+    const keepAlive = async () => {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/keepalive`);
+      } catch (error) {
+        console.log('Keep-alive ping failed:', error);
+      }
+    };
+
+    // Ping every 10 minutes to keep server warm
+    const interval = setInterval(keepAlive, 10 * 60 * 1000);
+    
+    // Initial ping
+    keepAlive();
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -125,18 +156,40 @@ export default function Dashboard() {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('No authentication token found');
         const month = getMonthNumber(period);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats?month=${month}&year=${year}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Failed to fetch incoming stats');
-        const data = await response.json();
+        
+        const apiCall = async () => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+          
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats?month=${month}&year=${year}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              if (response.status === 408) throw new Error('Request timeout - server is starting up');
+              if (response.status === 503) throw new Error('Service temporarily unavailable');
+              throw new Error(`Failed to fetch incoming stats: ${response.status}`);
+            }
+            return await response.json();
+          } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+          }
+        };
+        
+        const data = await retryApiCall(apiCall);
         setOrgTotals(data.donorTotals || {});
         setGrandTotalWeight(data.grandTotalWeight || 0);
         setGrandTotalValue(data.grandTotalValue || 0);
         setIncomingDollarValue(data.incomingDollarValue || 0);
         setMealsValue(data.mealsValue || 10);
       } catch (err) {
-        setErrorIncoming(err instanceof Error ? err.message : 'An error occurred');
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        setErrorIncoming(errorMessage);
+        console.error('Incoming stats error:', err);
         setOrgTotals({});
         setGrandTotalWeight(0);
         setGrandTotalValue(0);

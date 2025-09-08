@@ -97,7 +97,8 @@ export default function ManageShiftsPage() {
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setCategoryOptions(data);
+      // Filter out 'Collection' category from dropdown options
+      setCategoryOptions(data.filter((cat: any) => cat.name !== 'Collection'));
     } catch {
       setCategoryOptions([]);
     }
@@ -137,7 +138,8 @@ export default function ManageShiftsPage() {
       });
       if (!res.ok) throw new Error("Failed to fetch shift categories");
       const data = await res.json();
-      setCategories(data);
+      // Filter out 'Collection' category from display
+      setCategories(data.filter((cat: any) => cat.name !== 'Collection'));
     } catch (err) {
       setError("Failed to load shift categories.");
       setCategories([]);

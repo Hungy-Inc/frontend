@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import ReportIssueButton from "./ReportIssueButton";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -28,6 +29,7 @@ export default function ClientLayout({
         {shouldShowSidebarAndHeader && <Header />}
         <main style={{ flex: 1 }}>{children}</main>
       </div>
+      {shouldShowSidebarAndHeader && <ReportIssueButton />}
       <ToastContainer
         position="top-right"
         autoClose={3000}

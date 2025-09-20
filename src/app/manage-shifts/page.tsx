@@ -1584,75 +1584,115 @@ export default function ManageShiftsPage() {
             {/* Add Shift Modal */}
             {showAddRecurring && (
               <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.15)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ background: '#fff', borderRadius: 10, padding: 32, minWidth: 400, boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
+                <div style={{ background: '#fff', borderRadius: 10, padding: 32, minWidth: 600, maxWidth: '90vw', boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
                   <button onClick={() => setShowAddRecurring(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}>×</button>
                   <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Add Shift</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <input placeholder="Name" value={addRecurring.name} onChange={e => setAddRecurring(r => ({ ...r, name: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, name: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, name: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    {addRecurringTouched.name && !isRecurringNameValid && <div style={{ color: 'red', fontSize: 13 }}>Name is required.</div>}
-                    
-                    {/* Shift Type Selection */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type *</label>
-                      <div style={{ display: 'flex', gap: 12 }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name="shiftType"
-                            checked={addRecurring.isRecurring}
-                            onChange={() => setAddRecurring(r => ({ ...r, isRecurring: true }))}
-                            style={{ margin: 0 }}
-                          />
-                          <span style={{ fontSize: 14 }}>Recurring</span>
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name="shiftType"
-                            checked={!addRecurring.isRecurring}
-                            onChange={() => setAddRecurring(r => ({ ...r, isRecurring: false }))}
-                            style={{ margin: 0 }}
-                          />
-                          <span style={{ fontSize: 14 }}>One-time</span>
-                        </label>
+                  <div style={{ display: 'flex', gap: 24 }}>
+                    {/* Left Column */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                      {/* Left Column - Basic Info & Timing */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Shift Name *</label>
+                        <input placeholder="Enter shift name" value={addRecurring.name} onChange={e => setAddRecurring(r => ({ ...r, name: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, name: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, name: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                       </div>
+                      {addRecurringTouched.name && !isRecurringNameValid && <div style={{ color: 'red', fontSize: 13 }}>Name is required.</div>}
+                      
+                      {/* Shift Type Selection */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type *</label>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name="shiftType"
+                              checked={addRecurring.isRecurring}
+                              onChange={() => setAddRecurring(r => ({ ...r, isRecurring: true }))}
+                              style={{ margin: 0 }}
+                            />
+                            <span style={{ fontSize: 14 }}>Recurring</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name="shiftType"
+                              checked={!addRecurring.isRecurring}
+                              onChange={() => setAddRecurring(r => ({ ...r, isRecurring: false }))}
+                              style={{ margin: 0 }}
+                            />
+                            <span style={{ fontSize: 14 }}>One-time</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      {/* Day of Week - Only show for recurring shifts */}
+                      {addRecurring.isRecurring && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Day of Week *</label>
+                          <select value={addRecurring.dayOfWeek} onChange={e => setAddRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
+                            {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      
+                      {/* Date/Time inputs based on shift type */}
+                      {addRecurring.isRecurring ? (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Start Time *</label>
+                            <input type="time" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                          {addRecurringTouched.startTime && !isRecurringStartTimeValid && <div style={{ color: 'red', fontSize: 13 }}>Start time is required.</div>}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>End Time *</label>
+                            <input type="time" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                          {addRecurringTouched.endTime && !isRecurringEndTimeValid && <div style={{ color: 'red', fontSize: 13 }}>End time is required.</div>}
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Start Date & Time *</label>
+                            <input type="datetime-local" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                          {addRecurringTouched.startTime && !isRecurringStartTimeValid && <div style={{ color: 'red', fontSize: 13 }}>Start date & time is required.</div>}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>End Date & Time *</label>
+                            <input type="datetime-local" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                          {addRecurringTouched.endTime && !isRecurringEndTimeValid && <div style={{ color: 'red', fontSize: 13 }}>End date & time is required.</div>}
+                        </>
+                      )}
                     </div>
-                    
-                    {/* Day of Week - Only show for recurring shifts */}
-                    {addRecurring.isRecurring && (
-                      <select value={addRecurring.dayOfWeek} onChange={e => setAddRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
-                        {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
-                      </select>
-                    )}
-                    
-                    {/* Date/Time inputs based on shift type */}
-                    {addRecurring.isRecurring ? (
-                      <>
-                        <input type="time" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                        {addRecurringTouched.startTime && !isRecurringStartTimeValid && <div style={{ color: 'red', fontSize: 13 }}>Start time is required.</div>}
-                        <input type="time" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                        {addRecurringTouched.endTime && !isRecurringEndTimeValid && <div style={{ color: 'red', fontSize: 13 }}>End time is required.</div>}
-                      </>
-                    ) : (
-                      <>
-                        <input type="datetime-local" value={addRecurring.startTime} onChange={e => setAddRecurring(r => ({ ...r, startTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, startTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                        {addRecurringTouched.startTime && !isRecurringStartTimeValid && <div style={{ color: 'red', fontSize: 13 }}>Start date & time is required.</div>}
-                        <input type="datetime-local" value={addRecurring.endTime} onChange={e => setAddRecurring(r => ({ ...r, endTime: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, endTime: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                        {addRecurringTouched.endTime && !isRecurringEndTimeValid && <div style={{ color: 'red', fontSize: 13 }}>End date & time is required.</div>}
-                      </>
-                    )}
-                    
-                    <select value={addRecurring.shiftCategoryId} onChange={e => setAddRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, shiftCategoryId: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, shiftCategoryId: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
-                      <option value="">Select Category</option>
-                      {categoryOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>)}
-                    </select>
-                    {addRecurringTouched.shiftCategoryId && !isRecurringCategoryValid && <div style={{ color: 'red', fontSize: 13 }}>Category is required.</div>}
-                    <input placeholder="Location" value={addRecurring.location} onChange={e => setAddRecurring(r => ({ ...r, location: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, location: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, location: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    {addRecurringTouched.location && !isRecurringLocationValid && <div style={{ color: 'red', fontSize: 13 }}>Location is required.</div>}
-                    <input type="number" min={1} placeholder="Slots" value={addRecurring.slots} onChange={e => setAddRecurring(r => ({ ...r, slots: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    {addRecurringTouched.slots && !isRecurringSlotsValid && <div style={{ color: 'red', fontSize: 13 }}>Slots must be at least 1.</div>}
-                    {addRecurringError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{addRecurringError}</div>}
-                    <button onClick={handleAddRecurringShift} style={{ background: isRecurringFormValid ? '#EF5C11' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: isRecurringFormValid ? 'pointer' : 'not-allowed', opacity: addingRecurring ? 0.7 : 1 }} disabled={addingRecurring || !isRecurringFormValid}>
+
+                    {/* Right Column - Category, Location & Slots */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Shift Category *</label>
+                        <select value={addRecurring.shiftCategoryId} onChange={e => setAddRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, shiftCategoryId: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, shiftCategoryId: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
+                          <option value="">Select Category</option>
+                          {categoryOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>)}
+                        </select>
+                      </div>
+                      {addRecurringTouched.shiftCategoryId && !isRecurringCategoryValid && <div style={{ color: 'red', fontSize: 13 }}>Category is required.</div>}
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Location *</label>
+                        <input placeholder="Enter shift location" value={addRecurring.location} onChange={e => setAddRecurring(r => ({ ...r, location: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, location: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, location: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                      </div>
+                      {addRecurringTouched.location && !isRecurringLocationValid && <div style={{ color: 'red', fontSize: 13 }}>Location is required.</div>}
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Number of Volunteer Slots</label>
+                        <input type="number" min={1} placeholder="Enter number of volunteers needed" value={addRecurring.slots} onChange={e => setAddRecurring(r => ({ ...r, slots: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                      </div>
+                      {addRecurringTouched.slots && !isRecurringSlotsValid && <div style={{ color: 'red', fontSize: 13 }}>Slots must be at least 1.</div>}
+                    </div>
+                  </div>
+                  
+                  {/* Error Messages and Submit Button */}
+                  <div style={{ marginTop: 16 }}>
+                    {addRecurringError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center', marginBottom: 12 }}>{addRecurringError}</div>}
+                    <button onClick={handleAddRecurringShift} style={{ background: isRecurringFormValid ? '#EF5C11' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, width: '100%', cursor: isRecurringFormValid ? 'pointer' : 'not-allowed', opacity: addingRecurring ? 0.7 : 1 }} disabled={addingRecurring || !isRecurringFormValid}>
                       {addingRecurring ? 'Adding...' : 'Add'}
                     </button>
                   </div>
@@ -1662,59 +1702,99 @@ export default function ManageShiftsPage() {
             {/* Edit Shift Modal */}
             {editRecurringId && (
               <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.15)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ background: '#fff', borderRadius: 10, padding: 32, minWidth: 340, boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
+                <div style={{ background: '#fff', borderRadius: 10, padding: 32, minWidth: 600, maxWidth: '90vw', boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
                   <button onClick={handleCancelEditRecurring} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}>×</button>
                   <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Edit Shift</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <input placeholder="Name" value={editRecurring.name} onChange={e => setEditRecurring(r => ({ ...r, name: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    
-                    {/* Shift Type Display (Read-only) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type</label>
-                      <div style={{ 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        gap: 4,
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        fontSize: 14,
-                        fontWeight: 500,
-                        background: editRecurring.isRecurring ? '#e3f2fd' : '#fff3e0',
-                        color: editRecurring.isRecurring ? '#1976d2' : '#f57c00',
-                        border: '1px solid #e0e0e0'
-                      }}>
-                        {editRecurring.isRecurring ? '🔄 Recurring' : '📅 One-time'}
+                  <div style={{ display: 'flex', gap: 24 }}>
+                    {/* Left Column */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                      {/* Left Column - Basic Info & Timing */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Shift Name *</label>
+                        <input placeholder="Enter shift name" value={editRecurring.name} onChange={e => setEditRecurring(r => ({ ...r, name: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                      </div>
+                      
+                      {/* Shift Type Display (Read-only) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type</label>
+                        <div style={{ 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          gap: 4,
+                          padding: '6px 12px',
+                          borderRadius: 6,
+                          fontSize: 14,
+                          fontWeight: 500,
+                          background: editRecurring.isRecurring ? '#e3f2fd' : '#fff3e0',
+                          color: editRecurring.isRecurring ? '#1976d2' : '#f57c00',
+                          border: '1px solid #e0e0e0'
+                        }}>
+                          {editRecurring.isRecurring ? '🔄 Recurring' : '📅 One-time'}
+                        </div>
+                      </div>
+                      
+                      {/* Day of Week - Only show for recurring shifts */}
+                      {editRecurring.isRecurring && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Day of Week *</label>
+                          <select value={editRecurring.dayOfWeek} onChange={e => setEditRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
+                            {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      
+                      {/* Date/Time inputs based on shift type */}
+                      {editRecurring.isRecurring ? (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Start Time *</label>
+                            <input type="time" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>End Time *</label>
+                            <input type="time" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Start Date & Time *</label>
+                            <input type="datetime-local" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>End Date & Time *</label>
+                            <input type="datetime-local" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Right Column - Category, Location & Slots */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Shift Category *</label>
+                        <select value={editRecurring.shiftCategoryId} onChange={e => setEditRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
+                          <option value="">Select Category</option>
+                          {categoryOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>)}
+                        </select>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Location *</label>
+                        <input placeholder="Enter shift location" value={editRecurring.location} onChange={e => setEditRecurring(r => ({ ...r, location: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Number of Volunteer Slots</label>
+                        <input type="number" min={1} placeholder="Enter number of volunteers needed" value={editRecurring.slots} onChange={e => setEditRecurring(r => ({ ...r, slots: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                       </div>
                     </div>
-                    
-                    {/* Day of Week - Only show for recurring shifts */}
-                    {editRecurring.isRecurring && (
-                      <select value={editRecurring.dayOfWeek} onChange={e => setEditRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
-                        {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
-                      </select>
-                    )}
-                    
-                    {/* Date/Time inputs based on shift type */}
-                    {editRecurring.isRecurring ? (
-                      <>
-                        <input type="time" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                        <input type="time" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                      </>
-                    ) : (
-                      <>
-                        <input type="datetime-local" value={editRecurring.startTime} onChange={e => setEditRecurring(r => ({ ...r, startTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                        <input type="datetime-local" value={editRecurring.endTime} onChange={e => setEditRecurring(r => ({ ...r, endTime: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                      </>
-                    )}
-                    
-                    <select value={editRecurring.shiftCategoryId} onChange={e => setEditRecurring(r => ({ ...r, shiftCategoryId: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
-                      <option value="">Select Category</option>
-                      {categoryOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>)}
-                    </select>
-                    <input placeholder="Location" value={editRecurring.location} onChange={e => setEditRecurring(r => ({ ...r, location: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    <input type="number" min={1} placeholder="Slots" value={editRecurring.slots} onChange={e => setEditRecurring(r => ({ ...r, slots: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
-                    {editRecurringError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{editRecurringError}</div>}
-                    <button onClick={handleEditRecurringShift} style={{ background: '#ff9800', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, marginTop: 8, cursor: editingRecurring ? 'not-allowed' : 'pointer', opacity: editingRecurring ? 0.7 : 1 }} disabled={editingRecurring || !editRecurring.name.trim() || !editRecurring.startTime || !editRecurring.endTime || !editRecurring.shiftCategoryId || !editRecurring.location || !editRecurring.slots}>
+                  </div>
+                  
+                  {/* Error Messages and Submit Button */}
+                  <div style={{ marginTop: 16 }}>
+                    {editRecurringError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center', marginBottom: 12 }}>{editRecurringError}</div>}
+                    <button onClick={handleEditRecurringShift} style={{ background: '#ff9800', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, width: '100%', cursor: editingRecurring ? 'not-allowed' : 'pointer', opacity: editingRecurring ? 0.7 : 1 }} disabled={editingRecurring || !editRecurring.name.trim() || !editRecurring.startTime || !editRecurring.endTime || !editRecurring.shiftCategoryId || !editRecurring.location || !editRecurring.slots}>
                       {editingRecurring ? 'Saving...' : 'Save'}
                     </button>
                   </div>

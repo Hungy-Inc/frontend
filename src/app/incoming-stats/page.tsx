@@ -235,14 +235,14 @@ export default function IncomingStatsPage() {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch detail donations data');
+        throw new Error('Failed to fetch edit donations data');
       }
 
       const data = await response.json();
       setDetailDonationsData(data);
     } catch (err) {
-      console.error('Error fetching detail donations:', err);
-      toast.error('Failed to fetch detail donations data');
+      console.error('Error fetching edit donations:', err);
+      toast.error('Failed to fetch edit donations data');
     } finally {
       setDetailLoading(false);
     }
@@ -633,7 +633,7 @@ export default function IncomingStatsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div className={styles.topBar} style={{ marginBottom: 0 }}>
             <div>
-              <div className={styles.pageTitle}>Detail Donations</div>
+              <div className={styles.pageTitle}>Edit Donations</div>
               <div className={styles.pageSubtitle}>View and manage donations by donor and category</div>
             </div>
           </div>
@@ -686,7 +686,7 @@ export default function IncomingStatsPage() {
         </div>
         <div className={styles.tableWrapper}>
           <div className={styles.tableTitle}>
-            Detail Donations – <span className={styles.month}>{formatDate(selectedDate)}</span>
+            Edit Donations – <span className={styles.month}>{formatDate(selectedDate)}</span>
           </div>
           
           {/* Instructions */}
@@ -790,7 +790,7 @@ export default function IncomingStatsPage() {
           className={`${styles.tabButton} ${activeTab === 'detail' ? styles.activeTab : ''}`}
           onClick={() => setActiveTab('detail')}
         >
-          Detail Donations
+          Edit Donations
         </button>
       </div>
 

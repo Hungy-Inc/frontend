@@ -42,6 +42,9 @@ export default function ScheduleShiftsPage() {
   const [addDayOfWeek, setAddDayOfWeek] = useState<string>("");
   const [selectedSlotId, setSelectedSlotId] = useState<string>("");
   const [addDate, setAddDate] = useState<string>("");
+  
+  // State to track correct counts for each recurring shift (considering absences)
+  const [shiftCounts, setShiftCounts] = useState<{[key: number]: {totalFilledSlots: number, presentDefaultUsers: number, pendingSlots: number}}>({});
 
   // Add state for editing signup
   const [editSignupId, setEditSignupId] = useState<number|null>(null);
@@ -105,9 +108,22 @@ export default function ScheduleShiftsPage() {
 
   // --- Manage Employees Modal State ---
   const [manageModalOpen, setManageModalOpen] = useState(false);
-  const [manageModalData, setManageModalData] = useState<{ scheduled: any[]; unscheduled: any[]; slots: number; booked: number } | null>(null);
+  const [manageModalData, setManageModalData] = useState<{ scheduled: any[]; unscheduled: any[]; slots: number; booked: number; defaultUsers?: number; availableSlots?: number } | null>(null);
   const [manageModalShift, setManageModalShift] = useState<any>(null);
   const [manageModalLoading, setManageModalLoading] = useState(false);
+
+  // Default Users Management State
+  const [defaultUsers, setDefaultUsers] = useState<any[]>([]);
+  const [shiftAbsences, setShiftAbsences] = useState<any[]>([]);
+  const [loadingDefaultUsers, setLoadingDefaultUsers] = useState(false);
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
+  const [selectedUserForAbsence, setSelectedUserForAbsence] = useState<any>(null);
+  const [absenceReason, setAbsenceReason] = useState('');
+  const [absenceType, setAbsenceType] = useState('UNAVAILABLE');
+  
+  // Improved absence management state
+  const [selectedUsersForAbsence, setSelectedUsersForAbsence] = useState<number[]>([]);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
 
   // Add state for shift name filter
   const [selectedShiftName, setSelectedShiftName] = useState<string>("");
@@ -259,7 +275,11 @@ export default function ScheduleShiftsPage() {
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setCategoryOptions(data);
+      // Filter out "Collection" category as it's only for backend use
+      const filteredCategories = data.filter((category: any) => 
+        category.name.toLowerCase() !== 'collection'
+      );
+      setCategoryOptions(filteredCategories);
     } catch {
       setCategoryOptions([]);
     }
@@ -299,9 +319,106 @@ export default function ScheduleShiftsPage() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setRecurringShifts(data);
+      // Calculate correct counts after fetching recurring shifts
+      calculateShiftCounts(data);
     } catch {
       setRecurringShifts([]);
     }
+  };
+
+  // Calculate correct counts for each recurring shift considering absences
+  const calculateShiftCounts = async (recurringShiftsData: any[]) => {
+    const newCounts: {[key: number]: {totalFilledSlots: number, presentDefaultUsers: number, pendingSlots: number}} = {};
+    
+    for (const rec of recurringShiftsData) {
+      try {
+        // Find TODAY'S shifts for this recurring shift
+        const todaysShifts = shifts.filter(shift => 
+          shift.recurringShiftId === rec.id && 
+          new Date(shift.startTime).toDateString() === new Date().toDateString()
+        );
+        
+        // Get total default users for this recurring shift
+        const totalDefaultUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.length : 0;
+        
+        // Count absent default users for TODAY'S shifts only
+        let absentDefaultUsers = 0;
+        
+        for (const shift of todaysShifts) {
+          try {
+            const token = localStorage.getItem("token");
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${shift.id}/absences`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+              const response = await res.json();
+              
+              // The API returns { absences: [...], defaultUsers: [...] }
+              if (response && Array.isArray(response.absences)) {
+                // Count default users who are absent for THIS SPECIFIC SHIFT ONLY
+                const absentDefaultUserIds = response.absences
+                  .filter((absence: any) => absence.isApproved)
+                  .map((absence: any) => absence.userId);
+                
+                const defaultUserIds = rec.DefaultShiftUser ? rec.DefaultShiftUser.map((du: any) => du.userId) : [];
+                const shiftAbsentDefaultUsers = absentDefaultUserIds.filter((id: any) => defaultUserIds.includes(id)).length;
+                absentDefaultUsers += shiftAbsentDefaultUsers;
+                
+                // Debug logging
+                console.log(`Recurring Shift ${rec.id}, Shift ${shift.id} (${new Date(shift.startTime).toDateString()}):`, {
+                  shiftAbsentDefaultUsers,
+                  absentDefaultUserIds,
+                  defaultUserIds,
+                  totalAbsentDefaultUsers: absentDefaultUsers
+                });
+              } else {
+                console.warn(`Invalid absences response for shift ${shift.id}:`, response);
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching absences for shift ${shift.id}:`, err);
+          }
+        }
+        
+        // Calculate present default users for today
+        const presentDefaultUsers = totalDefaultUsers - absentDefaultUsers;
+        
+        // Calculate today's signups
+        const todaysSignups = todaysShifts.reduce((sum, shift) => sum + (shift.ShiftSignup ? shift.ShiftSignup.length : 0), 0);
+        
+        // Calculate total filled slots (today's signups + present default users)
+        const totalFilledSlots = todaysSignups + presentDefaultUsers;
+        
+        const totalSlots = rec.slots || 0;
+        const pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
+        
+        newCounts[rec.id] = {
+          totalFilledSlots,
+          presentDefaultUsers,
+          pendingSlots
+        };
+      } catch (err) {
+        console.error(`Error calculating counts for recurring shift ${rec.id}:`, err);
+        // Fallback to basic calculation
+        const todaysShifts = shifts.filter(shift => 
+          shift.recurringShiftId === rec.id && 
+          new Date(shift.startTime).toDateString() === new Date().toDateString()
+        );
+        const bookedSlots = todaysShifts.reduce((sum, shift) => sum + (shift.ShiftSignup ? shift.ShiftSignup.length : 0), 0);
+        const defaultUsersCount = rec.DefaultShiftUser ? rec.DefaultShiftUser.length : 0;
+        const totalFilledSlots = bookedSlots + defaultUsersCount;
+        const totalSlots = rec.slots || 0;
+        const pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
+        
+        newCounts[rec.id] = {
+          totalFilledSlots,
+          presentDefaultUsers: defaultUsersCount,
+          pendingSlots
+        };
+      }
+    }
+    
+    setShiftCounts(newCounts);
   };
 
   // Fetch categories and recurring shifts on page load
@@ -309,6 +426,13 @@ export default function ScheduleShiftsPage() {
     fetchCategories();
     fetchRecurringShifts();
   }, []);
+
+  // Recalculate counts when shifts change
+  useEffect(() => {
+    if (recurringShifts.length > 0) {
+      calculateShiftCounts(recurringShifts);
+    }
+  }, [shifts, recurringShifts]);
 
   // Find all recurring shifts for selected category and day
   const matchingSlots = recurringShifts.filter(
@@ -693,6 +817,31 @@ export default function ScheduleShiftsPage() {
     // Set time in Atlantic timezone
     const recStart = new Date(rec.startTime);
     nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
+    
+    console.log('🔍 SCHEDULE-SHIFTS DATE DEBUGGING:', {
+      '=== INPUT ===': {
+        rec: rec,
+        recDayOfWeek: rec.dayOfWeek,
+        recStartTime: rec.startTime
+      },
+      '=== CALCULATION ===': {
+        today: today,
+        todayDay: todayDay,
+        dayDiff: dayDiff
+      },
+      '=== RESULT ===': {
+        nextDate: nextDate,
+        nextDateString: nextDate.toDateString(),
+        nextDateISO: nextDate.toISOString(),
+        nextDateLocal: nextDate.toLocaleDateString(),
+        nextDateComponents: {
+          year: nextDate.getFullYear(),
+          month: nextDate.getMonth() + 1,
+          day: nextDate.getDate()
+        }
+      }
+    });
+    
     return nextDate;
   };
 
@@ -967,46 +1116,59 @@ export default function ScheduleShiftsPage() {
     const handleManageEmployeesClick = async () => {
       let shiftToUse = shiftForModal;
       if (!shiftToUse) {
-        // Create the shift for this occurrence
+        // Create the shift for this occurrence using the proper endpoint
         try {
           const token = localStorage.getItem("token");
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${rec.id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({
-              name: rec.name,
-              shiftCategoryId: rec.shiftCategoryId,
-              startTime: nextDate.toISOString(),
-              endTime: (() => {
-                if (rec.isRecurring) {
-                  const end = new Date(nextDate);
-                  end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
-                  return end.toISOString();
-                } else {
-                  return new Date(rec.endTime).toISOString();
-                }
-              })(),
-              location: rec.location,
-              slots: rec.slots,
-              recurringShiftId: rec.id
+              date: `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}` // Send date in YYYY-MM-DD format (local timezone)
             })
           });
-          if (!res.ok) throw new Error('Failed to create shift');
-          shiftToUse = await res.json();
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to create shift');
+          }
+          const result = await res.json();
+          shiftToUse = result.shift; // The endpoint returns { shift, assignedUsers, absentUsers }
+          
           // Optionally, refresh shifts list
           await fetchShifts();
-        } catch (err) {
-          toast.error('Failed to create shift for this occurrence');
+          
+          // Show success message with assignment details
+          if (result.assignedUsers && result.assignedUsers.length > 0) {
+            toast.success(`Shift created! ${result.assignedUsers.length} default user(s) auto-assigned.`);
+          } else {
+            toast.success('Shift created successfully!');
+          }
+        } catch (err: any) {
+          toast.error(`Failed to create shift for this occurrence: ${err.message || 'Unknown error'}`);
           return;
         }
       }
       openManageModal(shiftToUse);
     };
 
-    // Sum all signups for these shifts
-    const bookedSlots = matchingShifts.reduce((sum, shift) => sum + (shift.ShiftSignup ? shift.ShiftSignup.length : 0), 0);
+    // Use correct counts from state (considering absences) or fallback to basic calculation
+    const correctCounts = shiftCounts[rec.id];
     const totalSlots = rec.slots || 0;
-    const pendingSlots = Math.max(0, totalSlots - bookedSlots);
+    
+    let totalFilledSlots, presentDefaultUsers, pendingSlots;
+    
+    if (correctCounts) {
+      // Use the correct counts that consider absences
+      totalFilledSlots = correctCounts.totalFilledSlots;
+      presentDefaultUsers = correctCounts.presentDefaultUsers;
+      pendingSlots = correctCounts.pendingSlots;
+    } else {
+      // Fallback to basic calculation
+      const bookedSlots = matchingShifts.reduce((sum, shift) => sum + (shift.ShiftSignup ? shift.ShiftSignup.length : 0), 0);
+      const defaultUsersCount = rec.DefaultShiftUser ? rec.DefaultShiftUser.length : 0;
+      totalFilledSlots = bookedSlots + defaultUsersCount;
+      presentDefaultUsers = defaultUsersCount;
+      pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
+    }
 
     return (
       <div key={rec.id} style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: '20px 24px', marginBottom: 12, border: '1px solid #f0f0f0', position: 'relative', transition: 'box-shadow 0.2s' }}>
@@ -1033,7 +1195,12 @@ export default function ScheduleShiftsPage() {
               {pendingSlots > 0 ? `${pendingSlots} spots available` : 'Fully booked'}
             </div>
             <div style={{ color: '#888', fontSize: 11 }}>
-              {bookedSlots}/{totalSlots} filled
+              {totalFilledSlots}/{totalSlots} filled
+              {presentDefaultUsers > 0 && (
+                <span style={{ color: '#ff9800', marginLeft: 4 }}>
+                  ({presentDefaultUsers} default)
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1650,17 +1817,57 @@ export default function ScheduleShiftsPage() {
     setUnscheduledSearchTerm('');
     try {
       const token = localStorage.getItem("token");
+      
+      // Fetch shift employees
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-employees?shiftId=${shift.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch shift employees");
       const data = await res.json();
       setManageModalData(data);
+
+      // Fetch default users and absences if this is a recurring shift
+      if (shift.recurringShiftId) {
+        await fetchDefaultUsersAndAbsences(shift);
+      }
     } catch (err) {
       setManageModalData(null);
       toast.error("Failed to load shift employees");
     } finally {
       setManageModalLoading(false);
+    }
+  };
+
+  const fetchDefaultUsersAndAbsences = async (shift: any) => {
+    setLoadingDefaultUsers(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Fetch default users for the recurring shift
+      const defaultUsersRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shift.recurringShiftId}/default-users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Fetch absences for this specific shift
+      const absencesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${shift.id}/absences`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (defaultUsersRes.ok) {
+        const defaultUsersData = await defaultUsersRes.json();
+        setDefaultUsers(defaultUsersData.defaultUsers || []);
+      }
+
+      if (absencesRes.ok) {
+        const absencesData = await absencesRes.json();
+        setShiftAbsences(absencesData.absences || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch default users and absences:', err);
+      setDefaultUsers([]);
+      setShiftAbsences([]);
+    } finally {
+      setLoadingDefaultUsers(false);
     }
   };
 
@@ -1694,6 +1901,138 @@ export default function ScheduleShiftsPage() {
       await openManageModal(manageModalShift); // Refresh modal data
     } catch (err) {
       toast.error("Failed to remove employee");
+    }
+  };
+
+  // Handle absence request
+  const handleRequestAbsence = async () => {
+    if (!selectedUserForAbsence || !manageModalShift) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: selectedUserForAbsence.userId,
+          absenceType,
+          reason: absenceReason,
+          isApproved: true
+        })
+      });
+
+      if (!res.ok) throw new Error("Failed to request absence");
+      
+      toast.success("Absence marked successfully");
+      setShowAbsenceModal(false);
+      setSelectedUserForAbsence(null);
+      setAbsenceReason('');
+      setAbsenceType('UNAVAILABLE');
+      
+      // Refresh data
+      await fetchDefaultUsersAndAbsences(manageModalShift);
+    } catch (err) {
+      toast.error("Failed to request absence");
+    }
+  };
+
+  // Handle user selection for absence
+  const handleUserSelection = (userId: number) => {
+    setSelectedUsersForAbsence(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  // Handle making multiple users absent
+  const handleMakeAbsence = async () => {
+    if (selectedUsersForAbsence.length === 0 || !manageModalShift) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Create absences for all selected users
+      const promises = selectedUsersForAbsence.map(userId => 
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            userId,
+            absenceType,
+            reason: absenceReason || 'No reason provided',
+            isApproved: true
+          })
+        })
+      );
+      
+      await Promise.all(promises);
+      
+      setSelectedUsersForAbsence([]);
+      setAbsenceReason('');
+      
+      // Refresh default users and absences
+      await fetchDefaultUsersAndAbsences(manageModalShift);
+      
+      toast.success(`Marked ${selectedUsersForAbsence.length} user(s) as absent`);
+    } catch (err) {
+      toast.error('Failed to mark users as absent');
+    }
+  };
+
+  // Handle removing absence (making user present)
+  const handleRemoveAbsence = async (absenceId: number) => {
+    if (!manageModalShift) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences/${absenceId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error("Failed to remove absence");
+      
+      // Refresh default users and absences
+      await fetchDefaultUsersAndAbsences(manageModalShift);
+      
+      toast.success('User marked as present');
+    } catch (err) {
+      toast.error('Failed to remove absence');
+    }
+  };
+
+  // Handle absence approval/rejection
+  const handleAbsenceAction = async (absenceId: number, isApproved: boolean) => {
+    if (!manageModalShift) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences/${absenceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          isApproved
+        })
+      });
+
+      if (!res.ok) throw new Error(`Failed to ${isApproved ? 'approve' : 'reject'} absence`);
+      
+      toast.success(`Absence ${isApproved ? 'approved' : 'rejected'} successfully`);
+      
+      // Refresh data
+      await fetchDefaultUsersAndAbsences(manageModalShift);
+    } catch (err) {
+      toast.error(`Failed to ${isApproved ? 'approve' : 'reject'} absence`);
     }
   };
 
@@ -1741,12 +2080,85 @@ export default function ScheduleShiftsPage() {
           position: 'relative'
         }}>
           <button onClick={handleCloseModal} style={{ position: 'absolute', top: 18, right: 24, background: 'none', border: 'none', fontSize: 28, color: '#888', cursor: 'pointer' }}>×</button>
+          
+          {/* Refresh Button */}
+          <button 
+            onClick={async () => {
+              setManageModalLoading(true);
+              try {
+                await openManageModal(manageModalShift);
+                toast.success('Data refreshed successfully');
+              } catch (err) {
+                toast.error('Failed to refresh data');
+              } finally {
+                setManageModalLoading(false);
+              }
+            }}
+            disabled={manageModalLoading}
+            style={{ 
+              position: 'absolute', 
+              top: 18, 
+              right: 60, 
+              background: '#4caf50',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 12px',
+              fontSize: 14,
+              color: '#fff',
+              cursor: manageModalLoading ? 'not-allowed' : 'pointer',
+              opacity: manageModalLoading ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            title="Refresh data to see latest changes"
+          >
+            {manageModalLoading ? '⟳' : '↻'} Refresh
+          </button>
+          
           <h2 style={{ fontSize: 26, fontWeight: 700, marginBottom: 18 }}>Manage Employees for {manageModalShift.name}</h2>
+          
+          {/* Default Users Management Section - Only show for recurring shifts */}
+          {manageModalShift.recurringShiftId && (
+            <div style={{ marginBottom: 24, padding: 20, border: '1px solid #e0e0e0', borderRadius: 10, backgroundColor: '#f8f9fa' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: '#333', marginBottom: 4 }}>
+                    Manage Default Users Absences
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666' }}>
+                    Mark default users as absent for this specific occurrence
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAbsenceModal(true)}
+                  style={{
+                    background: '#ff9800',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '8px 16px',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Manage Absences
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div style={{ display: 'flex', gap: 32 }}>
             {/* Scheduled Employees */}
             <div style={{ flex: 1, minWidth: 200, background: '#f8f8f8', borderRadius: 10, padding: 18 }}>
               <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 10 }}>
                 Scheduled ({manageModalData?.booked ?? 0}/{manageModalData?.slots ?? 0})
+                {manageModalData?.defaultUsers && manageModalData.defaultUsers > 0 && (
+                  <span style={{ fontSize: 12, color: '#666', fontWeight: 400, marginLeft: 8 }}>
+                    ({manageModalData.defaultUsers} default)
+                  </span>
+                )}
                 {scheduledSearchTerm && (
                   <span style={{ fontSize: 14, color: '#666', fontWeight: 400, marginLeft: 8 }}>
                     ({filteredScheduled.length} found)
@@ -1809,8 +2221,26 @@ export default function ScheduleShiftsPage() {
                   ) : (
                     filteredScheduled.map(emp => (
                       <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-                        <span style={{ fontSize: 16 }}>{emp.name}</span>
-                        <button onClick={() => handleRemoveEmployee(emp.signupId)} style={{ background: '#fff', color: '#e53935', border: '1px solid #e53935', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>Remove</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 16 }}>{emp.name}</span>
+                          {emp.isDefault && (
+                            <span style={{ 
+                              fontSize: 10, 
+                              background: '#ff9800', 
+                              color: 'white', 
+                              padding: '2px 6px', 
+                              borderRadius: 4, 
+                              fontWeight: 600 
+                            }}>
+                              DEFAULT
+                            </span>
+                          )}
+                        </div>
+                        {emp.signupId ? (
+                          <button onClick={() => handleRemoveEmployee(emp.signupId)} style={{ background: '#fff', color: '#e53935', border: '1px solid #e53935', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>Remove</button>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#666', fontStyle: 'italic' }}>Default User</span>
+                        )}
                       </div>
                     ))
                   )}
@@ -1886,8 +2316,8 @@ export default function ScheduleShiftsPage() {
                         <span style={{ fontSize: 16 }}>{emp.name}</span>
                         <button
                           onClick={() => handleAddEmployee(emp.id)}
-                          disabled={!!manageModalData && manageModalData.booked >= manageModalData.slots}
-                          style={{ background: '#fff', color: '#43a047', border: '1px solid #43a047', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: (!!manageModalData && manageModalData.booked >= manageModalData.slots) ? 'not-allowed' : 'pointer', fontSize: 15, opacity: (!!manageModalData && manageModalData.booked >= manageModalData.slots) ? 0.5 : 1 }}
+                          disabled={!!manageModalData && (manageModalData.booked >= manageModalData.slots || (manageModalData.availableSlots ?? 0) <= 0)}
+                          style={{ background: '#fff', color: '#43a047', border: '1px solid #43a047', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: (!!manageModalData && (manageModalData.booked >= manageModalData.slots || (manageModalData.availableSlots ?? 0) <= 0)) ? 'not-allowed' : 'pointer', fontSize: 15, opacity: (!!manageModalData && (manageModalData.booked >= manageModalData.slots || (manageModalData.availableSlots ?? 0) <= 0)) ? 0.5 : 1 }}
                         >
                           Add
                         </button>
@@ -2317,6 +2747,253 @@ export default function ScheduleShiftsPage() {
 
       {renderEmployeePopup()}
       {renderManageModal()}
+      
+      {/* Improved Absence Modal */}
+      {showAbsenceModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.15)',
+          zIndex: 4000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 10,
+            padding: 32,
+            minWidth: 600,
+            maxWidth: '90vw',
+            boxShadow: '0 2px 16px #ddd',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => {
+                setShowAbsenceModal(false);
+                setSelectedUsersForAbsence([]);
+                setUserSearchTerm('');
+                setAbsenceReason('');
+                setAbsenceType('UNAVAILABLE');
+              }} 
+              style={{ 
+                position: 'absolute', 
+                top: 12, 
+                right: 12, 
+                background: 'none', 
+                border: 'none', 
+                fontSize: 20, 
+                color: '#888', 
+                cursor: 'pointer' 
+              }}
+            >
+              ×
+            </button>
+            
+            <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>
+              Manage Absences
+            </div>
+            
+            <div style={{ marginBottom: 16, padding: 12, background: '#f8f9fa', borderRadius: 6, border: '1px solid #e0e0e0' }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
+                {manageModalShift.name}
+              </div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                Mark default users as absent for this specific occurrence
+              </div>
+            </div>
+
+            {loadingDefaultUsers ? (
+              <div style={{ textAlign: 'center', color: '#666', padding: 20 }}>Loading absence data...</div>
+            ) : (
+              <div>
+                {/* User Search and Selection */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12, color: '#333' }}>
+                    Select Users for Absence
+                  </div>
+                  
+                  {/* Search Bar */}
+                  <div style={{ marginBottom: 16 }}>
+                    <input
+                      type="text"
+                      placeholder="Search users by name or email..."
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        fontSize: 14,
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                  
+                  {/* User List with Checkboxes */}
+                  {defaultUsers.length === 0 ? (
+                    <div style={{ color: '#666', fontSize: 14, textAlign: 'center', padding: 20, background: '#f8f9fa', borderRadius: 6 }}>
+                      No default users assigned to this shift
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      maxHeight: 200, 
+                      overflowY: 'auto', 
+                      border: '1px solid #e0e0e0', 
+                      borderRadius: 6,
+                      background: '#fff'
+                    }}>
+                      {defaultUsers
+                        .filter((defaultUser: any) => {
+                          if (!userSearchTerm) return true;
+                          const searchLower = userSearchTerm.toLowerCase();
+                          const fullName = `${defaultUser.user.firstName} ${defaultUser.user.lastName}`.toLowerCase();
+                          const email = defaultUser.user.email?.toLowerCase() || '';
+                          return fullName.includes(searchLower) || email.includes(searchLower);
+                        })
+                        .map((defaultUser: any) => {
+                          const isAbsent = shiftAbsences.some((absence: any) => 
+                            absence.userId === defaultUser.userId && absence.isApproved
+                          );
+                          const isSelected = selectedUsersForAbsence.includes(defaultUser.userId);
+                          
+                          return (
+                            <div key={defaultUser.userId} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: 12,
+                              borderBottom: '1px solid #f0f0f0',
+                              background: isSelected ? '#e3f2fd' : 'transparent',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => handleUserSelection(defaultUser.userId)}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleUserSelection(defaultUser.userId);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ marginRight: 12 }}
+                              />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                                  {defaultUser.user.firstName} {defaultUser.user.lastName}
+                                </div>
+                                {isAbsent && (
+                                  <div style={{ fontSize: 12, color: '#d32f2f', marginTop: 2 }}>
+                                    Currently absent
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Absence Details */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12, color: '#333' }}>
+                    Absence Details
+                  </div>
+                  
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 500 }}>
+                      Absence Type
+                    </label>
+                    <select
+                      value={absenceType}
+                      onChange={(e) => setAbsenceType(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        fontSize: 14,
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="UNAVAILABLE">Unavailable</option>
+                      <option value="SICK">Sick</option>
+                      <option value="PERSONAL">Personal</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 500 }}>
+                      Reason (Optional)
+                    </label>
+                    <textarea
+                      value={absenceReason}
+                      onChange={(e) => setAbsenceReason(e.target.value)}
+                      placeholder="Enter reason for absence..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        fontSize: 14,
+                        minHeight: 80,
+                        resize: 'vertical',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowAbsenceModal(false);
+                      setSelectedUsersForAbsence([]);
+                      setUserSearchTerm('');
+                      setAbsenceReason('');
+                      setAbsenceType('UNAVAILABLE');
+                    }}
+                    style={{
+                      background: '#f5f5f5',
+                      color: '#666',
+                      border: '1px solid #ddd',
+                      borderRadius: 6,
+                      padding: '10px 20px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontWeight: 500
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleMakeAbsence}
+                    disabled={selectedUsersForAbsence.length === 0}
+                    style={{
+                      background: selectedUsersForAbsence.length === 0 ? '#ccc' : '#ff9800',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 20px',
+                      cursor: selectedUsersForAbsence.length === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    Make Absence ({selectedUsersForAbsence.length})
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 } 

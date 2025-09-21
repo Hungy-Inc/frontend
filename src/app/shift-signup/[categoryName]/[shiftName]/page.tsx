@@ -24,6 +24,8 @@ interface ShiftDetails {
   organizationId: number;
   organizationName: string;
   signedUpCount: number;
+  defaultUsersCount?: number;
+  totalFilledSlots?: number;
   registrationFields?: {
     requireFirstName: boolean;
     requireLastName: boolean;
@@ -542,6 +544,11 @@ export default function ShiftSignupPage() {
                     <p className="font-medium">Available Spots</p>
                     <p className="text-sm">
                       {shift.availableSlots} of {shift.slots} spots remaining
+                      {shift.defaultUsersCount && shift.defaultUsersCount > 0 && (
+                        <span className="text-orange-600 ml-2">
+                          ({shift.defaultUsersCount} default users assigned)
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>

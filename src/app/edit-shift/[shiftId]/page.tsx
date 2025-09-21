@@ -326,6 +326,14 @@ export default function EditShiftPage() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Default Users state
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedDefaultUsers, setSelectedDefaultUsers] = useState<number[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [defaultUsersError, setDefaultUsersError] = useState("");
+  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [savingDefaultUsers, setSavingDefaultUsers] = useState(false);
+
   // Form state for shift details
   const [shiftForm, setShiftForm] = useState({
     name: '',
@@ -342,6 +350,7 @@ export default function EditShiftPage() {
     if (shiftId) {
       fetchShiftDetails();
       fetchCategories();
+      fetchAvailableUsers();
     }
   }, [shiftId]);
 
@@ -384,6 +393,9 @@ export default function EditShiftPage() {
       const fieldsData = await fieldsRes.json();
       setRegistrationFields(fieldsData);
 
+      // Fetch default users for this shift
+      fetchDefaultUsersForShift(shiftId);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load shift details");
       toast.error("Failed to load shift details");
@@ -400,9 +412,91 @@ export default function EditShiftPage() {
       });
       if (!res.ok) throw new Error("Failed to fetch categories");
       const data = await res.json();
-      setCategories(data);
+      // Filter out "Collection" category as it's only for backend use
+      const filteredCategories = data.filter((category: any) => 
+        category.name.toLowerCase() !== 'collection'
+      );
+      setCategories(filteredCategories);
     } catch (err) {
       console.error('Error fetching categories:', err);
+    }
+  };
+
+  const fetchAvailableUsers = async () => {
+    setLoadingUsers(true);
+    setDefaultUsersError('');
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch users');
+      const data = await res.json();
+      // Filter only approved users
+      const approvedUsers = data.filter((user: any) => user.status === 'APPROVED');
+      setAvailableUsers(approvedUsers);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setDefaultUsersError('Failed to load users');
+      setAvailableUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const fetchDefaultUsersForShift = async (shiftId: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/default-users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Fetched default users:', data); // Debug log
+        setSelectedDefaultUsers(data.defaultUsers.map((du: any) => du.userId));
+      } else {
+        console.error('Failed to fetch default users:', res.status, res.statusText);
+        setSelectedDefaultUsers([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch default users:', err);
+      setSelectedDefaultUsers([]);
+    }
+  };
+
+  const handleSaveDefaultUsers = async () => {
+    setSavingDefaultUsers(true);
+    setDefaultUsersError('');
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/default-users`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userIds: selectedDefaultUsers
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to save default users');
+      }
+
+      const data = await res.json();
+      console.log('Saved default users:', data); // Debug log
+      toast.success('Default users saved successfully!');
+      
+      // Refresh the default users to confirm they're saved
+      await fetchDefaultUsersForShift(shiftId);
+    } catch (err) {
+      console.error('Error saving default users:', err);
+      setDefaultUsersError(err instanceof Error ? err.message : 'Failed to save default users');
+      toast.error(err instanceof Error ? err.message : 'Failed to save default users');
+    } finally {
+      setSavingDefaultUsers(false);
     }
   };
 
@@ -450,6 +544,8 @@ export default function EditShiftPage() {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to update shift');
       }
+
+      // Note: Default users are saved separately using the "Save Default Users" button
 
       toast.success('Shift details updated successfully!');
       await fetchShiftDetails(); // Refresh data
@@ -706,11 +802,134 @@ export default function EditShiftPage() {
             </div>
           </div>
 
-          {/* Section B: Registration Fields */}
+          {/* Section B: Default Users */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
+                Section B
+              </span>
+              Default Users Assignment
+            </h2>
+            
+            <div className="mb-4">
+              <div className="text-sm text-gray-600 mb-2">
+                Select users to automatically assign to this shift:
+              </div>
+              <div className="text-xs text-gray-500 mb-4">
+                Debug: Available users: {availableUsers.length}, Selected: {selectedDefaultUsers.length}, Selected IDs: {JSON.stringify(selectedDefaultUsers)}
+              </div>
+              
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search users by name or email..."
+                    value={userSearchTerm}
+                    onChange={(e) => setUserSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {defaultUsersError && (
+              <div className="text-red-600 text-sm mb-4">{defaultUsersError}</div>
+            )}
+            
+            {loadingUsers ? (
+              <div className="text-gray-600 text-sm">Loading users...</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-4">
+                  {(() => {
+                    // Filter users based on search term
+                    const filteredUsers = availableUsers.filter(user => 
+                      user.firstName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                      user.lastName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                      user.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+                    );
+                    
+                    return filteredUsers.length === 0 ? (
+                      <div className="text-gray-600 text-sm text-center py-8">
+                        {userSearchTerm ? 'No users found matching your search' : 'No approved users available'}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredUsers.map((user: any) => (
+                          <label key={user.id} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedDefaultUsers.includes(user.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  if (selectedDefaultUsers.length >= shiftForm.slots) {
+                                    toast.error(`Cannot select more than ${shiftForm.slots} users (shift slots limit)`);
+                                    return;
+                                  }
+                                  setSelectedDefaultUsers(prev => [...prev, user.id]);
+                                } else {
+                                  setSelectedDefaultUsers(prev => prev.filter(id => id !== user.id));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                            />
+                            <span className="text-sm">
+                              {user.firstName} {user.lastName} ({user.email})
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+                
+                <div className="text-sm text-gray-600">
+                  Selected: {selectedDefaultUsers.length} / {shiftForm.slots} slots
+                </div>
+                
+                {selectedDefaultUsers.length === 0 && (
+                  <div className="text-sm text-orange-600 font-semibold p-3 bg-yellow-100 rounded-lg text-center">
+                    ⚠️ No default users assigned to this shift
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Save Button for Default Users */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={handleSaveDefaultUsers}
+                disabled={savingDefaultUsers}
+                className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {savingDefaultUsers ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving Default Users...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Save Default Users
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Section C: Registration Fields */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
               <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
-                Section B
+                Section C
               </span>
               Registration Fields Configuration
             </h2>

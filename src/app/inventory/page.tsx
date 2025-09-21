@@ -53,9 +53,9 @@ function getYearOptions() {
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'categories' | 'donors'>('inventory');
-  const [donors, setDonors] = useState<string[]>([]);
+  const [donationLocations, setDonationLocations] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [tableData, setTableData] = useState<{ [donor: string]: { [cat: string]: number } }>({});
+  const [tableData, setTableData] = useState<{ [donationLocation: string]: { [cat: string]: number } }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(0);
@@ -173,11 +173,11 @@ export default function InventoryPage() {
         });
         if (!res.ok) throw new Error('Failed to fetch inventory table');
         const data = await res.json();
-        setDonors(data.donors);
+        setDonationLocations(data.donors);
         setCategories(data.categories);
         setTableData(data.table);
       } catch (err) {
-        setDonors([]);
+        setDonationLocations([]);
         setCategories([]);
         setTableData({});
         setError('Failed to load inventory data.');
@@ -540,7 +540,7 @@ export default function InventoryPage() {
             <div style={{ padding: 32, textAlign: 'center' }}>Loading...</div>
           ) : error ? (
             <div style={{ padding: 32, textAlign: 'center', color: 'red' }}>{error}</div>
-          ) : donors.length === 0 || categories.length === 0 ? (
+          ) : donationLocations.length === 0 || categories.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center' }}>No inventory data found.</div>
           ) : (
             <table className={styles.table}>
@@ -554,14 +554,14 @@ export default function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {donors.map((donor: string) => (
-                  <tr key={donor}>
-                    <td>{donor}</td>
+                {donationLocations.map((donationLocation: string) => (
+                  <tr key={donationLocation}>
+                    <td>{donationLocation}</td>
                     {categories.map((cat: string) => (
-                      <td key={cat}>{formatWeight(tableData[donor][cat]).toFixed(2)}</td>
+                      <td key={cat}>{formatWeight(tableData[donationLocation][cat]).toFixed(2)}</td>
                     ))}
                     <td className={styles.totalCol}>
-                      {formatWeight(Object.values(tableData[donor]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
+                      {formatWeight(Object.values(tableData[donationLocation]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -569,11 +569,11 @@ export default function InventoryPage() {
                   <td>Total</td>
                   {categories.map((cat: string) => (
                     <td key={cat}>
-                      {formatWeight(donors.reduce((sum, donor) => sum + tableData[donor][cat], 0)).toFixed(2)}
+                      {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + tableData[donationLocation][cat], 0)).toFixed(2)}
                     </td>
                   ))}
                   <td className={styles.totalCol}>
-                    {formatWeight(donors.reduce((sum, donor) => sum + Object.values(tableData[donor]).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
+                    {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + Object.values(tableData[donationLocation]).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
                   </td>
                 </tr>
               </tbody>
@@ -972,7 +972,7 @@ export default function InventoryPage() {
                   borderRadius: '4px',
                   fontSize: '14px'
                 }}
-                placeholder="Enter donor name"
+                placeholder="Enter donation location name"
               />
             </div>
             <div style={{ marginBottom: '16px' }}>
@@ -1084,7 +1084,7 @@ export default function InventoryPage() {
                   borderRadius: '4px',
                   fontSize: '14px'
                 }}
-                placeholder="Enter donor name"
+                placeholder="Enter donation location name"
               />
             </div>
             <div style={{ marginBottom: '16px' }}>
@@ -1126,8 +1126,8 @@ export default function InventoryPage() {
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
-                  setShowEditDonorModal(false);
-                  setEditingDonor(null);
+                  setShowEditDonationLocationModal(false);
+                  setEditingDonationLocation(null);
                   setDonationLocationFormData({ name: '', location: '', contactInfo: '' });
                 }}
                 style={{

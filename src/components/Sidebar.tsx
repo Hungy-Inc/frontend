@@ -1,7 +1,7 @@
 'use client';
 
 import styles from './Sidebar.module.css';
-import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils } from 'react-icons/fa';
+import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers } from 'react-icons/fa';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -13,6 +13,7 @@ const menu = [
   { icon: <FaChartBar />, label: 'Incoming Stats', href: '/incoming-stats' },
   { icon: <FaExchangeAlt />, label: 'Outgoing Stats', href: '/outgoing-stats' },
   { icon: <FaBoxOpen />, label: 'Inventory', href: '/inventory' },
+  { icon: <FaUsers />, label: 'Donor Data', href: '/donor-data' },
   { icon: <FaUserFriends />, label: 'Manage Users', href: '/manage-users' },
   { icon: <FaClock />, label: 'Manage Shifts', href: '/manage-shifts' },
   { icon: <FaCalendarAlt />, label: 'Schedule Shifts', href: '/schedule-shifts' },

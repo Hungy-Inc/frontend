@@ -9,7 +9,7 @@ type DonationCategory = {
   icon: string | null;
 };
 
-type Donor = {
+type DonationLocation = {
   id: number;
   name: string;
   location: string | null;
@@ -71,13 +71,13 @@ export default function InventoryPage() {
   const [editingCategory, setEditingCategory] = useState<DonationCategory | null>(null);
   const [formData, setFormData] = useState({ name: '', icon: '' });
 
-  // Donors state
-  const [donorsList, setDonorsList] = useState<Donor[]>([]);
-  const [donorsLoading, setDonorsLoading] = useState(false);
-  const [showAddDonorModal, setShowAddDonorModal] = useState(false);
-  const [showEditDonorModal, setShowEditDonorModal] = useState(false);
-  const [editingDonor, setEditingDonor] = useState<Donor | null>(null);
-  const [donorFormData, setDonorFormData] = useState({ name: '', location: '', contactInfo: '' });
+  // Donation Locations state
+  const [donationLocationsList, setDonationLocationsList] = useState<DonationLocation[]>([]);
+  const [donationLocationsLoading, setDonationLocationsLoading] = useState(false);
+  const [showAddDonationLocationModal, setShowAddDonationLocationModal] = useState(false);
+  const [showEditDonationLocationModal, setShowEditDonationLocationModal] = useState(false);
+  const [editingDonationLocation, setEditingDonationLocation] = useState<DonationLocation | null>(null);
+  const [donationLocationFormData, setDonationLocationFormData] = useState({ name: '', location: '', contactInfo: '' });
 
   // Fetch weighing categories
   useEffect(() => {
@@ -127,10 +127,10 @@ export default function InventoryPage() {
     }
   };
 
-  // Fetch donors
-  const fetchDonors = async () => {
+  // Fetch donation locations
+  const fetchDonationLocations = async () => {
     try {
-      setDonorsLoading(true);
+      setDonationLocationsLoading(true);
       const token = localStorage.getItem('token');
       if (!token) return;
       
@@ -140,15 +140,15 @@ export default function InventoryPage() {
       
       if (response.ok) {
         const data = await response.json();
-        setDonorsList(data || []);
+        setDonationLocationsList(data || []);
       } else {
-        toast.error('Failed to fetch donors');
+        toast.error('Failed to fetch donation locations');
       }
     } catch (err) {
-      console.error('Error fetching donors:', err);
-      toast.error('Failed to fetch donors');
+      console.error('Error fetching donation locations:', err);
+      toast.error('Failed to fetch donation locations');
     } finally {
-      setDonorsLoading(false);
+      setDonationLocationsLoading(false);
     }
   };
 
@@ -156,7 +156,7 @@ export default function InventoryPage() {
     if (activeTab === 'categories') {
       fetchDonationCategories();
     } else if (activeTab === 'donors') {
-      fetchDonors();
+      fetchDonationLocations();
     }
   }, [activeTab]);
 
@@ -354,8 +354,8 @@ export default function InventoryPage() {
     setShowEditModal(true);
   };
 
-  // Donor CRUD functions
-  const handleAddDonor = async () => {
+  // Donation Location CRUD functions
+  const handleAddDonationLocation = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -369,27 +369,27 @@ export default function InventoryPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(donorFormData)
+        body: JSON.stringify(donationLocationFormData)
       });
 
       if (response.ok) {
-        const newDonor = await response.json();
-        setDonorsList(prev => [...prev, newDonor]);
-        setDonorFormData({ name: '', location: '', contactInfo: '' });
-        setShowAddDonorModal(false);
-        toast.success('Donor added successfully!');
+        const newDonationLocation = await response.json();
+        setDonationLocationsList(prev => [...prev, newDonationLocation]);
+        setDonationLocationFormData({ name: '', location: '', contactInfo: '' });
+        setShowAddDonationLocationModal(false);
+        toast.success('Donation location added successfully!');
       } else {
         const error = await response.json();
-        toast.error(error.error || 'Failed to add donor');
+        toast.error(error.error || 'Failed to add donation location');
       }
     } catch (err) {
-      console.error('Error adding donor:', err);
-      toast.error('Failed to add donor');
+      console.error('Error adding donation location:', err);
+      toast.error('Failed to add donation location');
     }
   };
 
-  const handleEditDonor = async () => {
-    if (!editingDonor) return;
+  const handleEditDonationLocation = async () => {
+    if (!editingDonationLocation) return;
     
     try {
       const token = localStorage.getItem('token');
@@ -398,36 +398,36 @@ export default function InventoryPage() {
         return;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donors/${editingDonor.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donors/${editingDonationLocation.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(donorFormData)
+        body: JSON.stringify(donationLocationFormData)
       });
 
       if (response.ok) {
-        const updatedDonor = await response.json();
-        setDonorsList(prev => 
-          prev.map(donor => donor.id === editingDonor.id ? updatedDonor : donor)
+        const updatedDonationLocation = await response.json();
+        setDonationLocationsList(prev => 
+          prev.map(donationLocation => donationLocation.id === editingDonationLocation.id ? updatedDonationLocation : donationLocation)
         );
-        setDonorFormData({ name: '', location: '', contactInfo: '' });
-        setShowEditDonorModal(false);
-        setEditingDonor(null);
-        toast.success('Donor updated successfully!');
+        setDonationLocationFormData({ name: '', location: '', contactInfo: '' });
+        setShowEditDonationLocationModal(false);
+        setEditingDonationLocation(null);
+        toast.success('Donation location updated successfully!');
       } else {
         const error = await response.json();
-        toast.error(error.error || 'Failed to update donor');
+        toast.error(error.error || 'Failed to update donation location');
       }
     } catch (err) {
-      console.error('Error updating donor:', err);
-      toast.error('Failed to update donor');
+      console.error('Error updating donation location:', err);
+      toast.error('Failed to update donation location');
     }
   };
 
-  const handleDeleteDonor = async (donorId: number) => {
-    if (!confirm('Are you sure you want to delete this donor?')) return;
+  const handleDeleteDonationLocation = async (donationLocationId: number) => {
+    if (!confirm('Are you sure you want to delete this donation location?')) return;
     
     try {
       const token = localStorage.getItem('token');
@@ -436,7 +436,7 @@ export default function InventoryPage() {
         return;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donors/${donorId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donors/${donationLocationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -444,26 +444,26 @@ export default function InventoryPage() {
       });
 
       if (response.ok) {
-        setDonorsList(prev => prev.filter(donor => donor.id !== donorId));
-        toast.success('Donor deleted successfully!');
+        setDonationLocationsList(prev => prev.filter(donationLocation => donationLocation.id !== donationLocationId));
+        toast.success('Donation location deleted successfully!');
       } else {
         const error = await response.json();
-        toast.error(error.error || 'Failed to delete donor');
+        toast.error(error.error || 'Failed to delete donation location');
       }
     } catch (err) {
-      console.error('Error deleting donor:', err);
-      toast.error('Failed to delete donor');
+      console.error('Error deleting donation location:', err);
+      toast.error('Failed to delete donation location');
     }
   };
 
-  const openEditDonorModal = (donor: Donor) => {
-    setEditingDonor(donor);
-    setDonorFormData({ 
-      name: donor.name, 
-      location: donor.location || '', 
-      contactInfo: donor.contactInfo || '' 
+  const openEditDonationLocationModal = (donationLocation: DonationLocation) => {
+    setEditingDonationLocation(donationLocation);
+    setDonationLocationFormData({ 
+      name: donationLocation.name, 
+      location: donationLocation.location || '', 
+      contactInfo: donationLocation.contactInfo || '' 
     });
-    setShowEditDonorModal(true);
+    setShowEditDonationLocationModal(true);
   };
 
   return (
@@ -486,7 +486,7 @@ export default function InventoryPage() {
           className={`${styles.tabButton} ${activeTab === 'donors' ? styles.activeTab : ''}`}
           onClick={() => setActiveTab('donors')}
         >
-          Donors
+          Donation Locations
         </button>
       </div>
 
@@ -494,7 +494,7 @@ export default function InventoryPage() {
       {activeTab === 'inventory' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-            <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Current Inventory by Donor and Category</div>
+            <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Current Inventory by Donation Location and Category</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <select
                 className={styles.select}
@@ -546,7 +546,7 @@ export default function InventoryPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Donor</th>
+                  <th>Donation Location</th>
                   {categories.map(cat => (
                     <th key={cat}>{cat} ({getUnitLabel()})</th>
                   ))}
@@ -664,13 +664,13 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Donors Tab */}
+      {/* Donation Locations Tab */}
       {activeTab === 'donors' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-            <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Donors</div>
+            <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Donation Locations</div>
             <button
-              onClick={() => setShowAddDonorModal(true)}
+              onClick={() => setShowAddDonationLocationModal(true)}
               style={{
                 padding: '12px 24px',
                 backgroundColor: '#10b981',
@@ -681,14 +681,14 @@ export default function InventoryPage() {
                 fontWeight: '500'
               }}
             >
-              Add Donor
+              Add Donation Location
             </button>
           </div>
 
-          {donorsLoading ? (
-            <div style={{ padding: 32, textAlign: 'center' }}>Loading donors...</div>
-          ) : donorsList.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center' }}>No donors found.</div>
+          {donationLocationsLoading ? (
+            <div style={{ padding: 32, textAlign: 'center' }}>Loading donation locations...</div>
+          ) : donationLocationsList.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center' }}>No donation locations found.</div>
           ) : (
             <div className={styles.tableWrapper}>
               <div className={styles.tableContainer}>
@@ -702,14 +702,14 @@ export default function InventoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {donorsList.map((donor) => (
-                      <tr key={donor.id}>
-                        <td>{donor.name}</td>
-                        <td>{donor.location || '-'}</td>
-                        <td>{donor.contactInfo || '-'}</td>
+                    {donationLocationsList.map((donationLocation) => (
+                      <tr key={donationLocation.id}>
+                        <td>{donationLocation.name}</td>
+                        <td>{donationLocation.location || '-'}</td>
+                        <td>{donationLocation.contactInfo || '-'}</td>
                         <td>
                           <button
-                            onClick={() => openEditDonorModal(donor)}
+                            onClick={() => openEditDonationLocationModal(donationLocation)}
                             style={{
                               padding: '6px 12px',
                               backgroundColor: '#3b82f6',
@@ -723,7 +723,7 @@ export default function InventoryPage() {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteDonor(donor.id)}
+                            onClick={() => handleDeleteDonationLocation(donationLocation.id)}
                             style={{
                               padding: '6px 12px',
                               backgroundColor: '#ef4444',
@@ -935,8 +935,8 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Add Donor Modal */}
-      {showAddDonorModal && (
+      {/* Add Donation Location Modal */}
+      {showAddDonationLocationModal && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -956,15 +956,15 @@ export default function InventoryPage() {
             width: '400px',
             maxWidth: '90vw'
           }}>
-            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Add Donor</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Add Donation Location</h3>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                Donor Name *
+                Donation Location Name *
               </label>
               <input
                 type="text"
-                value={donorFormData.name}
-                onChange={(e) => setDonorFormData(prev => ({ ...prev, name: e.target.value }))}
+                value={donationLocationFormData.name}
+                onChange={(e) => setDonationLocationFormData(prev => ({ ...prev, name: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -981,8 +981,8 @@ export default function InventoryPage() {
               </label>
               <input
                 type="text"
-                value={donorFormData.location}
-                onChange={(e) => setDonorFormData(prev => ({ ...prev, location: e.target.value }))}
+                value={donationLocationFormData.location}
+                onChange={(e) => setDonationLocationFormData(prev => ({ ...prev, location: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -999,8 +999,8 @@ export default function InventoryPage() {
               </label>
               <input
                 type="text"
-                value={donorFormData.contactInfo}
-                onChange={(e) => setDonorFormData(prev => ({ ...prev, contactInfo: e.target.value }))}
+                value={donationLocationFormData.contactInfo}
+                onChange={(e) => setDonationLocationFormData(prev => ({ ...prev, contactInfo: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1014,8 +1014,8 @@ export default function InventoryPage() {
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
-                  setShowAddDonorModal(false);
-                  setDonorFormData({ name: '', location: '', contactInfo: '' });
+                  setShowAddDonationLocationModal(false);
+                  setDonationLocationFormData({ name: '', location: '', contactInfo: '' });
                 }}
                 style={{
                   padding: '8px 16px',
@@ -1029,26 +1029,26 @@ export default function InventoryPage() {
                 Cancel
               </button>
               <button
-                onClick={handleAddDonor}
-                disabled={!donorFormData.name.trim()}
+                onClick={handleAddDonationLocation}
+                disabled={!donationLocationFormData.name.trim()}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: donorFormData.name.trim() ? '#10b981' : '#9ca3af',
+                  backgroundColor: donationLocationFormData.name.trim() ? '#10b981' : '#9ca3af',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: donorFormData.name.trim() ? 'pointer' : 'not-allowed'
+                  cursor: donationLocationFormData.name.trim() ? 'pointer' : 'not-allowed'
                 }}
               >
-                Add Donor
+                Add Donation Location
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Donor Modal */}
-      {showEditDonorModal && editingDonor && (
+      {/* Edit Donation Location Modal */}
+      {showEditDonationLocationModal && editingDonationLocation && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -1068,15 +1068,15 @@ export default function InventoryPage() {
             width: '400px',
             maxWidth: '90vw'
           }}>
-            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Edit Donor</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Edit Donation Location</h3>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                Donor Name *
+                Donation Location Name *
               </label>
               <input
                 type="text"
-                value={donorFormData.name}
-                onChange={(e) => setDonorFormData(prev => ({ ...prev, name: e.target.value }))}
+                value={donationLocationFormData.name}
+                onChange={(e) => setDonationLocationFormData(prev => ({ ...prev, name: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1093,8 +1093,8 @@ export default function InventoryPage() {
               </label>
               <input
                 type="text"
-                value={donorFormData.location}
-                onChange={(e) => setDonorFormData(prev => ({ ...prev, location: e.target.value }))}
+                value={donationLocationFormData.location}
+                onChange={(e) => setDonationLocationFormData(prev => ({ ...prev, location: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1111,8 +1111,8 @@ export default function InventoryPage() {
               </label>
               <input
                 type="text"
-                value={donorFormData.contactInfo}
-                onChange={(e) => setDonorFormData(prev => ({ ...prev, contactInfo: e.target.value }))}
+                value={donationLocationFormData.contactInfo}
+                onChange={(e) => setDonationLocationFormData(prev => ({ ...prev, contactInfo: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1128,7 +1128,7 @@ export default function InventoryPage() {
                 onClick={() => {
                   setShowEditDonorModal(false);
                   setEditingDonor(null);
-                  setDonorFormData({ name: '', location: '', contactInfo: '' });
+                  setDonationLocationFormData({ name: '', location: '', contactInfo: '' });
                 }}
                 style={{
                   padding: '8px 16px',
@@ -1142,18 +1142,18 @@ export default function InventoryPage() {
                 Cancel
               </button>
               <button
-                onClick={handleEditDonor}
-                disabled={!donorFormData.name.trim()}
+                onClick={handleEditDonationLocation}
+                disabled={!donationLocationFormData.name.trim()}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: donorFormData.name.trim() ? '#3b82f6' : '#9ca3af',
+                  backgroundColor: donationLocationFormData.name.trim() ? '#3b82f6' : '#9ca3af',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: donorFormData.name.trim() ? 'pointer' : 'not-allowed'
+                  cursor: donationLocationFormData.name.trim() ? 'pointer' : 'not-allowed'
                 }}
               >
-                Update Donor
+                Update Donation Location
               </button>
             </div>
           </div>

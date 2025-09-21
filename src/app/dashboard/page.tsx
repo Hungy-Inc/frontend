@@ -580,11 +580,11 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-                {/* Donor breakdown table */}
+                {/* Donation Location breakdown table */}
                 <table style={{ width: '100%', fontSize: 15 }}>
                 <thead>
                   <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donor</th>
+                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donation Location</th>
                       <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Weight ({getIncomingUnitLabel()})</th>
                       <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Value ($)</th>
                   </tr>

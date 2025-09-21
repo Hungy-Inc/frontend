@@ -728,7 +728,7 @@ export default function IncomingStatsPage() {
             <table className={styles.table} style={{ minWidth: '800px' }}>
               <thead>
                 <tr>
-                  <th>Donor</th>
+                  <th>Donation Location</th>
                   {categories.map(category => (
                     <th key={category.id}>{category.name} ({getUnitLabel()})</th>
                   ))}

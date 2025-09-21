@@ -636,7 +636,7 @@ export default function AddShiftPage() {
                           </div>
                           <div className="ml-4">
                             <button
-                              onClick={() => handleFieldToggle(field.key)}
+                              onClick={() => handleFieldToggle(field.key as keyof RegistrationFields)}
                               disabled={field.required}
                               className={`p-2 rounded-lg transition-colors ${
                                 field.required 

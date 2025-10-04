@@ -49,7 +49,7 @@ Timestamp: ${new Date().toISOString()}
     };
 
     // Forward the request to the backend contact endpoint
-    const response = await fetch('http://localhost:3001/api/contact', {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contact`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

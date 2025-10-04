@@ -140,13 +140,6 @@ export default function IncomingStatsPage() {
     }).split('/').reverse().join('-');
   };
 
-  // Helper function to get Halifax date for yesterday
-  const getHalifaxDateYesterday = () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return getHalifaxDate(yesterday);
-  };
-
   // Initialize with Halifax date
   useEffect(() => {
     setSelectedDate(getHalifaxDate());
@@ -624,10 +617,6 @@ export default function IncomingStatsPage() {
       setSelectedDate(getHalifaxDate());
     };
 
-    const setDateToYesterday = () => {
-      setSelectedDate(getHalifaxDateYesterday());
-    };
-
     return (
       <>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -647,16 +636,6 @@ export default function IncomingStatsPage() {
               }}
             >
               Today
-            </button>
-            <button 
-              className={styles.dateButton}
-              onClick={setDateToYesterday}
-              style={{ 
-                backgroundColor: selectedDate === getHalifaxDateYesterday() ? '#ff9800' : '#f0f0f0',
-                color: selectedDate === getHalifaxDateYesterday() ? '#fff' : '#333'
-              }}
-            >
-              Yesterday
             </button>
             <input
               type="date"

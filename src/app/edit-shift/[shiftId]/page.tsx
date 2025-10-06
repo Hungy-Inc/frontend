@@ -14,6 +14,8 @@ const convertUTCToHalifax = (utcTimeString: string): string => {
 const convertHalifaxToUTC = (halifaxTimeString: string): string => {
   try {
     // If it's already a full datetime string, parse it directly
+
+    
     if (halifaxTimeString.includes('T') && halifaxTimeString.includes('-')) {
       // It's already a datetime string, just return it as UTC
       return new Date(halifaxTimeString).toISOString();

@@ -1,7 +1,7 @@
 'use client';
 
 import styles from './Sidebar.module.css';
-import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog } from 'react-icons/fa';
+import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog, FaEnvelope } from 'react-icons/fa';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ const menu = [
   { icon: <FaCalendarAlt />, label: 'Schedule Shifts', href: '/schedule-shifts' },
   { icon: <FaUtensils />, label: 'Kitchen Details', href: '/kitchen-details' },
   { icon: <FaCog />, label: 'Field Management', href: '/field-management' },
+  { icon: <FaEnvelope />, label: 'Email Management', href: '/email-management' },
 ];
 
 export default function Sidebar() {

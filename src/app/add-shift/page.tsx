@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff } from "react-icons/fa";
+import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff, FaCog, FaTrash, FaPlus, FaCheck, FaBan } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
 interface ShiftForm {
@@ -15,32 +15,7 @@ interface ShiftForm {
   isRecurring: boolean;
 }
 
-interface RegistrationFields {
-  requireFirstName: boolean;
-  requireLastName: boolean;
-  requireEmail: boolean;
-  requireAgeBracket: boolean;
-  requireBirthdate: boolean;
-  requirePronouns: boolean;
-  requirePhone: boolean;
-  requireAddress: boolean;
-  requireCity: boolean;
-  requirePostalCode: boolean;
-  requireHomePhone: boolean;
-  requireEmergencyContactName: boolean;
-  requireEmergencyContactNumber: boolean;
-  requireCommunicationPreferences: boolean;
-  requireProfilePictureUrl: boolean;
-  requireAllergies: boolean;
-  requireMedicalConcerns: boolean;
-  requirePreferredDays: boolean;
-  requirePreferredShifts: boolean;
-  requireFrequency: boolean;
-  requirePreferredPrograms: boolean;
-  requireSkills: boolean;
-  requireAvailability: boolean;
-  requireNotes: boolean;
-}
+// Removed old RegistrationFields interface - now using dynamic fields
 
 export default function AddShiftPage() {
   const router = useRouter();
@@ -57,33 +32,11 @@ export default function AddShiftPage() {
     isRecurring: true
   });
 
-  // Registration fields state
-  const [registrationFields, setRegistrationFields] = useState<RegistrationFields>({
-    requireFirstName: true,
-    requireLastName: true,
-    requireEmail: true,
-    requireAgeBracket: false,
-    requireBirthdate: false,
-    requirePronouns: false,
-    requirePhone: false,
-    requireAddress: false,
-    requireCity: false,
-    requirePostalCode: false,
-    requireHomePhone: false,
-    requireEmergencyContactName: false,
-    requireEmergencyContactNumber: false,
-    requireCommunicationPreferences: false,
-    requireProfilePictureUrl: false,
-    requireAllergies: false,
-    requireMedicalConcerns: false,
-    requirePreferredDays: false,
-    requirePreferredShifts: false,
-    requireFrequency: false,
-    requirePreferredPrograms: false,
-    requireSkills: false,
-    requireAvailability: false,
-    requireNotes: false
-  });
+  // Dynamic field management state
+  const [shiftFields, setShiftFields] = useState<any[]>([]);
+  const [availableFieldDefs, setAvailableFieldDefs] = useState<any[]>([]);
+  const [fieldLoading, setFieldLoading] = useState(false);
+  const [fieldSearchTerm, setFieldSearchTerm] = useState('');
 
   // Other state
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
@@ -99,6 +52,7 @@ export default function AddShiftPage() {
   useEffect(() => {
     fetchCategories();
     fetchAvailableUsers();
+    loadAvailableFields();
   }, []);
 
   const fetchCategories = async () => {
@@ -135,6 +89,61 @@ export default function AddShiftPage() {
     } catch (err) {
       console.error('Error fetching users:', err);
     }
+  };
+
+  // Load available field definitions
+  const loadAvailableFields = async () => {
+    try {
+      setFieldLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/fields/definitions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to fetch field definitions");
+      const data = await response.json();
+      setAvailableFieldDefs(data);
+      
+      // Set default fields (system fields)
+      const defaultFields = data.filter((field: any) => field.isSystemField).slice(0, 3);
+      setShiftFields(defaultFields.map((field: any, index: number) => ({
+        fieldDefinitionId: field.id,
+        fieldDefinition: field,
+        isRequired: true,
+        isActive: true,
+        order: index + 1
+      })));
+    } catch (err) {
+      console.error("Failed to load available fields:", err);
+      setAvailableFieldDefs([]);
+    } finally {
+      setFieldLoading(false);
+    }
+  };
+
+  const addFieldToForm = (field: any) => {
+    const newField = {
+      fieldDefinitionId: field.id,
+      fieldDefinition: field,
+      isRequired: false,
+      isActive: true,
+      order: shiftFields.length + 1
+    };
+    setShiftFields([...shiftFields, newField]);
+    setAvailableFieldDefs(availableFieldDefs.filter(f => f.id !== field.id));
+  };
+
+  const removeFieldFromForm = (fieldId: number) => {
+    const fieldToRemove = shiftFields.find(f => f.fieldDefinitionId === fieldId);
+    if (fieldToRemove && !fieldToRemove.fieldDefinition.isSystemField) {
+      setShiftFields(shiftFields.filter(f => f.fieldDefinitionId !== fieldId));
+      setAvailableFieldDefs([...availableFieldDefs, fieldToRemove.fieldDefinition]);
+    }
+  };
+
+  const updateFieldInForm = (fieldId: number, updates: any) => {
+    setShiftFields(shiftFields.map(field => 
+      field.fieldDefinitionId === fieldId ? { ...field, ...updates } : field
+    ));
   };
 
   const handleSave = async () => {
@@ -204,7 +213,12 @@ export default function AddShiftPage() {
           shiftCategoryId: Number(shiftForm.shiftCategoryId),
           dayOfWeek: shiftForm.isRecurring ? Number(shiftForm.dayOfWeek) : null,
           slots: Number(shiftForm.slots),
-          isRecurring: shiftForm.isRecurring
+          isRecurring: shiftForm.isRecurring,
+          fieldRequirements: shiftFields.map(field => ({
+            fieldDefinitionId: field.fieldDefinitionId,
+            isRequired: field.isRequired,
+            isActive: field.isActive
+          }))
         })
       });
       
@@ -229,21 +243,6 @@ export default function AddShiftPage() {
           toast.warning('Shift created but failed to assign default users. You can assign them later.');
         }
       }
-
-      // Create registration fields
-      try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${data.id}/registration-fields`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(registrationFields)
-        });
-      } catch (err) {
-        console.error('Failed to create registration fields:', err);
-        toast.warning('Shift created but failed to set registration fields. You can configure them later.');
-      }
       
       toast.success(`${shiftForm.isRecurring ? 'Recurring' : 'One-time'} shift added successfully!`);
       router.push('/manage-shifts');
@@ -256,54 +255,7 @@ export default function AddShiftPage() {
     }
   };
 
-  const handleFieldToggle = (fieldKey: keyof RegistrationFields) => {
-    setRegistrationFields(prev => ({
-      ...prev,
-      [fieldKey]: !prev[fieldKey]
-    }));
-  };
-
-  // Grouped fields for better organization
-  const groupedFields = {
-    'Basic Information': [
-      { key: 'requireFirstName', label: 'First Name', description: 'User\'s first name', required: true },
-      { key: 'requireLastName', label: 'Last Name', description: 'User\'s last name', required: true },
-      { key: 'requireEmail', label: 'Email Address', description: 'User\'s email address', required: true },
-      { key: 'requireAgeBracket', label: 'Age Bracket', description: 'User\'s age range', required: false },
-      { key: 'requireBirthdate', label: 'Birth Date', description: 'User\'s date of birth', required: false },
-      { key: 'requirePronouns', label: 'Pronouns', description: 'User\'s preferred pronouns', required: false }
-    ],
-    'Contact Information': [
-      { key: 'requirePhone', label: 'Phone Number', description: 'User\'s primary phone number', required: false },
-      { key: 'requireHomePhone', label: 'Home Phone', description: 'User\'s home phone number', required: false },
-      { key: 'requireAddress', label: 'Address', description: 'User\'s street address', required: false },
-      { key: 'requireCity', label: 'City', description: 'User\'s city', required: false },
-      { key: 'requirePostalCode', label: 'Postal Code', description: 'User\'s postal/ZIP code', required: false }
-    ],
-    'Emergency Contacts': [
-      { key: 'requireEmergencyContactName', label: 'Emergency Contact Name', description: 'Name of emergency contact', required: false },
-      { key: 'requireEmergencyContactNumber', label: 'Emergency Contact Number', description: 'Phone number of emergency contact', required: false }
-    ],
-    'Preferences & Communication': [
-      { key: 'requireCommunicationPreferences', label: 'Communication Preferences', description: 'How user prefers to be contacted', required: false },
-      { key: 'requireProfilePictureUrl', label: 'Profile Picture', description: 'User\'s profile photo', required: false }
-    ],
-    'Health & Safety': [
-      { key: 'requireAllergies', label: 'Allergies', description: 'Any known allergies', required: false },
-      { key: 'requireMedicalConcerns', label: 'Medical Concerns', description: 'Any medical conditions or concerns', required: false }
-    ],
-    'Availability & Skills': [
-      { key: 'requirePreferredDays', label: 'Preferred Days', description: 'Days user prefers to volunteer', required: false },
-      { key: 'requirePreferredShifts', label: 'Preferred Shifts', description: 'Types of shifts user prefers', required: false },
-      { key: 'requireFrequency', label: 'Volunteer Frequency', description: 'How often user wants to volunteer', required: false },
-      { key: 'requirePreferredPrograms', label: 'Preferred Programs', description: 'Programs user is interested in', required: false },
-      { key: 'requireSkills', label: 'Skills', description: 'User\'s relevant skills and experience', required: false },
-      { key: 'requireAvailability', label: 'Availability', description: 'User\'s general availability', required: false }
-    ],
-    'Additional Information': [
-      { key: 'requireNotes', label: 'Additional Notes', description: 'Any additional information or comments', required: false }
-    ]
-  };
+  // Removed old handleFieldToggle and groupedFields - now using dynamic field management
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -570,97 +522,166 @@ export default function AddShiftPage() {
             </div>
           </div>
 
-          {/* Section C: Registration Fields */}
+          {/* Section C: Dynamic Field Management */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
               <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
                 Section C
               </span>
-              Registration Fields Configuration
+              Field Requirements
             </h2>
 
             <div className="space-y-6">
-              {/* Search Bar */}
-              <div className="mb-6">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search fields by name..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  />
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+              {/* Selected Fields */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <div className="text-sm font-medium text-gray-700">
+                    Selected Fields ({shiftFields.length})
                   </div>
+                  <button
+                    onClick={loadAvailableFields}
+                    className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 flex items-center gap-2"
+                  >
+                    <FaCog />
+                    Refresh Fields
+                  </button>
                 </div>
-              </div>
 
-              {(() => {
-                const allFilteredFields = Object.entries(groupedFields).map(([category, fields]) => {
-                  // Filter fields based on search term
-                  const filteredFields = fields.filter(field => 
-                    field.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    field.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    category.toLowerCase().includes(searchTerm.toLowerCase())
-                  );
-
-                  return { category, fields: filteredFields };
-                }).filter(({ fields }) => fields.length > 0);
-
-                if (searchTerm && allFilteredFields.length === 0) {
-                  return (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500 text-lg">No fields found matching "{searchTerm}"</p>
-                      <p className="text-gray-400 text-sm mt-2">Try searching for a different term</p>
-                    </div>
-                  );
-                }
-
-                return allFilteredFields.map(({ category, fields }) => (
-                  <div key={category} className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">{category}</h3>
-                    <div className="space-y-3">
-                      {fields.map((field) => (
-                        <div key={field.key} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              <label className="text-sm font-medium text-gray-900">
-                                {field.label}
-                                {field.required && <span className="text-red-500 ml-1">*</span>}
-                              </label>
-                            </div>
-                            <p className="text-xs text-gray-600 mt-1">{field.description}</p>
+                {fieldLoading ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Loading fields...
+                  </div>
+                ) : shiftFields.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 italic">
+                    No fields selected. Basic fields (Name, Email) will be required by default.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {shiftFields.map((field) => (
+                      <div key={field.fieldDefinitionId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            {field.fieldDefinition.label}
                           </div>
-                          <div className="ml-4">
-                            <button
-                              onClick={() => handleFieldToggle(field.key as keyof RegistrationFields)}
-                              disabled={field.required}
-                              className={`p-2 rounded-lg transition-colors ${
-                                field.required 
-                                  ? 'bg-green-100 text-green-600 cursor-not-allowed' 
-                                  : registrationFields[field.key as keyof RegistrationFields]
-                                    ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                              }`}
-                            >
-                              {field.required ? (
-                                <FaToggleOn className="text-lg" />
-                              ) : registrationFields[field.key as keyof RegistrationFields] ? (
-                                <FaToggleOn className="text-lg" />
-                              ) : (
-                                <FaToggleOff className="text-lg" />
-                              )}
-                            </button>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {field.fieldDefinition.fieldType}
+                            {field.fieldDefinition.description && ` - ${field.fieldDefinition.description}`}
                           </div>
                         </div>
-                      ))}
+                        <div className="flex items-center gap-2 ml-4">
+                          <button
+                            onClick={() => updateFieldInForm(field.fieldDefinitionId, { isRequired: !field.isRequired })}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                              field.isRequired
+                                ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                                : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                            }`}
+                          >
+                            {field.isRequired ? <><FaCheck className="inline mr-1" />Required</> : <><FaBan className="inline mr-1" />Optional</>}
+                          </button>
+                          {!field.fieldDefinition.isSystemField && (
+                            <button
+                              onClick={() => removeFieldFromForm(field.fieldDefinitionId)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Remove field"
+                            >
+                              <FaTrash />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Available Fields */}
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-sm font-medium text-gray-700">
+                    Available Fields ({availableFieldDefs.filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id)).length})
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => window.open('/field-management', '_blank')}
+                      className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 flex items-center gap-2"
+                    >
+                      <FaPlus />
+                      Add New Dynamic Field
+                    </button>
+                    <button
+                      onClick={loadAvailableFields}
+                      className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 flex items-center gap-2"
+                    >
+                      <FaCog />
+                      Refresh Fields
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search available fields..."
+                      value={fieldSearchTerm}
+                      onChange={(e) => setFieldSearchTerm(e.target.value)}
+                      className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
                     </div>
                   </div>
-                ));
-              })()}
+                </div>
+
+                {fieldLoading ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Loading available fields...
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {availableFieldDefs
+                      .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
+                      .filter(fieldDef => 
+                        fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                        fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                        fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                        fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
+                      )
+                      .slice(0, 10)
+                      .map(field => (
+                        <button
+                          key={field.id}
+                          onClick={() => addFieldToForm(field)}
+                          className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center gap-2"
+                        >
+                          <FaPlus className="text-xs" />
+                          {field.label}
+                        </button>
+                      ))}
+                    {availableFieldDefs.filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id)).length === 0 && (
+                      <div className="text-center py-8 text-gray-500 italic">
+                        All available fields have been added to this shift.
+                      </div>
+                    )}
+                    {fieldSearchTerm && availableFieldDefs
+                      .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
+                      .filter(fieldDef => 
+                        fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                        fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                        fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                        fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
+                      ).length === 0 && (
+                      <div className="text-center py-8 text-gray-500 italic">
+                        No fields found matching "{fieldSearchTerm}".
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

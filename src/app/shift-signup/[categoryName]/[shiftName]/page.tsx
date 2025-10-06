@@ -56,6 +56,14 @@ interface SignupFormData {
   fieldValues: { [key: string]: any }; // Dynamic field values
 }
 
+interface FormErrors {
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  selectedDate?: string;
+  [key: string]: string | undefined; // Allow any string key with string or undefined value
+}
+
 // Helper: Parse YYYY-MM-DD as Halifax local date
 function parseHalifaxDate(dateStr: string): Date {
   if (!dateStr) return new Date('');
@@ -106,7 +114,7 @@ export default function ShiftSignupPage() {
     selectedDate: urlDate || "",
     fieldValues: {}
   });
-  const [formErrors, setFormErrors] = useState<Partial<SignupFormData>>({});
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -151,7 +159,7 @@ export default function ShiftSignupPage() {
   };
 
   const validateForm = (): boolean => {
-    const errors: Partial<SignupFormData> = {};
+    const errors: FormErrors = {};
     
     // Always validate basic fields
     if (!formData.email.trim()) {
@@ -240,7 +248,7 @@ export default function ShiftSignupPage() {
   const handleInputChange = (field: keyof SignupFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
-    if (formErrors[field]) {
+    if (field in formErrors) {
       setFormErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
@@ -254,8 +262,8 @@ export default function ShiftSignupPage() {
       }
     }));
     // Clear error when user starts typing
-    const errorKey = `field_${fieldName}` as keyof SignupFormData;
-    if (formErrors[errorKey]) {
+    const errorKey = `field_${fieldName}`;
+    if (errorKey in formErrors) {
       setFormErrors(prev => ({ ...prev, [errorKey]: undefined }));
     }
   };
@@ -576,20 +584,20 @@ export default function ShiftSignupPage() {
 
                {/* Dynamic Fields based on shift requirements */}
                {shift?.dynamicFields && shift.dynamicFields.length > 0 && (
-                 <div className="border-t border-gray-200 pt-4">
+                     <div className="border-t border-gray-200 pt-4">
                    <h4 className="text-md font-medium text-gray-900 mb-3">Additional Information</h4>
-                   <div className="space-y-4">
+                       <div className="space-y-4">
                      {shift.dynamicFields.map((fieldReq) => {
                        const fieldDef = fieldReq.fieldDefinition;
                        const fieldValue = formData.fieldValues[fieldDef.name] || '';
-                       const errorKey = `field_${fieldDef.name}` as keyof SignupFormData;
-                       const hasError = formErrors[errorKey];
+                       const errorKey = `field_${fieldDef.name}`;
+                       const hasError = errorKey in formErrors ? formErrors[errorKey] : undefined;
                        
                        return (
                          <div key={fieldDef.id}>
-                           <label className="block text-sm font-medium text-gray-700 mb-1">
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
                              {fieldDef.label} {fieldReq.isRequired && '*'}
-                           </label>
+                             </label>
                            
                            {fieldDef.description && (
                              <p className="text-xs text-gray-500 mb-2">{fieldDef.description}</p>
@@ -622,28 +630,28 @@ export default function ShiftSignupPage() {
                            )}
                            
                            {fieldDef.fieldType === 'PHONE' && (
-                             <input
+                               <input
                                type="tel"
                                value={fieldValue}
                                onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
                                  hasError ? 'border-red-500' : 'border-gray-300'
-                               }`}
+                                 }`}
                                placeholder={`Enter ${fieldDef.label.toLowerCase()}`}
-                               disabled={submitting}
-                             />
+                                 disabled={submitting}
+                               />
                            )}
                            
                            {fieldDef.fieldType === 'DATE' && (
-                             <input
+                               <input
                                type="date"
                                value={fieldValue}
                                onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
                                  hasError ? 'border-red-500' : 'border-gray-300'
-                               }`}
-                               disabled={submitting}
-                             />
+                                 }`}
+                                 disabled={submitting}
+                               />
                            )}
                            
                            {fieldDef.fieldType === 'NUMBER' && (
@@ -697,7 +705,7 @@ export default function ShiftSignupPage() {
                                  const isSelected = selectedValues.includes(option);
                                  return (
                                    <label key={option} className="flex items-center">
-                                     <input
+                             <input
                                        type="checkbox"
                                        checked={isSelected}
                                        onChange={(e) => {
@@ -707,27 +715,27 @@ export default function ShiftSignupPage() {
                                          handleFieldValueChange(fieldDef.name, newValues);
                                        }}
                                        className="mr-2"
-                                       disabled={submitting}
-                                     />
+                               disabled={submitting}
+                             />
                                      <span className="text-sm text-gray-700">{option}</span>
                                    </label>
                                  );
                                })}
-                             </div>
-                           )}
-                           
+                           </div>
+                         )}
+
                            {fieldDef.fieldType === 'BOOLEAN' && (
                              <div className="flex items-center">
-                               <input
+                             <input
                                  type="checkbox"
                                  checked={fieldValue === true}
                                  onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.checked)}
                                  className="mr-2"
-                                 disabled={submitting}
-                               />
+                               disabled={submitting}
+                             />
                                <span className="text-sm text-gray-700">{fieldDef.label}</span>
-                             </div>
-                           )}
+                           </div>
+                         )}
                            
                            {hasError && (
                              <p className="text-red-500 text-sm mt-1">{formErrors[errorKey]}</p>
@@ -735,8 +743,8 @@ export default function ShiftSignupPage() {
                          </div>
                        );
                      })}
-                   </div>
-                 </div>
+                       </div>
+                     </div>
                )}
 
               

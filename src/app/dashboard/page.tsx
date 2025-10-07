@@ -326,8 +326,9 @@ export default function Dashboard() {
   };
 
   // Volunteer summary
-  const totalVolunteers = volunteers.length;
-  const totalHours = Number(volunteers.reduce((sum, v) => sum + v.hours, 0).toFixed(2));
+  const filteredVolunteers = volunteers.filter(u => u.role === 'VOLUNTEER');
+  const totalVolunteers = filteredVolunteers.length;
+  const totalHours = Number(filteredVolunteers.reduce((sum, u) => sum + u.hours, 0).toFixed(2));
 
   // Custom units state (move these above helpers)
   const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);

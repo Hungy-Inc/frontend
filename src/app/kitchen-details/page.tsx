@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes, FaArrowDown, FaArrowUp, FaTrash } from "react-icons/fa";
+import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes, FaArrowDown, FaArrowUp, FaTrash, FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from 'react-toastify';
 import TermsAndConditions from '../../components/TermsAndConditions';
 
@@ -66,6 +66,14 @@ export default function KitchenDetailsPage() {
   const [mealsValue, setMealsValue] = useState<number>(10);
   const [isEditingMealsValue, setIsEditingMealsValue] = useState(false);
   const [editingMealsValue, setEditingMealsValue] = useState<string>("");
+
+  // Donor password state
+  const [donorPassword, setDonorPassword] = useState<string>("");
+  const [isEditingDonorPassword, setIsEditingDonorPassword] = useState(false);
+  const [editingDonorPassword, setEditingDonorPassword] = useState<string>("");
+  const [showDonorPassword, setShowDonorPassword] = useState(false);
+  const [confirmDonorPassword, setConfirmDonorPassword] = useState<string>("");
+  const [showConfirmDonorPassword, setShowConfirmDonorPassword] = useState(false);
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
@@ -162,6 +170,16 @@ export default function KitchenDetailsPage() {
         const statsData = await statsRes.json();
         setStats(statsData);
       }
+
+      // Fetch donor password
+      const donorPasswordRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${userOrg.id}/donor-password`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (donorPasswordRes.ok) {
+        const donorPasswordData = await donorPasswordRes.json();
+        setDonorPassword(donorPasswordData.donorPagePassword);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load organization details");
       toast.error(err.message || "Failed to load organization details");
@@ -206,6 +224,27 @@ export default function KitchenDetailsPage() {
     } catch (err: any) {
       console.error('Error fetching weighing data:', err);
       toast.error('Failed to load weighing data');
+    }
+  };
+
+  const fetchDonorPassword = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/donor-password`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setDonorPassword(data.donorPagePassword);
+      }
+    } catch (err: any) {
+      console.error('Error fetching donor password:', err);
+      toast.error('Failed to load donor password');
     }
   };
 
@@ -451,6 +490,63 @@ export default function KitchenDetailsPage() {
   const handleCancelEditMealsValue = () => {
     setIsEditingMealsValue(false);
     setEditingMealsValue("");
+  };
+
+  const handleStartEditDonorPassword = () => {
+    setIsEditingDonorPassword(true);
+    setEditingDonorPassword("");
+    setConfirmDonorPassword("");
+  };
+
+  const handleSaveDonorPassword = async () => {
+    const inputValue = editingDonorPassword.trim();
+    if (!inputValue || inputValue.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+    if (inputValue !== confirmDonorPassword.trim()) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/donor-password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          donorPagePassword: inputValue
+        }),
+      });      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.error || 'Failed to update donor password');
+        return;
+      }
+      const updatedOrg = await res.json();
+      setDonorPassword(updatedOrg.donorPagePassword);
+      setIsEditingDonorPassword(false);
+      setEditingDonorPassword("");
+      setConfirmDonorPassword("");
+      toast.success('Donor password updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating donor password:', error);
+      toast.error('Failed to update donor password. Please try again.');
+    }
+  };
+  const handleCancelEditDonorPassword = () => {
+    setIsEditingDonorPassword(false);
+    setEditingDonorPassword("");
+    setConfirmDonorPassword("");
   };
 
   // Weighing category functions
@@ -894,6 +990,216 @@ export default function KitchenDetailsPage() {
                   Update Details
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* Donor Data Password Card */}
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Donor Data Password</h2>
+              <button
+                onClick={isEditingDonorPassword ? handleCancelEditDonorPassword : handleStartEditDonorPassword}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#2196f3',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 16
+                }}
+              >
+                <FaEdit />
+                {isEditingDonorPassword ? 'Cancel' : 'Edit'}
+              </button>
+            </div>
+
+            <div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, color: '#666' }}>Current Password</label>
+                {isEditingDonorPassword ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showDonorPassword ? "text" : "password"}
+                        value={editingDonorPassword}
+                        onChange={(e) => setEditingDonorPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #dee2e6',
+                          borderRadius: 6,
+                          padding: '8px 40px 8px 12px',
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: '#333',
+                          width: '250px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowDonorPassword(!showDonorPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={showDonorPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showDonorPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
+                    {/* Confirm New Password */}
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showConfirmDonorPassword ? "text" : "password"}
+                        value={confirmDonorPassword}
+                        onChange={(e) => setConfirmDonorPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #dee2e6',
+                          borderRadius: 6,
+                          padding: '8px 40px 8px 12px',
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: '#333',
+                          width: '250px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmDonorPassword(!showConfirmDonorPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={showConfirmDonorPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showConfirmDonorPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={handleSaveDonorPassword}
+                        disabled={!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() !== confirmDonorPassword.trim()}
+                        style={{
+                          background: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() !== confirmDonorPassword.trim()) ? '#ccc' : '#28a745',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '8px 16px',
+                          cursor: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() !== confirmDonorPassword.trim()) ? 'not-allowed' : 'pointer',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <FaSave />
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelEditDonorPassword}
+                        style={{
+                          background: '#dc3545',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '8px 16px',
+                          cursor: 'pointer',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <FaTimes />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8
+                  }}>
+                    <div style={{ 
+                      fontSize: 16, 
+                      fontFamily: 'monospace',
+                      background: '#f8f9fa',
+                      padding: '8px 12px',
+                      borderRadius: 6,
+                      border: '1px solid #e9ecef',
+                      display: 'inline-block',
+                      minWidth: '200px'
+                    }}>
+                      {donorPassword ? (showDonorPassword ? donorPassword : '••••••••') : 'No password set'}
+                    </div>
+                    {donorPassword && (
+                      <button
+                        onClick={() => setShowDonorPassword(!showDonorPassword)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={showDonorPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showDonorPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim().length > 0 && editingDonorPassword.trim().length < 6 && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    Password must be at least 6 characters long
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim() && confirmDonorPassword.trim() && editingDonorPassword.trim() !== confirmDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    Passwords do not match
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

@@ -59,7 +59,8 @@ const extractTimeFromUTC = (utcTimeString: string): string => {
 interface ShiftDetails {
   id: number;
   name: string;
-  dayOfWeek: number | null;
+  dayOfWeek: number | null; // Keep for backward compatibility
+  newDaysOfWeek: number[];
   startTime: string;
   endTime: string;
   shiftCategoryId: number;
@@ -337,7 +338,7 @@ export default function EditShiftPage() {
   // Form state for shift details
   const [shiftForm, setShiftForm] = useState({
     name: '',
-    dayOfWeek: 0,
+    newDaysOfWeek: [] as number[],
     startTime: '',
     endTime: '',
     shiftCategoryId: '',
@@ -369,9 +370,13 @@ export default function EditShiftPage() {
       setShift(shiftData);
 
       // Set form data with Halifax timezone conversion
+      const daysOfWeek = shiftData.newDaysOfWeek && shiftData.newDaysOfWeek.length > 0 
+        ? shiftData.newDaysOfWeek 
+        : (shiftData.dayOfWeek !== null ? [shiftData.dayOfWeek] : []);
+      
       setShiftForm({
         name: shiftData.name,
-        dayOfWeek: shiftData.dayOfWeek || 0,
+        newDaysOfWeek: daysOfWeek,
         startTime: shiftData.isRecurring 
           ? extractTimeFromUTC(shiftData.startTime)
           : convertUTCToHalifax(shiftData.startTime),
@@ -503,6 +508,12 @@ export default function EditShiftPage() {
   const handleShiftSave = async () => {
     if (!shift) return;
     
+    // Validation
+    if (shift.isRecurring && shiftForm.newDaysOfWeek.length === 0) {
+      toast.error("Please select at least one day of the week for recurring shifts");
+      return;
+    }
+    
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -519,7 +530,7 @@ export default function EditShiftPage() {
       if (shift.isRecurring) {
         // Recurring shift - use time format with Halifax to UTC conversion
         const baseDate = '1969-06-10';
-        updateData.dayOfWeek = Number(shiftForm.dayOfWeek);
+        updateData.newDaysOfWeek = shiftForm.newDaysOfWeek;
         // Convert Halifax time to UTC for recurring shifts
         const startTimeUTC = convertHalifaxToUTC(`${baseDate}T${shiftForm.startTime}:00`);
         const endTimeUTC = convertHalifaxToUTC(`${baseDate}T${shiftForm.endTime}:00`);
@@ -684,18 +695,52 @@ export default function EditShiftPage() {
 
               {shift.isRecurring && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Day of Week *
+                  {/* <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Day of Week * */}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Days of Week *
                   </label>
-                  <select
+                  {/* <select
                     value={shiftForm.dayOfWeek}
                     onChange={(e) => setShiftForm(prev => ({ ...prev, dayOfWeek: Number(e.target.value) }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
+                  > */}
+                  <div className="flex flex-wrap gap-4">
                     {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
-                      <option key={i} value={i}>{day}</option>
+                      // <option key={i} value={i}>{day}</option>
+                      <label key={i} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={shiftForm.newDaysOfWeek.includes(i)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setShiftForm(prev => {
+                                const newDaysOfWeek = [...prev.newDaysOfWeek, i];
+                                return {
+                                  ...prev,
+                                  newDaysOfWeek
+                                };
+                              });
+                            } else {
+                              setShiftForm(prev => {
+                                const newDaysOfWeek = prev.newDaysOfWeek.filter(d => d !== i);
+                                return {
+                                  ...prev,
+                                  newDaysOfWeek
+                                };
+                              });
+                            }
+                          }}
+                          className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                        />
+                        <span className="text-sm text-gray-700">{day}</span>
+                      </label>
                     ))}
-                  </select>
+                  {/* </select> */}
+                  </div>
+                  {shiftForm.newDaysOfWeek.length === 0 && (
+                    <p className="text-red-500 text-sm mt-1">Please select at least one day</p>
+                  )}
                 </div>
               )}
 

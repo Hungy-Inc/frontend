@@ -21,18 +21,18 @@ export default function ManageShiftsPage() {
   const [editIcon, setEditIcon] = useState("");
   const [editError, setEditError] = useState("");
   const [editing, setEditing] = useState(false);
-
   // Recurring Shift Add/Edit Modal State
   const [showAddRecurring, setShowAddRecurring] = useState(false);
   const [addRecurring, setAddRecurring] = useState({
     name: '',
-    dayOfWeek: 0,
+    newDaysOfWeek: [] as number[],
     startTime: '',
     endTime: '',
     shiftCategoryId: '',
     location: '',
     slots: 1,
-    isRecurring: true // Add shift type field
+    isRecurring: true,
+    shiftType: 'REGULAR' // Add shift type field
   });
   const [addRecurringError, setAddRecurringError] = useState('');
   const [addingRecurring, setAddingRecurring] = useState(false);
@@ -41,13 +41,14 @@ export default function ManageShiftsPage() {
   const [editRecurringId, setEditRecurringId] = useState<number|null>(null);
   const [editRecurring, setEditRecurring] = useState({
     name: '',
-    dayOfWeek: 0,
+    newDaysOfWeek: [] as number[],
     startTime: '',
     endTime: '',
     shiftCategoryId: '',
     location: '',
     slots: 1,
-    isRecurring: true // Add shift type field
+    isRecurring: true,
+    shiftType: 'REGULAR' // Add shift type field
   });
   const [editRecurringError, setEditRecurringError] = useState('');
   const [editingRecurring, setEditingRecurring] = useState(false);
@@ -390,7 +391,7 @@ export default function ManageShiftsPage() {
           startTime,
           endTime,
           shiftCategoryId: Number(addRecurring.shiftCategoryId),
-          dayOfWeek: addRecurring.isRecurring ? Number(addRecurring.dayOfWeek) : null,
+          newDaysOfWeek: addRecurring.isRecurring ? addRecurring.newDaysOfWeek : [],
           slots: Number(addRecurring.slots),
           isRecurring: addRecurring.isRecurring
         })
@@ -420,7 +421,7 @@ export default function ManageShiftsPage() {
       toast.success(`${addRecurring.isRecurring ? 'Recurring' : 'One-time'} shift added successfully!`);
       
       setShowAddRecurring(false);
-      setAddRecurring({ name: '', dayOfWeek: 0, startTime: '', endTime: '', shiftCategoryId: '', location: '', slots: 1, isRecurring: true });
+      setAddRecurring({ name: '', newDaysOfWeek: [], startTime: '', endTime: '', shiftCategoryId: '', location: '', slots: 1, isRecurring: true, shiftType: 'REGULAR' });
       setSelectedDefaultUsers([]);
       setAddShiftUserSearchTerm('');
       fetchRecurringShifts();
@@ -439,27 +440,33 @@ export default function ManageShiftsPage() {
     
     if (shift.isRecurring) {
       // Recurring shift - extract time from datetime
+      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
+        ? shift.newDaysOfWeek 
+        : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
+      
       setEditRecurring({
         name: shift.name,
-        dayOfWeek: shift.dayOfWeek,
+        newDaysOfWeek: daysOfWeek,
         startTime: shift.startTime ? shift.startTime.slice(11, 16) : '',
         endTime: shift.endTime ? shift.endTime.slice(11, 16) : '',
         shiftCategoryId: String(shift.shiftCategoryId),
         location: shift.location,
         slots: shift.slots,
-        isRecurring: true
+        isRecurring: true,
+        shiftType: 'REGULAR'
       });
     } else {
       // One-time shift - use full datetime
       setEditRecurring({
         name: shift.name,
-        dayOfWeek: 0,
+        newDaysOfWeek: [],
         startTime: shift.startTime ? new Date(shift.startTime).toISOString().slice(0, 16) : '',
         endTime: shift.endTime ? new Date(shift.endTime).toISOString().slice(0, 16) : '',
         shiftCategoryId: String(shift.shiftCategoryId),
         location: shift.location,
         slots: shift.slots,
-        isRecurring: false
+        isRecurring: false,
+        shiftType: 'REGULAR'
       });
     }
     setEditRecurringError('');
@@ -539,7 +546,7 @@ export default function ManageShiftsPage() {
           startTime,
           endTime,
           shiftCategoryId: Number(editRecurring.shiftCategoryId),
-          dayOfWeek: editRecurring.isRecurring ? Number(editRecurring.dayOfWeek) : null,
+          newDaysOfWeek: editRecurring.isRecurring ? editRecurring.newDaysOfWeek : [],
           slots: Number(editRecurring.slots)
         })
       });
@@ -569,13 +576,14 @@ export default function ManageShiftsPage() {
       setEditRecurringId(null);
       setEditRecurring({
         name: '',
-        dayOfWeek: 0,
+        newDaysOfWeek: [],
         startTime: '',
         endTime: '',
         shiftCategoryId: '',
         location: '',
         slots: 1,
-        isRecurring: true
+        isRecurring: true,
+        shiftType: 'REGULAR'
       });
       setSelectedDefaultUsers([]);
       fetchRecurringShifts();
@@ -590,13 +598,14 @@ export default function ManageShiftsPage() {
     setEditRecurringError('');
     setEditRecurring({
       name: '',
-      dayOfWeek: 0,
+      newDaysOfWeek: [],
       startTime: '',
       endTime: '',
       shiftCategoryId: '',
       location: '',
       slots: 1,
-      isRecurring: true
+      isRecurring: true,
+      shiftType: 'REGULAR'
     });
     setSelectedDefaultUsers([]);
   };
@@ -646,7 +655,11 @@ export default function ManageShiftsPage() {
 
   // Calculate occurrences for a recurring shift
   const calculateNextOccurrences = (shift: any, targetMonth?: number, targetYear?: number) => {
-    if (!shift || !shift.isRecurring || shift.dayOfWeek === null) return [];
+    // if (!shift || !shift.isRecurring || shift.dayOfWeek === null) return [];
+    if (!shift || !shift.isRecurring) return [];
+    
+    const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 ? shift.newDaysOfWeek : [shift.dayOfWeek];
+    if (daysOfWeek.length === 0) return [];
     
     const occurrences = [];
     
@@ -654,94 +667,184 @@ export default function ManageShiftsPage() {
     if (targetMonth !== undefined && targetYear !== undefined) {
       const startDate = new Date(targetYear, targetMonth, 1);
       const endDate = new Date(targetYear, targetMonth + 1, 0); // Last day of the month
+
+      // // Find the first occurrence of this day of week in the target month
+      // let currentDate = new Date(startDate);
+      // while (currentDate.getDay() !== shift.dayOfWeek) {
+      //   currentDate.setDate(currentDate.getDate() + 1);
+      // }
       
-      // Find the first occurrence of this day of week in the target month
-      let currentDate = new Date(startDate);
-      while (currentDate.getDay() !== shift.dayOfWeek) {
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
+      // // Generate occurrences for this month only
+      // while (currentDate <= endDate) {
+      //   // Create date without time to avoid timezone issues
+      //   const occurrenceDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+        
+      //   // Set the time for this occurrence
+      //   const startTime = new Date(shift.startTime);
+      //   const endTime = new Date(shift.endTime);
+        
+      //   const occurrenceStart = new Date(occurrenceDate);
+      //   occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+        
+      //   const occurrenceEnd = new Date(occurrenceDate);
+      //   occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+        
+      //   occurrences.push({
+      //     date: occurrenceDate,
+      //     startTime: occurrenceStart,
+      //     endTime: occurrenceEnd,
+      //     dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
+      //   });
+        
+      //   // Move to next week
+      //   currentDate.setDate(currentDate.getDate() + 7);
+      // }
       
-      // Generate occurrences for this month only
-      while (currentDate <= endDate) {
-        // Create date without time to avoid timezone issues
-        const occurrenceDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      // Generate occurrences for each day of the week in this month
+      for (const dayOfWeek of daysOfWeek) {
+        // Find the first occurrence of this day of week in the target month
+        let currentDate = new Date(startDate);
+        while (currentDate.getDay() !== dayOfWeek) {
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
         
-        // Set the time for this occurrence
-        const startTime = new Date(shift.startTime);
-        const endTime = new Date(shift.endTime);
-        
-        const occurrenceStart = new Date(occurrenceDate);
-        occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-        
-        const occurrenceEnd = new Date(occurrenceDate);
-        occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
-        
-        occurrences.push({
-          date: occurrenceDate,
-          startTime: occurrenceStart,
-          endTime: occurrenceEnd,
-          dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
-        });
-        
-        // Move to next week
-        currentDate.setDate(currentDate.getDate() + 7);
+        // Generate occurrences for this day of week in this month
+        while (currentDate <= endDate) {
+          // Create date without time to avoid timezone issues
+          const occurrenceDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+          
+          // Set the time for this occurrence
+          const startTime = new Date(shift.startTime);
+          const endTime = new Date(shift.endTime);
+          
+          const occurrenceStart = new Date(occurrenceDate);
+          occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+          
+          const occurrenceEnd = new Date(occurrenceDate);
+          occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+          
+          occurrences.push({
+            date: occurrenceDate,
+            startTime: occurrenceStart,
+            endTime: occurrenceEnd,
+            dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
+          });
+          
+          // Move to next week
+          currentDate.setDate(currentDate.getDate() + 7);
+        }
       }
     } else {
       // Default behavior: Generate 52 occurrences (one year) from current date
       const today = new Date();
       let startDate = new Date();
+
+      // const startDateDay = startDate.getDay();
+      // let dayDiff = shift.dayOfWeek - startDateDay;
       
-      const startDateDay = startDate.getDay();
-      let dayDiff = shift.dayOfWeek - startDateDay;
+      // // If start date is the recurring day, start from next week
+      // if (dayDiff <= 0) dayDiff += 7;
       
-      // If start date is the recurring day, start from next week
-      if (dayDiff <= 0) dayDiff += 7;
+      // // Generate 52 occurrences (one year of weekly shifts)
+      // for (let i = 0; i < 52; i++) {
+      //   // Create date without time to avoid timezone issues
+      //   const targetDate = startDate.getDate() + dayDiff + (i * 7);
+      //   const occurrenceDate = new Date(startDate.getFullYear(), startDate.getMonth(), targetDate);
+        
+      //   // Set the time for this occurrence
+      //   const startTime = new Date(shift.startTime);
+      //   const endTime = new Date(shift.endTime);
+        
+      //   const occurrenceStart = new Date(occurrenceDate);
+      //   occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+        
+      //   const occurrenceEnd = new Date(occurrenceDate);
+      //   occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+        
+      //   // Debug first few occurrences
+      //   if (i < 3) {
+      //     console.log(`🔍 MANAGE-SHIFTS OCCURRENCE ${i}:`, {
+      //       '=== INPUT ===': {
+      //         startDate: startDate,
+      //         dayDiff: dayDiff,
+      //         i: i,
+      //         targetDate: targetDate
+      //       },
+      //       '=== CREATION ===': {
+      //         occurrenceDate: occurrenceDate,
+      //         occurrenceDateString: occurrenceDate.toDateString(),
+      //         occurrenceDateISO: occurrenceDate.toISOString(),
+      //         occurrenceDateLocal: occurrenceDate.toLocaleDateString(),
+      //         occurrenceDateComponents: {
+      //           year: occurrenceDate.getFullYear(),
+      //           month: occurrenceDate.getMonth() + 1,
+      //           day: occurrenceDate.getDate()
+      //         }
+      //       }
+      //     });
+      //   }
+        
+      //   occurrences.push({
+      //     date: occurrenceDate,
+      //     startTime: occurrenceStart,
+      //     endTime: occurrenceEnd,
+      //     dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
+      //   });
       
-      // Generate 52 occurrences (one year of weekly shifts)
-      for (let i = 0; i < 52; i++) {
-        // Create date without time to avoid timezone issues
-        const targetDate = startDate.getDate() + dayDiff + (i * 7);
-        const occurrenceDate = new Date(startDate.getFullYear(), startDate.getMonth(), targetDate);
+      // Generate occurrences for each day of the week
+      for (const dayOfWeek of daysOfWeek) {
+        const startDateDay = startDate.getDay();
+        let dayDiff = dayOfWeek - startDateDay;
         
-        // Set the time for this occurrence
-        const startTime = new Date(shift.startTime);
-        const endTime = new Date(shift.endTime);
+        // If start date is the recurring day, start from next week
+        if (dayDiff <= 0) dayDiff += 7;
         
-        const occurrenceStart = new Date(occurrenceDate);
-        occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-        
-        const occurrenceEnd = new Date(occurrenceDate);
-        occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
-        
-        // Debug first few occurrences
-        if (i < 3) {
-          console.log(`🔍 MANAGE-SHIFTS OCCURRENCE ${i}:`, {
-            '=== INPUT ===': {
-              startDate: startDate,
-              dayDiff: dayDiff,
-              i: i,
-              targetDate: targetDate
-            },
-            '=== CREATION ===': {
-              occurrenceDate: occurrenceDate,
-              occurrenceDateString: occurrenceDate.toDateString(),
-              occurrenceDateISO: occurrenceDate.toISOString(),
-              occurrenceDateLocal: occurrenceDate.toLocaleDateString(),
-              occurrenceDateComponents: {
-                year: occurrenceDate.getFullYear(),
-                month: occurrenceDate.getMonth() + 1,
-                day: occurrenceDate.getDate()
+        // Generate 52 occurrences (one year of weekly shifts) for this day
+        for (let i = 0; i < 52; i++) {
+          // Create date without time to avoid timezone issues - use proper setDate method
+          const occurrenceDate = new Date(startDate);
+          occurrenceDate.setDate(startDate.getDate() + dayDiff + (i * 7));
+          
+          // Set the time for this occurrence
+          const startTime = new Date(shift.startTime);
+          const endTime = new Date(shift.endTime);
+          
+          const occurrenceStart = new Date(occurrenceDate);
+          occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+          
+          const occurrenceEnd = new Date(occurrenceDate);
+          occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+          
+          // Debug first few occurrences
+          if (i < 3) {
+            console.log(`🔍 MANAGE-SHIFTS OCCURRENCE ${i}:`, {
+              '=== INPUT ===': {
+                startDate: startDate,
+                dayDiff: dayDiff,
+                i: i,
+                calculatedDays: dayDiff + (i * 7)
+              },
+              '=== CREATION ===': {
+                occurrenceDate: occurrenceDate,
+                occurrenceDateString: occurrenceDate.toDateString(),
+                occurrenceDateISO: occurrenceDate.toISOString(),
+                occurrenceDateLocal: occurrenceDate.toLocaleDateString(),
+                occurrenceDateComponents: {
+                  year: occurrenceDate.getFullYear(),
+                  month: occurrenceDate.getMonth() + 1,
+                  day: occurrenceDate.getDate()
+                }
               }
-            }
+            });
+          }
+          
+          occurrences.push({
+            date: occurrenceDate,
+            startTime: occurrenceStart,
+            endTime: occurrenceEnd,
+            dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
           });
         }
-        
-        occurrences.push({
-          date: occurrenceDate,
-          startTime: occurrenceStart,
-          endTime: occurrenceEnd,
-          dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
-        });
       }
     }
     
@@ -975,7 +1078,7 @@ export default function ManageShiftsPage() {
   };
 
   const isRecurringNameValid = /^[A-Za-z\s]+$/.test(addRecurring.name.trim());
-  const isRecurringDayValid = addRecurring.isRecurring ? (typeof addRecurring.dayOfWeek === 'number' && addRecurring.dayOfWeek >= 0 && addRecurring.dayOfWeek <= 6) : true;
+  const isRecurringDayValid = addRecurring.isRecurring ? (addRecurring.newDaysOfWeek.length > 0) : true;
   const isRecurringStartTimeValid = !!addRecurring.startTime;
   const isRecurringEndTimeValid = !!addRecurring.endTime;
   const isRecurringCategoryValid = !!addRecurring.shiftCategoryId;
@@ -1706,7 +1809,12 @@ export default function ManageShiftsPage() {
                 <tbody>
                   {recurringShifts
                     .filter(shift => !filterCategory || String(shift.shiftCategoryId) === filterCategory)
-                    .filter(shift => filterDay === '' || (shift.dayOfWeek !== null && String(shift.dayOfWeek) === filterDay))
+                    // .filter(shift => filterDay === '' || (shift.dayOfWeek !== null && String(shift.dayOfWeek) === filterDay))
+                    .filter(shift => {
+                      if (filterDay === '') return true;
+                      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 ? shift.newDaysOfWeek : [shift.dayOfWeek];
+                      return daysOfWeek.includes(Number(filterDay));
+                    })
                     .filter(shift => !filterShiftName || shift.name.trim() === filterShiftName)
                     .map(shift => (
                       <React.Fragment key={shift.id}>
@@ -1755,7 +1863,12 @@ export default function ManageShiftsPage() {
                           </td>
                           <td style={{ padding: 12 }}>
                             {shift.isRecurring ? 
-                              ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek || 0] :
+                            // ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek || 0] :
+                              (() => {
+                                const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 ? shift.newDaysOfWeek : [shift.dayOfWeek];
+                                const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                                return daysOfWeek.map((day: number) => dayNames[day]).join(', ');
+                              })() :
                               new Date(shift.startTime).toLocaleDateString('en-CA', { 
                                 month: 'short', 
                                 day: 'numeric', 
@@ -2021,15 +2134,16 @@ export default function ManageShiftsPage() {
                                           }}>
                                             {monthOccurrences.map((occurrence, index) => (
                                       <div key={index} style={{
-                                        background: '#fff',
-                                        border: '1px solid #e0e0e0',
+                                        background: '#fff', 
+                                        border: `1px solid ${getOccurrenceStatus(shift.id, occurrence.date) ? '#e0e0e0' : '#dee2e6'}`,
                                         borderRadius: '8px',
                                         padding: '12px',
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.2s',
+                                        // opacity: getOccurrenceStatus(shift.id, occurrence.date) ? 1 : 0.7
                                       }}
                                       onMouseEnter={(e) => {
                                         e.currentTarget.style.borderColor = '#ff9800';
@@ -2040,13 +2154,32 @@ export default function ManageShiftsPage() {
                                         e.currentTarget.style.boxShadow = 'none';
                                       }}>
                                         <div style={{ flex: 1 }}>
-                                          <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
+                                          <div style={{ 
+                                            fontWeight: 600, 
+                                            fontSize: 14, 
+                                            color: '#333',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                          }}>
                                             {occurrence.dayName}, {occurrence.date.toLocaleDateString('en-CA', { 
                                               month: 'short', 
                                               day: 'numeric', 
                                               year: 'numeric',
                                               timeZone: 'America/Halifax'
                                             })}
+                                            {!getOccurrenceStatus(shift.id, occurrence.date) && (
+                                              <span style={{
+                                                background: '#dc3545',
+                                                color: 'white',
+                                                fontSize: '10px',
+                                                padding: '2px 6px',
+                                                borderRadius: '12px',
+                                                fontWeight: 500
+                                              }}>
+                                                INACTIVE
+                                              </span>
+                                            )}
                                           </div>
                                           <div style={{ fontSize: 12, color: '#666', marginTop: '4px' }}>
                                             {occurrence.startTime.toLocaleTimeString('en-CA', { 
@@ -2163,13 +2296,29 @@ export default function ManageShiftsPage() {
                         </div>
                       </div>
                       
-                      {/* Day of Week - Only show for recurring shifts */}
+                      {/* Days of Week - Only show for recurring shifts */}
                       {addRecurring.isRecurring && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Day of Week *</label>
-                          <select value={addRecurring.dayOfWeek} onChange={e => setAddRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, dayOfWeek: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
-                            {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
-                          </select>
+                          <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Days of Week *</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                              <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={addRecurring.newDaysOfWeek.includes(i)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setAddRecurring(r => ({ ...r, newDaysOfWeek: [...r.newDaysOfWeek, i] }));
+                                    } else {
+                                      setAddRecurring(r => ({ ...r, newDaysOfWeek: r.newDaysOfWeek.filter(d => d !== i) }));
+                                    }
+                                  }}
+                                  style={{ margin: 0 }}
+                                />
+                                <span style={{ fontSize: 12 }}>{day}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       )}
                       
@@ -2368,13 +2517,29 @@ export default function ManageShiftsPage() {
                         </div>
                       </div>
                       
-                      {/* Day of Week - Only show for recurring shifts */}
+                      {/* Days of Week - Only show for recurring shifts */}
                       {editRecurring.isRecurring && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Day of Week *</label>
-                          <select value={editRecurring.dayOfWeek} onChange={e => setEditRecurring(r => ({ ...r, dayOfWeek: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }}>
-                            {[...Array(7)].map((_, i) => <option key={i} value={i}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}</option>)}
-                          </select>
+                          <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Days of Week *</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                              <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={editRecurring.newDaysOfWeek.includes(i)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setEditRecurring(r => ({ ...r, newDaysOfWeek: [...r.newDaysOfWeek, i] }));
+                                    } else {
+                                      setEditRecurring(r => ({ ...r, newDaysOfWeek: r.newDaysOfWeek.filter(d => d !== i) }));
+                                    }
+                                  }}
+                                  style={{ margin: 0 }}
+                                />
+                                <span style={{ fontSize: 12 }}>{day}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       )}
                       

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaDownload } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import PasswordProtection from '../../components/PasswordProtection';
 
 const months = [
   { value: 0, label: 'All Months' },
@@ -49,6 +50,10 @@ export default function DonorDataPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [unit, setUnit] = useState('lbs');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('donorPageAuthenticated') === 'true';
+    return false;
+  });
 
   // Filter states
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -164,19 +169,51 @@ export default function DonorDataPage() {
            orgName.includes(search);
   });
 
-  // Load data on component mount and when filters change
+  // Handle password verification
+  const handlePasswordVerified = () => {
+    setIsAuthenticated(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('donorPageAuthenticated', 'true');
+    }
+  };
+
   useEffect(() => {
-    fetchDonorData();
-  }, [selectedYear, selectedMonth, selectedUnit]);
+    if (isAuthenticated) {
+      fetchDonorData();
+    }
+  }, [selectedYear, selectedMonth, selectedUnit, isAuthenticated]);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleStorageChange = () => {
+      const mainToken = localStorage.getItem('token');
+      if (!mainToken) {
+        // Main session ended, clear donor page authentication
+        setIsAuthenticated(false);
+        localStorage.removeItem('donorPageAuthenticated');
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    const mainToken = localStorage.getItem('token');
+    if (!mainToken) {
+      setIsAuthenticated(false);
+      localStorage.removeItem('donorPageAuthenticated');
+    }
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Donor Data</h1>
-          <p className="text-gray-600">View and analyze donor information and donation summaries</p>
-        </div>
+    <PasswordProtection isAuthenticated={isAuthenticated} onPasswordVerified={handlePasswordVerified}>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Donor Data</h1>
+            <p className="text-gray-600">View and analyze donor information and donation summaries</p>
+          </div>
 
 
         {/* Filters */}
@@ -334,7 +371,8 @@ export default function DonorDataPage() {
             </div>
           )}
         </div>
+        </div>
       </div>
-    </div>
+    </PasswordProtection>
   );
 }

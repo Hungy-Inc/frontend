@@ -1411,42 +1411,11 @@ export default function ScheduleShiftsPage() {
                   }
                 }
                 
-                // If no existing shift found, create a new one
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${rec.id}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                   body: JSON.stringify({
-                    name: rec.name,
-                    shiftCategoryId: rec.shiftCategoryId,
-                    startTime: (() => {
-                      if (rec.isRecurring) {
-                        // Extract time from recurring shift and create in Halifax timezone
-                        const recStart = new Date(rec.startTime);
-                        const start = new Date(nextDate);
-                        start.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-                        // Convert to Halifax timezone for storage
-                        return start.toISOString();
-                      } else {
-                        // For one-time shifts, use the actual start time
-                        return new Date(rec.startTime).toISOString();
-                      }
-                    })(),
-                    endTime: (() => {
-                      if (rec.isRecurring) {
-                        // Extract time from recurring shift and create in Halifax timezone
-                        const recEnd = new Date(rec.endTime);
-                        const end = new Date(nextDate);
-                        end.setHours(recEnd.getHours(), recEnd.getMinutes(), 0, 0);
-                        // Convert to Halifax timezone for storage
-                        return end.toISOString();
-                      } else {
-                        // For one-time shifts, use the actual end time
-                        return new Date(rec.endTime).toISOString();
-                      }
-                    })(),
-                    location: rec.location,
-                    slots: rec.slots,
-                    recurringShiftId: rec.id // Link to the RecurringShift
+                    date: `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}` 
                   })
                 });
                 

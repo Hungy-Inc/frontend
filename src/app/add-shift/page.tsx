@@ -170,8 +170,7 @@ export default function AddShiftPage() {
       let startTime, endTime;
       
       if (shiftForm.isRecurring) {
-        // Recurring shift - use time inputs
-        const baseDate = '1969-06-10';
+        const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
         const start = new Date(`${baseDate}T${shiftForm.startTime}`);
         const end = new Date(`${baseDate}T${shiftForm.endTime}`);
         const diffMs = end.getTime() - start.getTime();

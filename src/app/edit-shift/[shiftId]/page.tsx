@@ -326,6 +326,13 @@ export default function EditShiftPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Unsaved changes tracking
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [originalShiftForm, setOriginalShiftForm] = useState<any>(null);
+  const [originalRegistrationFields, setOriginalRegistrationFields] = useState<RegistrationFields | null>(null);
+  const [originalDefaultUsers, setOriginalDefaultUsers] = useState<number[]>([]);
 
   // Default Users state
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
@@ -355,6 +362,60 @@ export default function EditShiftPage() {
     }
   }, [shiftId]);
 
+  // Utility function for deep comparison
+  const deepEqual = (obj1: any, obj2: any): boolean => {
+    if (obj1 === obj2) return true;
+    
+    if (obj1 == null || obj2 == null) return obj1 === obj2;
+    
+    if (typeof obj1 !== typeof obj2) return false;
+    
+    if (Array.isArray(obj1) && Array.isArray(obj2)) {
+      if (obj1.length !== obj2.length) return false;
+      // Sort arrays before comparison for consistent results
+      const sorted1 = [...obj1].sort();
+      const sorted2 = [...obj2].sort();
+      return sorted1.every((item, index) => deepEqual(item, sorted2[index]));
+    }
+    
+    if (typeof obj1 === 'object') {
+      const keys1 = Object.keys(obj1);
+      const keys2 = Object.keys(obj2);
+      
+      if (keys1.length !== keys2.length) return false;
+      
+      return keys1.every(key => deepEqual(obj1[key], obj2[key]));
+    }
+    
+    return obj1 === obj2;
+  };
+
+  // Detect changes in form data
+  useEffect(() => {
+    if (!originalShiftForm || !originalRegistrationFields) return;
+    
+    const shiftChanged = !deepEqual(shiftForm, originalShiftForm);
+    const fieldsChanged = !deepEqual(registrationFields, originalRegistrationFields);
+    const usersChanged = !deepEqual(selectedDefaultUsers, originalDefaultUsers);
+    
+    const hasChanges = shiftChanged || fieldsChanged || usersChanged;
+    setHasUnsavedChanges(hasChanges);
+  }, [shiftForm, registrationFields, selectedDefaultUsers, originalShiftForm, originalRegistrationFields, originalDefaultUsers]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   const fetchShiftDetails = async () => {
     try {
       setLoading(true);
@@ -374,7 +435,7 @@ export default function EditShiftPage() {
         ? shiftData.newDaysOfWeek 
         : (shiftData.dayOfWeek !== null ? [shiftData.dayOfWeek] : []);
       
-      setShiftForm({
+      const formData = {
         name: shiftData.name,
         newDaysOfWeek: daysOfWeek,
         startTime: shiftData.isRecurring 
@@ -387,6 +448,19 @@ export default function EditShiftPage() {
         location: shiftData.location,
         slots: shiftData.slots,
         isActive: shiftData.isActive
+      };
+      
+      setShiftForm(formData);
+      // Create proper deep copy for comparison
+      setOriginalShiftForm({
+        name: formData.name,
+        newDaysOfWeek: [...formData.newDaysOfWeek],
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        shiftCategoryId: formData.shiftCategoryId,
+        location: formData.location,
+        slots: formData.slots,
+        isActive: formData.isActive
       });
 
       // Fetch registration fields
@@ -397,6 +471,7 @@ export default function EditShiftPage() {
       if (!fieldsRes.ok) throw new Error("Failed to fetch registration fields");
       const fieldsData = await fieldsRes.json();
       setRegistrationFields(fieldsData);
+      setOriginalRegistrationFields({ ...fieldsData }); // Deep copy for comparison
 
       // Fetch default users for this shift
       fetchDefaultUsersForShift(shiftId);
@@ -458,10 +533,13 @@ export default function EditShiftPage() {
       if (res.ok) {
         const data = await res.json();
         console.log('Fetched default users:', data); // Debug log
-        setSelectedDefaultUsers(data.defaultUsers.map((du: any) => du.userId));
+        const defaultUserIds = data.defaultUsers.map((du: any) => du.userId);
+        setSelectedDefaultUsers(defaultUserIds);
+        setOriginalDefaultUsers([...defaultUserIds]); // Store original for comparison
       } else {
         console.error('Failed to fetch default users:', res.status, res.statusText);
         setSelectedDefaultUsers([]);
+        setOriginalDefaultUsers([]);
       }
     } catch (err) {
       console.error('Failed to fetch default users:', err);
@@ -493,6 +571,9 @@ export default function EditShiftPage() {
       const data = await res.json();
       console.log('Saved default users:', data); // Debug log
       toast.success('Default users saved successfully!');
+      
+      // Update original values to reflect saved state
+      setOriginalDefaultUsers([...selectedDefaultUsers]);
       
       // Refresh the default users to confirm they're saved
       await fetchDefaultUsersForShift(shiftId);
@@ -529,7 +610,7 @@ export default function EditShiftPage() {
 
       if (shift.isRecurring) {
         // Recurring shift - use time format with Halifax to UTC conversion
-        const baseDate = '1969-06-10';
+        const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
         updateData.newDaysOfWeek = shiftForm.newDaysOfWeek;
         // Convert Halifax time to UTC for recurring shifts
         const startTimeUTC = convertHalifaxToUTC(`${baseDate}T${shiftForm.startTime}:00`);
@@ -559,7 +640,21 @@ export default function EditShiftPage() {
       // Note: Default users are saved separately using the "Save Default Users" button
 
       toast.success('Shift details updated successfully!');
-      await fetchShiftDetails(); // Refresh data
+      
+      // Update original values to reflect saved state (deep copy)
+      setOriginalShiftForm({
+        name: shiftForm.name,
+        newDaysOfWeek: [...shiftForm.newDaysOfWeek],
+        startTime: shiftForm.startTime,
+        endTime: shiftForm.endTime,
+        shiftCategoryId: shiftForm.shiftCategoryId,
+        location: shiftForm.location,
+        slots: shiftForm.slots,
+        isActive: shiftForm.isActive
+      });
+      
+      // Don't refresh data immediately to avoid overwriting the updated original values
+      // The form state is already up to date
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update shift');
     } finally {
@@ -589,6 +684,9 @@ export default function EditShiftPage() {
       }
 
       toast.success('Registration fields updated successfully!');
+      
+      // Update original values to reflect saved state (deep copy)
+      setOriginalRegistrationFields({ ...registrationFields });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update registration fields');
     } finally {
@@ -606,7 +704,20 @@ export default function EditShiftPage() {
   };
 
   const handleBack = () => {
+    if (hasUnsavedChanges) {
+      setShowConfirmDialog(true);
+    } else {
+      router.push('/manage-shifts');
+    }
+  };
+
+  const handleConfirmLeave = () => {
+    setShowConfirmDialog(false);
     router.push('/manage-shifts');
+  };
+
+  const handleCancelLeave = () => {
+    setShowConfirmDialog(false);
   };
 
   if (loading) {
@@ -647,6 +758,35 @@ export default function EditShiftPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Unsaved Changes
+              </h3>
+              <p className="text-gray-600">
+                You have unsaved changes that will be lost if you leave this page. Are you sure you want to continue without saving?
+              </p>
+            </div>
+            <div className="flex space-x-3 justify-end">
+              <button
+                onClick={handleCancelLeave}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Stay on Page
+              </button>
+              <button
+                onClick={handleConfirmLeave}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Leave Without Saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -658,9 +798,16 @@ export default function EditShiftPage() {
               >
                 <FaArrowLeft className="w-5 h-5" />
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Edit Shift: {shift.name}
-              </h1>
+              <div className="flex items-center">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Edit Shift: {shift.name}
+                </h1>
+                {hasUnsavedChanges && (
+                  <span className="ml-3 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                    Unsaved Changes
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

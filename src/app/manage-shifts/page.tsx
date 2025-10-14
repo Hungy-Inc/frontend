@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { FaEdit, FaTrash, FaPlusCircle, FaToggleOn, FaToggleOff, FaCalendarAlt, FaClock } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
 export default function ManageShiftsPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<'shiftcategory' | 'recurringshifts'>('recurringshifts');
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,6 +84,7 @@ export default function ManageShiftsPage() {
     showInactive: boolean;
     searchText: string;
     monthFilter: string;
+    activeDays: number[]; // Days that are active (selected by default, user can deselect)
   }}>({});
 
   // Default Users Management State
@@ -107,12 +110,73 @@ export default function ManageShiftsPage() {
   // No Category Modal State
   const [showNoCategoryModal, setShowNoCategoryModal] = useState(false);
 
+  // Track original inactive days for each shift to detect changes
+  const [originalInactiveDays, setOriginalInactiveDays] = useState<{[key: number]: number[]}>({});
+  
+  // Track if there are unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+
   useEffect(() => {
     if (tab === 'recurringshifts' || showAddRecurring || editRecurringId) {
       fetchCategoryOptions();
     }
     // eslint-disable-next-line
   }, [tab, showAddRecurring, editRecurringId]);
+
+  // Check for unsaved changes across all expanded shifts
+  useEffect(() => {
+    const hasAnyUnsavedChanges = Array.from(expandedShifts).some(shiftId => 
+      hasShiftUnsavedChanges(shiftId)
+    );
+    setHasUnsavedChanges(hasAnyUnsavedChanges);
+  }, [shiftOccurrenceFilters, originalInactiveDays, expandedShifts, recurringShifts]);
+
+  // Warn user before leaving page with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Intercept all navigation attempts (links, buttons, etc.)
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (!hasUnsavedChanges) return;
+
+      const target = e.target as HTMLElement;
+      const link = target.closest('a');
+      
+      // Check if it's a navigation link (not within this page)
+      if (link && link.href && !link.href.includes('#')) {
+        const currentPath = window.location.pathname;
+        const linkPath = new URL(link.href, window.location.origin).pathname;
+        
+        // If navigating away from current page
+        if (linkPath !== currentPath) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          setPendingNavigation(() => () => {
+            window.location.href = link.href;
+          });
+          setShowConfirmDialog(true);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [hasUnsavedChanges]);
 
   // Fetch available users for default assignment
   useEffect(() => {
@@ -350,9 +414,9 @@ export default function ManageShiftsPage() {
       let startTime, endTime;
       
       if (addRecurring.isRecurring) {
-        // Recurring shift - use time inputs
+        // Recurring shift - use time inputs with current date
         if (addRecurring.startTime && addRecurring.endTime) {
-          const baseDate = '1969-06-10';
+          const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
           const start = new Date(`${baseDate}T${addRecurring.startTime}`);
           const end = new Date(`${baseDate}T${addRecurring.endTime}`);
           const diffMs = end.getTime() - start.getTime();
@@ -505,9 +569,9 @@ export default function ManageShiftsPage() {
       let startTime, endTime;
       
       if (editRecurring.isRecurring) {
-        // Recurring shift - use time inputs
+        // Recurring shift - use time inputs with current date
         if (editRecurring.startTime && editRecurring.endTime) {
-          const baseDate = '1969-06-10';
+          const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
           const start = new Date(`${baseDate}T${editRecurring.startTime}`);
           const end = new Date(`${baseDate}T${editRecurring.endTime}`);
           const diffMs = end.getTime() - start.getTime();
@@ -888,6 +952,9 @@ export default function ManageShiftsPage() {
 
   // Get the current status of an occurrence
   const getOccurrenceStatus = (shiftId: number, occurrenceDate: Date) => {
+    const filters = shiftOccurrenceFilters[shiftId];
+    const dayOfWeek = occurrenceDate.getDay();
+    
     // Check if there's a shift for this occurrence in the shifts data
     const existingShift = shifts.find((s: any) => {
       if (s.recurringShiftId !== shiftId) return false;
@@ -899,14 +966,27 @@ export default function ManageShiftsPage() {
     console.log('🔍 GET OCCURRENCE STATUS:', {
       shiftId,
       occurrenceDate: occurrenceDate.toDateString(),
+      dayOfWeek,
+      activeDays: filters?.activeDays,
+      isDayActive: filters?.activeDays ? filters.activeDays.includes(dayOfWeek) : true,
       existingShift: existingShift ? { id: existingShift.id, isActive: existingShift.isActive } : null,
       totalShifts: shifts.length,
       shiftsForRecurring: shifts.filter(s => s.recurringShiftId === shiftId).length
     });
     
-    // If no shift exists, it's considered active by default (will be created when toggled)
-    // If shift exists, return its isActive status
-    return existingShift ? existingShift.isActive : true;
+    // If a shift exists, return its isActive status (this takes priority)
+    if (existingShift) {
+      return existingShift.isActive;
+    }
+    
+    // If no shift exists, check if this day is in the activeDays filter
+    // If activeDays filter exists and this day is not in it, the occurrence is inactive
+    if (filters && filters.activeDays && !filters.activeDays.includes(dayOfWeek)) {
+      return false;
+    }
+    
+    // Default: no shift exists and day is active, so it's considered active
+    return true;
   };
 
   // Toggle individual shift occurrence status
@@ -946,11 +1026,11 @@ export default function ManageShiftsPage() {
           
           toast.success(`Occurrence ${existingShift.isActive ? 'deactivated' : 'activated'} successfully`);
         } else {
-          // No shift exists yet. Since the display shows as "active" by default when no shift exists,
-          // and the user clicked the toggle, they want to deactivate it (create as inactive)
-          const desiredStatus = false; // Create as inactive since user clicked to deactivate
+          // No shift exists yet. Determine the desired status based on current display status
+          const currentStatus = getOccurrenceStatus(shiftId, occurrenceDate);
+          const desiredStatus = !currentStatus; // Toggle the current status
           
-          // Create new shift for this occurrence with the desired status using proper endpoint
+          // Create new shift for this occurrence using proper endpoint
           const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shiftId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -968,19 +1048,19 @@ export default function ManageShiftsPage() {
           const result = await createRes.json();
           const createdShift = result.shift;
           
-          // Now set the shift as inactive since user clicked to deactivate
+          // Set the shift to the desired status
           const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${createdShift.id}/toggle-active`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ isActive: false })
+            body: JSON.stringify({ isActive: desiredStatus })
           });
           
           if (!updateRes.ok) {
             const errorData = await updateRes.json();
-            throw new Error(errorData.error || 'Failed to deactivate shift');
+            throw new Error(errorData.error || `Failed to ${desiredStatus ? 'activate' : 'deactivate'} shift`);
           }
           
-          toast.success('Occurrence created and deactivated successfully');
+          toast.success(`Occurrence created and ${desiredStatus ? 'activated' : 'deactivated'} successfully`);
         }
         
         // Refresh the shifts data and occurrences
@@ -1106,13 +1186,29 @@ export default function ManageShiftsPage() {
   // Initialize filters for a specific shift
   const initializeShiftFilters = (shiftId: number) => {
     if (!shiftOccurrenceFilters[shiftId]) {
+      const shift = recurringShifts.find(s => s.id === shiftId);
+      const daysOfWeek = shift?.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
+        ? shift.newDaysOfWeek 
+        : (shift?.dayOfWeek !== null ? [shift?.dayOfWeek] : []);
+      
+      // Initialize activeDays with all days from newDaysOfWeek, excluding inactiveDays
+      const inactiveDays = shift?.inactiveDays || [];
+      const activeDays = daysOfWeek.filter((day: number) => !inactiveDays.includes(day));
+      
+      // Store original inactive days for this shift
+      setOriginalInactiveDays(prev => ({
+        ...prev,
+        [shiftId]: [...inactiveDays]
+      }));
+      
       setShiftOccurrenceFilters(prev => ({
         ...prev,
         [shiftId]: {
           showActive: true,
           showInactive: true,
           searchText: '',
-          monthFilter: ''
+          monthFilter: '',
+          activeDays: activeDays
         }
       }));
     }
@@ -1221,6 +1317,118 @@ export default function ManageShiftsPage() {
         [filterType]: value
       }
     }));
+  };
+
+  // Check if a specific shift has unsaved changes
+  const hasShiftUnsavedChanges = (shiftId: number): boolean => {
+    const shift = recurringShifts.find(s => s.id === shiftId);
+    if (!shift) return false;
+
+    const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
+      ? shift.newDaysOfWeek 
+      : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
+    
+    const activeDays = shiftOccurrenceFilters[shiftId]?.activeDays || [];
+    const currentInactiveDays = daysOfWeek.filter((day: number) => !activeDays.includes(day));
+    const originalInactive = originalInactiveDays[shiftId] || [];
+
+    // Sort both arrays for comparison
+    const sortedCurrent = [...currentInactiveDays].sort();
+    const sortedOriginal = [...originalInactive].sort();
+
+    // Compare arrays
+    if (sortedCurrent.length !== sortedOriginal.length) return true;
+    return !sortedCurrent.every((day, index) => day === sortedOriginal[index]);
+  };
+
+  // Handle tab change with unsaved changes check
+  const handleTabChange = (newTab: 'shiftcategory' | 'recurringshifts') => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation(() => () => setTab(newTab));
+      setShowConfirmDialog(true);
+    } else {
+      setTab(newTab);
+    }
+  };
+
+  // Confirm navigation and discard changes
+  const confirmNavigation = () => {
+    if (pendingNavigation) {
+      pendingNavigation();
+      setPendingNavigation(null);
+    }
+    setShowConfirmDialog(false);
+    setHasUnsavedChanges(false);
+  };
+
+  // Cancel navigation
+  const cancelNavigation = () => {
+    setPendingNavigation(null);
+    setShowConfirmDialog(false);
+  };
+
+  // Safe navigation helper - checks for unsaved changes before navigating
+  const safeNavigate = (url: string) => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation(() => () => {
+        window.location.href = url;
+      });
+      setShowConfirmDialog(true);
+    } else {
+      window.location.href = url;
+    }
+  };
+
+  // Save inactive days to backend
+  const saveInactiveDays = async (shiftId: number) => {
+    try {
+      const shift = recurringShifts.find(s => s.id === shiftId);
+      if (!shift) {
+        toast.error('Shift not found');
+        return;
+      }
+
+      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
+        ? shift.newDaysOfWeek 
+        : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
+      
+      const activeDays = shiftOccurrenceFilters[shiftId]?.activeDays || [];
+      const inactiveDays = daysOfWeek.filter((day: number) => !activeDays.includes(day));
+
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ inactiveDays })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to save inactive days');
+      }
+
+      toast.success('Inactive days saved successfully');
+      
+      // Update original inactive days to reflect the saved state
+      setOriginalInactiveDays(prev => ({
+        ...prev,
+        [shiftId]: [...inactiveDays]
+      }));
+      
+      // Refresh recurring shifts to get updated data
+      await fetchRecurringShifts();
+      await fetchShifts();
+      
+      // Refresh occurrences for this shift to reflect the changes
+      const occurrences = calculateNextOccurrences(shift);
+      setShiftOccurrences(prev => ({ ...prev, [shiftId]: occurrences }));
+    } catch (error: any) {
+      console.error('Error saving inactive days:', error);
+      toast.error(error.message || 'Failed to save inactive days');
+    }
   };
 
   // Absence Management Functions
@@ -1340,33 +1548,29 @@ export default function ManageShiftsPage() {
       
       console.log('🎯 FINAL OCCURRENCE DATE (using local):', occurrenceDate);
       
-      // First, try to find existing shift for this occurrence
-      const shiftsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+      // First, check if shift exists for this occurrence using the same logic as backend
+      const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shift.id}/check/${occurrenceDate}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       let actualShift = null;
-      if (shiftsRes.ok) {
-        const allShifts = await shiftsRes.json();
-        console.log('Searching for existing shift:', {
-          occurrenceDate: occurrence.date.toDateString(),
-          recurringShiftId: shift.id,
-          totalShifts: allShifts.length
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        console.log('Existing shift check result:', {
+          exists: checkData.exists,
+          shift: checkData.shift ? { id: checkData.shift.id, name: checkData.shift.name } : null,
+          occurrenceDate,
+          recurringShiftId: shift.id
         });
         
-        actualShift = allShifts.find((s: any) => {
-          const shiftDate = new Date(s.startTime);
-          const matches = shiftDate.toDateString() === occurrence.date.toDateString() && s.recurringShiftId === shift.id;
-          console.log('Checking shift:', {
-            shiftId: s.id,
-            shiftDate: shiftDate.toDateString(),
-            recurringShiftId: s.recurringShiftId,
-            matches
-          });
-          return matches;
-        });
-        
-        console.log('Found existing shift:', actualShift ? { id: actualShift.id, name: actualShift.name } : 'None');
+        if (checkData.exists && checkData.shift) {
+          actualShift = checkData.shift;
+          console.log('Found existing shift:', { id: actualShift.id, name: actualShift.name });
+        } else {
+          console.log('No existing shift found for this occurrence');
+        }
+      } else {
+        console.error('Failed to check for existing shift:', checkRes.status, checkRes.statusText);
       }
       
       // If no shift exists, create one
@@ -1566,38 +1770,37 @@ export default function ManageShiftsPage() {
       <div style={{ fontWeight: 700, fontSize: 28, marginBottom: 24 }}>Manage Shifts</div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <button
-          onClick={() => setTab('recurringshifts')}
+          onClick={() => handleTabChange('recurringshifts')}
           style={{
             padding: '10px 24px',
             borderRadius: 8,
-            border: 'none',
-            background: tab === 'recurringshifts' ? '#ff9800' : '#eee',
-            color: tab === 'recurringshifts' ? '#fff' : '#888',
-            fontWeight: 600,
+            border: tab === 'recurringshifts' ? '2px solid #ff9800' : '2px solid #ddd',
+            background: tab === 'recurringshifts' ? '#fff3e0' : '#fff',
+            color: tab === 'recurringshifts' ? '#ff9800' : '#666',
+            fontWeight: tab === 'recurringshifts' ? 600 : 400,
             cursor: 'pointer',
-            boxShadow: tab === 'recurringshifts' ? '0 2px 8px #ffd699' : 'none',
-            transition: 'all 0.15s'
+            fontSize: 14,
+            transition: 'all 0.2s'
           }}
         >
           Recurring Shifts
         </button>
         <button
-          onClick={() => setTab('shiftcategory')}
+          onClick={() => handleTabChange('shiftcategory')}
           style={{
             padding: '10px 24px',
             borderRadius: 8,
-            border: 'none',
-            background: tab === 'shiftcategory' ? '#ff9800' : '#eee',
-            color: tab === 'shiftcategory' ? '#fff' : '#888',
-            fontWeight: 600,
+            border: tab === 'shiftcategory' ? '2px solid #ff9800' : '2px solid #ddd',
+            background: tab === 'shiftcategory' ? '#fff3e0' : '#fff',
+            color: tab === 'shiftcategory' ? '#ff9800' : '#666',
+            fontWeight: tab === 'shiftcategory' ? 600 : 400,
             cursor: 'pointer',
-            boxShadow: tab === 'shiftcategory' ? '0 2px 8px #ffd699' : 'none',
-            transition: 'all 0.15s'
+            fontSize: 14,
+            transition: 'all 0.2s'
           }}
         >
-          Shift Category
+          Shift Categories
         </button>
-        
         {/* Special Events Toggle Button - Only show on Recurring Shifts tab */}
         {tab === 'recurringshifts' && (
           <button
@@ -1755,7 +1958,7 @@ export default function ManageShiftsPage() {
                 }
                 
                 // Redirect to full Add Shift page
-                window.location.href = '/add-shift';
+                safeNavigate('/add-shift');
               }} style={{ background: 'none', border: 'none', color: '#ff9800', fontSize: 28, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Add Shift">
                 <FaPlusCircle />
               </button>
@@ -1914,7 +2117,7 @@ export default function ManageShiftsPage() {
                             <button 
                               style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} 
                               title="Edit" 
-                              onClick={() => window.location.href = `/edit-shift/${shift.id}`}
+                              onClick={() => safeNavigate(`/edit-shift/${shift.id}`)}
                             >
                               <FaEdit />
                             </button>
@@ -2018,6 +2221,113 @@ export default function ManageShiftsPage() {
                                       ))}
                                     </select>
                                   </div>
+
+                                  {/* Day Filter - Show/Hide Days of Week */}
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px',
+                                    marginBottom: '16px',
+                                    padding: '12px',
+                                    background: '#f8f9fa',
+                                    borderRadius: '6px',
+                                    border: '1px solid #e9ecef',
+                                    flexWrap: 'wrap'
+                                  }}>
+                                    <span style={{ fontWeight: 600, color: '#666', fontSize: '12px' }}>Active Days:</span>
+                                    
+                                    {(() => {
+                                      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
+                                        ? shift.newDaysOfWeek 
+                                        : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
+                                      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                                      
+                                      return daysOfWeek.map((day: number) => {
+                                        const isActive = shiftOccurrenceFilters[shift.id]?.activeDays?.includes(day) ?? true;
+                                        return (
+                                          <label 
+                                            key={day}
+                                            style={{ 
+                                              fontSize: '12px', 
+                                              color: isActive ? '#333' : '#999',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              cursor: 'pointer',
+                                              padding: '4px 8px',
+                                              borderRadius: '4px',
+                                              background: isActive ? '#fff' : '#f0f0f0',
+                                              border: `1px solid ${isActive ? '#ff9800' : '#ddd'}`,
+                                              fontWeight: isActive ? 600 : 400
+                                            }}
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={isActive}
+                                              onChange={(e) => {
+                                                const currentActiveDays = shiftOccurrenceFilters[shift.id]?.activeDays || [];
+                                                const newActiveDays = e.target.checked
+                                                  ? [...currentActiveDays, day]
+                                                  : currentActiveDays.filter(d => d !== day);
+                                                
+                                                updateShiftFilter(shift.id, 'activeDays', newActiveDays);
+                                                
+                                                // Immediately update local shifts state to reflect UI changes
+                                                // When a day is re-selected (checked), mark all existing shifts for that day as active
+                                                // When a day is deselected (unchecked), mark all existing shifts for that day as inactive
+                                                setShifts(prevShifts => 
+                                                  prevShifts.map(s => {
+                                                    if (s.recurringShiftId === shift.id) {
+                                                      const shiftDate = new Date(s.startTime);
+                                                      const shiftDayOfWeek = shiftDate.getDay();
+                                                      if (shiftDayOfWeek === day) {
+                                                        return { ...s, isActive: e.target.checked };
+                                                      }
+                                                    }
+                                                    return s;
+                                                  })
+                                                );
+                                              }}
+                                              style={{ marginRight: '4px' }}
+                                            />
+                                            {dayNames[day]}
+                                          </label>
+                                        );
+                                      });
+                                    })()}
+                                    
+                                    {/* Save Inactive Days Button */}
+                                    {(() => {
+                                      const hasChanges = hasShiftUnsavedChanges(shift.id);
+                                      return (
+                                        <button
+                                          onClick={() => saveInactiveDays(shift.id)}
+                                          disabled={!hasChanges}
+                                          style={{
+                                            padding: '6px 16px',
+                                            borderRadius: '4px',
+                                            border: 'none',
+                                            background: hasChanges ? '#ff9800' : '#e0e0e0',
+                                            color: hasChanges ? '#fff' : '#999',
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            cursor: hasChanges ? 'pointer' : 'not-allowed',
+                                            transition: 'background 0.2s',
+                                            opacity: hasChanges ? 1 : 0.6
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (hasChanges) e.currentTarget.style.background = '#f57c00';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            if (hasChanges) e.currentTarget.style.background = '#ff9800';
+                                          }}
+                                          title={hasChanges ? 'Save changes to inactive days' : 'No changes to save'}
+                                        >
+                                          💾 Save Days
+                                        </button>
+                                      );
+                                    })()}
+                                  </div>
                                   
                                   <div style={{ 
                                     display: 'flex', 
@@ -2065,13 +2375,20 @@ export default function ManageShiftsPage() {
                                     {/* Clear Filters */}
                                     <button
                                       onClick={() => {
+                                        const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
+                                          ? shift.newDaysOfWeek 
+                                          : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
+                                        const inactiveDays = shift.inactiveDays || [];
+                                        const activeDays = daysOfWeek.filter((day: number) => !inactiveDays.includes(day));
+                                        
                                         setShiftOccurrenceFilters(prev => ({
                                           ...prev,
                                           [shift.id]: {
                                             showActive: true,
                                             showInactive: true,
                                             searchText: '',
-                                            monthFilter: ''
+                                            monthFilter: '',
+                                            activeDays: activeDays
                                           }
                                         }));
                                       }}
@@ -3035,6 +3352,70 @@ export default function ManageShiftsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Unsaved Changes Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 32,
+            maxWidth: 500,
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+          }}>
+            <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#333' }}>
+              ⚠️ Unsaved Changes
+            </div>
+            <div style={{ fontSize: 14, color: '#666', marginBottom: 24, lineHeight: 1.6 }}>
+              You have unsaved changes to inactive days. If you leave now, your changes will be lost.
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={cancelNavigation}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  background: '#fff',
+                  color: '#666',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500
+                }}
+              >
+                Stay on Page
+              </button>
+              <button
+                onClick={confirmNavigation}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#e53935',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500
+                }}
+              >
+                Leave Without Saving
+              </button>
+            </div>
           </div>
         </div>
       )}

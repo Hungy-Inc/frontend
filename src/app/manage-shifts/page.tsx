@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { FaEdit, FaTrash, FaPlusCircle, FaToggleOn, FaToggleOff, FaCalendarAlt, FaClock } from "react-icons/fa";
+import { FaEdit, FaTrash, FaPlusCircle, FaToggleOn, FaToggleOff, FaCalendarAlt, FaClock, FaCheck, FaBan, FaTimes, FaPlus, FaSave } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
 export default function ManageShiftsPage() {
@@ -36,6 +35,8 @@ export default function ManageShiftsPage() {
     isRecurring: true,
     shiftType: 'REGULAR' // Add shift type field
   });
+  
+  // Removed field management state - now handled in dedicated add/edit shift pages
   const [addRecurringError, setAddRecurringError] = useState('');
   const [addingRecurring, setAddingRecurring] = useState(false);
   const [addRecurringTouched, setAddRecurringTouched] = useState<{[key: string]: boolean}>({});
@@ -52,6 +53,8 @@ export default function ManageShiftsPage() {
     isRecurring: true,
     shiftType: 'REGULAR' // Add shift type field
   });
+  
+  // Removed edit shift field management state - now handled in dedicated edit shift page
   const [editRecurringError, setEditRecurringError] = useState('');
   const [editingRecurring, setEditingRecurring] = useState(false);
 
@@ -91,6 +94,8 @@ export default function ManageShiftsPage() {
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [selectedDefaultUsers, setSelectedDefaultUsers] = useState<number[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Removed field management state - now handled in add/edit shift pages
   const [defaultUsersError, setDefaultUsersError] = useState('');
 
   // Absence Management State

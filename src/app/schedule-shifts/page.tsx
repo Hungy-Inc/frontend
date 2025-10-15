@@ -436,9 +436,14 @@ export default function ScheduleShiftsPage() {
 
   // Find all recurring shifts for selected category and day
   const matchingSlots = recurringShifts.filter(
-    (r) =>
-      String(r.shiftCategoryId) === addData.shiftCategoryId &&
-      String(r.dayOfWeek) === addDayOfWeek
+    (r) => 
+      // String(r.shiftCategoryId) === addData.shiftCategoryId &&
+      // String(r.dayOfWeek) === addDayOfWeek
+    {
+      const daysOfWeek = r.newDaysOfWeek && r.newDaysOfWeek.length > 0 ? r.newDaysOfWeek : [r.dayOfWeek];
+      return String(r.shiftCategoryId) === addData.shiftCategoryId &&
+             daysOfWeek.includes(Number(addDayOfWeek));
+    }
   );
 
   // When selectedSlotId changes, set start/end, location, and slots from that slot
@@ -469,7 +474,19 @@ export default function ScheduleShiftsPage() {
       if (rec) {
         // Calculate next occurrence date
         const today = new Date();
-        const dayDiff = (rec.dayOfWeek - today.getDay() + 7) % 7 || 7;
+        const todayDay = today.getDay();
+        const daysOfWeek = rec.newDaysOfWeek && rec.newDaysOfWeek.length > 0 ? rec.newDaysOfWeek : [rec.dayOfWeek];
+        
+        // Find the closest upcoming day
+        let minDaysDiff = 7;
+        for (const day of daysOfWeek) {
+          let dayDiff = day - todayDay;
+          if (dayDiff < 0) dayDiff += 7;
+          if (dayDiff < minDaysDiff) {
+            minDaysDiff = dayDiff;
+          }
+        }
+        const dayDiff = minDaysDiff || 7;
         const nextDate = new Date(today);
         nextDate.setDate(today.getDate() + dayDiff);
         const start = new Date(nextDate);
@@ -605,7 +622,19 @@ export default function ScheduleShiftsPage() {
 
       // Calculate next occurrence date
       const today = new Date();
-      const dayDiff = (rec.dayOfWeek - today.getDay() + 7) % 7 || 7;
+      const todayDay = today.getDay();
+      const daysOfWeek = rec.newDaysOfWeek && rec.newDaysOfWeek.length > 0 ? rec.newDaysOfWeek : [rec.dayOfWeek];
+      
+      // Find the closest upcoming day
+      let minDaysDiff = 7;
+      for (const day of daysOfWeek) {
+        let dayDiff = day - todayDay;
+        if (dayDiff < 0) dayDiff += 7;
+        if (dayDiff < minDaysDiff) {
+          minDaysDiff = dayDiff;
+        }
+      }
+      const dayDiff = minDaysDiff || 7;
       const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + dayDiff);
       const start = new Date(nextDate);
@@ -765,7 +794,19 @@ export default function ScheduleShiftsPage() {
       .filter(r => r.name === addData.shiftName && String(r.shiftCategoryId) === String(addData.shiftCategoryId))
                 .map(opt => {
                   const today = new Date();
-                  const dayDiff = (opt.dayOfWeek - today.getDay() + 7) % 7 || 7;
+                  const todayDay = today.getDay();
+                  const daysOfWeek = opt.newDaysOfWeek && opt.newDaysOfWeek.length > 0 ? opt.newDaysOfWeek : [opt.dayOfWeek];
+                  
+                  // Find the closest upcoming day
+                  let minDaysDiff = 7;
+                  for (const day of daysOfWeek) {
+                    let dayDiff = day - todayDay;
+                    if (dayDiff < 0) dayDiff += 7;
+                    if (dayDiff < minDaysDiff) {
+                      minDaysDiff = dayDiff;
+                    }
+                  }
+                  const dayDiff = minDaysDiff || 7;
                   const nextDate = new Date(today);
                   nextDate.setDate(today.getDate() + dayDiff);
                   const start = new Date(nextDate);
@@ -809,11 +850,29 @@ export default function ScheduleShiftsPage() {
     // For recurring shifts, calculate the next occurrence
     const today = new Date();
     const todayDay = today.getDay();
-    let dayDiff = rec.dayOfWeek - todayDay;
-    if (dayDiff < 0) dayDiff += 7;
-    // If today is the recurring day, show today (not 7 days later)
+    const daysOfWeek = rec.newDaysOfWeek && rec.newDaysOfWeek.length > 0 ? rec.newDaysOfWeek : [rec.dayOfWeek];
+    
+    // Find the closest upcoming day (including today)
+    let closestDay = null;
+    let minDaysDiff = 7;
+    
+    for (const day of daysOfWeek) {
+      let dayDiff = day - todayDay;
+      if (dayDiff < 0) dayDiff += 7; // Wrap to next week
+      if (dayDiff < minDaysDiff) {
+        minDaysDiff = dayDiff;
+        closestDay = day;
+      }
+    }
+    
+    // If no valid day found, use the first day
+    if (closestDay === null) {
+      closestDay = daysOfWeek[0] || 0;
+      minDaysDiff = (closestDay - todayDay + 7) % 7;
+    }
+    
     const nextDate = new Date(today);
-    nextDate.setDate(today.getDate() + dayDiff);
+    nextDate.setDate(today.getDate() + minDaysDiff);
     // Set time in Atlantic timezone
     const recStart = new Date(rec.startTime);
     nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
@@ -821,13 +880,14 @@ export default function ScheduleShiftsPage() {
     console.log('🔍 SCHEDULE-SHIFTS DATE DEBUGGING:', {
       '=== INPUT ===': {
         rec: rec,
-        recDayOfWeek: rec.dayOfWeek,
+        // recDayOfWeek: rec.dayOfWeek,
+        recDayOfWeek: rec.newDaysOfWeek && rec.newDaysOfWeek.length > 0 ? rec.newDaysOfWeek : [rec.dayOfWeek],
         recStartTime: rec.startTime
       },
       '=== CALCULATION ===': {
         today: today,
         todayDay: todayDay,
-        dayDiff: dayDiff
+        minDaysDiff: minDaysDiff
       },
       '=== RESULT ===': {
         nextDate: nextDate,
@@ -848,7 +908,6 @@ export default function ScheduleShiftsPage() {
   // Filtered shifts for cards
             const now = new Date();
   const todayDay = now.getDay();
-  const weekDays = [0,1,2,3,4,5,6];
   let filteredShifts = shifts.filter((shift: any) => {
               const endTime = new Date(shift.endTime);
               return endTime >= now;
@@ -865,8 +924,33 @@ export default function ScheduleShiftsPage() {
     filteredShifts = filteredShifts.filter((shift: any) => isSameDay(new Date(shift.startTime), custom));
   }
 
+  // Expand recurring shifts into individual occurrences for proper filtering
+  const expandRecurringShifts = (recurringShifts: any[]) => {
+    const expandedShifts: any[] = [];
+    
+    for (const rec of recurringShifts) {
+      if (rec.isRecurring) {
+        const daysOfWeek = rec.newDaysOfWeek && rec.newDaysOfWeek.length > 0 ? rec.newDaysOfWeek : [rec.dayOfWeek];
+        
+        // Create separate occurrence for each day of the week
+        for (const dayOfWeek of daysOfWeek) {
+          expandedShifts.push({
+            ...rec,
+            _occurrenceDay: dayOfWeek, // Track which day this occurrence is for
+            _isExpanded: true // Mark as expanded occurrence
+          });
+        }
+      } else {
+        // One-time shifts don't need expansion
+        expandedShifts.push(rec);
+      }
+    }
+    
+    return expandedShifts;
+  };
+
   // Filter recurringShifts for the cards
-  const filteredRecurring = recurringShifts.filter((rec: any) => {
+  const filteredRecurring = expandRecurringShifts(recurringShifts).filter((rec: any) => {
     // Exclude Meals Counting and Collection categories
     const category = categoryOptions.find(cat => cat.id === rec.shiftCategoryId);
     if (category && (category.name === 'Meals Counting' || category.name === 'Collection')) return false;
@@ -884,8 +968,12 @@ export default function ScheduleShiftsPage() {
     // Date filter - handle both recurring and one-time shifts
     if (dateFilter === 'today') {
       if (rec.isRecurring) {
-        // For recurring shifts, check day of week
-        if (rec.dayOfWeek !== todayDay) return false;
+        // // For recurring shifts, check day of week
+        // if (rec.dayOfWeek !== todayDay) return false;
+        
+        // For expanded recurring shifts, check the specific occurrence day
+        const occurrenceDay = rec._isExpanded ? rec._occurrenceDay : rec.dayOfWeek;
+        if (occurrenceDay !== todayDay) return false;
       } else {
         // For one-time shifts, check if the shift is today
         const shiftDate = new Date(rec.startTime);
@@ -893,8 +981,9 @@ export default function ScheduleShiftsPage() {
       }
     } else if (dateFilter === 'week') {
       if (rec.isRecurring) {
-        // For recurring shifts, check if day is in this week
-        if (!weekDays.includes(rec.dayOfWeek)) return false;
+        // For expanded recurring shifts, all occurrences are valid for the current week
+        // (since we're only showing current week, any day 0-6 will be in the week)
+        return true;
       } else {
         // For one-time shifts, check if the shift is in this week
         const shiftDate = new Date(rec.startTime);
@@ -902,9 +991,10 @@ export default function ScheduleShiftsPage() {
       }
     } else if (dateFilter === 'custom' && customDate) {
       if (rec.isRecurring) {
-        // For recurring shifts, check if day matches custom date
+        // For expanded recurring shifts, check if the occurrence day matches custom date
         const customDay = new Date(customDate + 'T00:00:00').getDay();
-        if (rec.dayOfWeek !== customDay) return false;
+        const occurrenceDay = rec._isExpanded ? rec._occurrenceDay : rec.dayOfWeek;
+        if (occurrenceDay !== customDay) return false;
       } else {
         // For one-time shifts, check if the shift is on the custom date
         const shiftDate = new Date(rec.startTime);
@@ -913,7 +1003,11 @@ export default function ScheduleShiftsPage() {
       }
     } else if (selectedDay && selectedDay !== 'all') {
       // Day filter (if not using dateFilter)
-      if (rec.isRecurring && rec.dayOfWeek !== Number(selectedDay)) return false;
+      // if (rec.isRecurring && rec.dayOfWeek !== Number(selectedDay)) return false;
+      if (rec.isRecurring) {
+        const occurrenceDay = rec._isExpanded ? rec._occurrenceDay : rec.dayOfWeek;
+        if (occurrenceDay !== Number(selectedDay)) return false;
+      }
     }
     return true;
   });
@@ -1075,7 +1169,9 @@ export default function ScheduleShiftsPage() {
       if (rec.isRecurring) {
         // For recurring shifts, check if the custom date matches the day of week
         const customDay = new Date(customDate + 'T00:00:00').getDay();
-        if (rec.dayOfWeek === customDay) {
+        // if (rec.dayOfWeek === customDay) {
+        const daysOfWeek = rec.newDaysOfWeek && rec.newDaysOfWeek.length > 0 ? rec.newDaysOfWeek : [rec.dayOfWeek];
+        if (daysOfWeek.includes(customDay)) {
           // Create the date for the custom date
           nextDate = new Date(customDate + 'T00:00:00');
           // Set the time from the recurring shift
@@ -1097,8 +1193,26 @@ export default function ScheduleShiftsPage() {
         }
       }
     } else {
-      // Use the existing getNextOccurrence logic for today/week filters
-      nextDate = getNextOccurrence(rec);
+      // For expanded occurrences, calculate the specific occurrence date
+      if (rec._isExpanded && rec.isRecurring) {
+        const today = new Date();
+        const todayDay = today.getDay();
+        const occurrenceDay = rec._occurrenceDay;
+        
+        // Calculate days difference to the occurrence day
+        let dayDiff = occurrenceDay - todayDay;
+        if (dayDiff < 0) dayDiff += 7; // Wrap to next week if needed
+        
+        nextDate = new Date(today);
+        nextDate.setDate(today.getDate() + dayDiff);
+        
+        // Set the time from the recurring shift
+        const recStart = new Date(rec.startTime);
+        nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
+      } else {
+        // Use the existing getNextOccurrence logic for non-expanded shifts
+        nextDate = getNextOccurrence(rec);
+      }
     }
     
     // Match by shiftCategoryId, location, and isSameDay only
@@ -1170,8 +1284,11 @@ export default function ScheduleShiftsPage() {
       pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
     }
 
+    // Create unique key for multiple occurrences of the same shift
+    const uniqueKey = rec._isExpanded ? `${rec.id}-${rec._occurrenceDay}` : rec.id;
+
     return (
-      <div key={rec.id} style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: '20px 24px', marginBottom: 12, border: '1px solid #f0f0f0', position: 'relative', transition: 'box-shadow 0.2s' }}>
+      <div key={uniqueKey} style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: '20px 24px', marginBottom: 12, border: '1px solid #f0f0f0', position: 'relative', transition: 'box-shadow 0.2s' }}>
         {/* Header Section */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1294,42 +1411,11 @@ export default function ScheduleShiftsPage() {
                   }
                 }
                 
-                // If no existing shift found, create a new one
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${rec.id}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                   body: JSON.stringify({
-                    name: rec.name,
-                    shiftCategoryId: rec.shiftCategoryId,
-                    startTime: (() => {
-                      if (rec.isRecurring) {
-                        // Extract time from recurring shift and create in Halifax timezone
-                        const recStart = new Date(rec.startTime);
-                        const start = new Date(nextDate);
-                        start.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-                        // Convert to Halifax timezone for storage
-                        return start.toISOString();
-                      } else {
-                        // For one-time shifts, use the actual start time
-                        return new Date(rec.startTime).toISOString();
-                      }
-                    })(),
-                    endTime: (() => {
-                      if (rec.isRecurring) {
-                        // Extract time from recurring shift and create in Halifax timezone
-                        const recEnd = new Date(rec.endTime);
-                        const end = new Date(nextDate);
-                        end.setHours(recEnd.getHours(), recEnd.getMinutes(), 0, 0);
-                        // Convert to Halifax timezone for storage
-                        return end.toISOString();
-                      } else {
-                        // For one-time shifts, use the actual end time
-                        return new Date(rec.endTime).toISOString();
-                      }
-                    })(),
-                    location: rec.location,
-                    slots: rec.slots,
-                    recurringShiftId: rec.id // Link to the RecurringShift
+                    date: `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}` 
                   })
                 });
                 
@@ -2154,11 +2240,11 @@ export default function ScheduleShiftsPage() {
             <div style={{ flex: 1, minWidth: 200, background: '#f8f8f8', borderRadius: 10, padding: 18 }}>
               <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 10 }}>
                 Scheduled ({manageModalData?.booked ?? 0}/{manageModalData?.slots ?? 0})
-                {manageModalData?.defaultUsers && manageModalData.defaultUsers > 0 && (
+                {/* {manageModalData?.defaultUsers && manageModalData.defaultUsers > 0 && (
                   <span style={{ fontSize: 12, color: '#666', fontWeight: 400, marginLeft: 8 }}>
                     ({manageModalData.defaultUsers} default)
                   </span>
-                )}
+                )} */}
                 {scheduledSearchTerm && (
                   <span style={{ fontSize: 14, color: '#666', fontWeight: 400, marginLeft: 8 }}>
                     ({filteredScheduled.length} found)

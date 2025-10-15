@@ -326,8 +326,9 @@ export default function Dashboard() {
   };
 
   // Volunteer summary
-  const totalVolunteers = volunteers.length;
-  const totalHours = Number(volunteers.reduce((sum, v) => sum + v.hours, 0).toFixed(2));
+  const filteredVolunteers = volunteers.filter(u => u.role === 'VOLUNTEER');
+  const totalVolunteers = filteredVolunteers.length;
+  const totalHours = Number(filteredVolunteers.reduce((sum, u) => sum + u.hours, 0).toFixed(2));
 
   // Custom units state (move these above helpers)
   const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);
@@ -512,6 +513,30 @@ export default function Dashboard() {
             <div style={{ color: '#888', fontSize: 15, marginTop: 2 }}>Overview of all operations</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Consolidated Export Button */}
+            <button
+              className="export-btn"
+              style={{ 
+                color: '#fff', 
+                background: '#ff9800', 
+                border: 'none', 
+                fontWeight: 600, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 6, 
+                cursor: 'pointer',
+                padding: '8px 16px',
+                borderRadius: 8,
+                fontSize: 14
+              }}
+              onClick={() => {
+                const month = getMonthNumber(period);
+                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/export-consolidated?month=${month}&year=${year}&incomingUnit=${incomingUnit}&inventoryUnit=${inventoryUnit}`;
+                downloadExcel(url, `consolidated-dashboard-${year}-${month}.xlsx`);
+              }}
+            >
+              <FiDownload /> Export to Excel
+            </button>
             {/* Period Filter */}
             <select value={period} onChange={e => setPeriod(e.target.value)} style={{ padding: '8px 18px 8px 12px', borderRadius: 8, border: '1px solid #eee', background: '#fff', color: '#222', fontWeight: 500, fontSize: 15, marginRight: 2 }}>
               {periodOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}

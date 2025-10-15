@@ -493,45 +493,52 @@ export default function InventoryPage() {
       {/* Inventory Tab */}
       {activeTab === 'inventory' && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-            <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Current Inventory by Donation Location and Category</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <select
-                className={styles.select}
-                value={selectedMonth}
-                onChange={e => setSelectedMonth(Number(e.target.value))}
-                style={{ marginRight: 8 }}
-              >
-                {months.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              <select
-                className={styles.select}
-                value={selectedYear}
-                onChange={e => setSelectedYear(Number(e.target.value))}
-                style={{ marginRight: 8 }}
-              >
-                {getYearOptions().map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <select
-                className={styles.select}
-                value={selectedUnit}
-                onChange={e => setSelectedUnit(e.target.value)}
-                style={{ marginRight: 8 }}
-              >
-                {allUnits.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleExportExcel}
-                className={styles.exportBtn}
-              >
-                Export to Excel
-              </button>
+          <div className={styles.headerContainer}>
+            <div className={styles.pageTitle}>Current Inventory by Donation Location and Category</div>
+            <div className={styles.filtersContainer}>
+              <div className={styles.filtersRow}>
+                <select className={styles.select} value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}>
+                  {months.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                <select className={styles.select} value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
+                  {getYearOptions().map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <select className={styles.select} value={selectedUnit} onChange={e => setSelectedUnit(e.target.value)}>
+                  {allUnits.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                <button onClick={handleExportExcel} className={styles.exportBtn}>
+                  Export to Excel
+                </button>
+              </div>
+          <div className={styles.headerContainer}>
+            <div className={styles.pageTitle}>Current Inventory by Donation Location and Category</div>
+            <div className={styles.filtersContainer}>
+              <div className={styles.filtersRow}>
+                <select className={styles.select} value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}>
+                  {months.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                <select className={styles.select} value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
+                  {getYearOptions().map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <select className={styles.select} value={selectedUnit} onChange={e => setSelectedUnit(e.target.value)}>
+                  {allUnits.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                <button onClick={handleExportExcel} className={styles.exportBtn}>
+                  Export to Excel
+                </button>
+              </div>
             </div>
           </div>
       <div className={styles.tableWrapper}>
@@ -543,12 +550,12 @@ export default function InventoryPage() {
           ) : donationLocations.length === 0 || categories.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center' }}>No inventory data found.</div>
           ) : (
-            <table className={styles.table}>
+            <table className={`${styles.table} ${styles.colScroll}`} style={{ width:`${(categories.length + 2) * 16.6667}%` }}>
               <thead>
                 <tr>
-                  <th>Donation Location</th>
-                  {categories.map(cat => (
-                    <th key={cat}>{cat} ({getUnitLabel()})</th>
+                  <th>Donation Category</th>
+                  {donationLocations.map(donationLocation => (
+                    <th key={donationLocation}>{donationLocation} ({getUnitLabel()})</th>
                   ))}
                   <th>Total ({getUnitLabel()})</th>
                 </tr>
@@ -556,20 +563,20 @@ export default function InventoryPage() {
               <tbody>
                 {donationLocations.map((donationLocation: string) => (
                   <tr key={donationLocation}>
-                    <td>{donationLocation}</td>
+                    <td style={{alignItems:"center", fontWeight:"bold"}} >{donationLocation}</td>
                     {categories.map((cat: string) => (
                       <td key={cat}>{formatWeight(tableData[donationLocation][cat]).toFixed(2)}</td>
                     ))}
                     <td className={styles.totalCol}>
-                      {formatWeight(Object.values(tableData[donationLocation]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
+                      {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + tableData[donationLocation][cat], 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))}
                 <tr className={styles.monthlyTotalRow}>
                   <td>Total</td>
-                  {categories.map((cat: string) => (
-                    <td key={cat}>
-                      {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + tableData[donationLocation][cat], 0)).toFixed(2)}
+                  {donationLocations.map((donationLocation: string) => (
+                    <td key={donationLocation}>
+                      {formatWeight(Object.values(tableData[donationLocation]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
                     </td>
                   ))}
                   <td className={styles.totalCol}>
@@ -612,7 +619,8 @@ export default function InventoryPage() {
           ) : (
             <div className={styles.tableWrapper}>
               <div className={styles.tableContainer}>
-                <table className={styles.table}>
+                <table className={`${styles.table} ${styles.colScroll}`}>
+                <table className={`${styles.table} ${styles.colScroll}`}>
                   <thead>
                     <tr>
                       <th>Name</th>
@@ -692,7 +700,7 @@ export default function InventoryPage() {
           ) : (
             <div className={styles.tableWrapper}>
               <div className={styles.tableContainer}>
-                <table className={styles.table}>
+                <table className={`${styles.table} ${styles.colScroll}`}>
                   <thead>
                     <tr>
                       <th>Name</th>

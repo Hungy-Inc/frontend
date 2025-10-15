@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useRouter } from "next/navigation";
 
 const menu = [
   { icon: <FaHome />, label: 'Dashboard', href: '/dashboard' },
@@ -26,6 +27,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('');
+  const router = useRouter();
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('user');
@@ -48,10 +50,25 @@ export default function Sidebar() {
   return (
     <aside className={styles.sidebar}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2rem 1.5rem 1.5rem 1.5rem' }}>
-          <Image src="/assets/hungy-logo.jpg" alt="Hungy Logo" width={32} height={32} />
-          <div className={styles.logo} style={{ padding: 0 }}>HUN<span>G</span>Y</div>
-        </div>
+        <button
+        onClick={() => router.push("/dashboard")}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "2rem 1.5rem 1.5rem 1.5rem",
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          borderRadius: "8px",
+          transition: "all 0.3s ease", 
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.03)"}
+        onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+      >
+        <Image src="/assets/hungy-logo.jpg" alt="Hungy Logo" width={32} height={32}/>
+        <div className={styles.logo} style={{ padding: 0 }}>HUN<span>G</span>Y</div>
+      </button>
         <nav style={{ flex: 1, overflowY: 'auto' }}>
           {menu.map((item) => (
             <Link

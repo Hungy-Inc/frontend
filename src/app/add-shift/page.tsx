@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 interface ShiftForm {
   name: string;
   dayOfWeek: number;
+  newDaysOfWeek: number[];
   startTime: string;
   endTime: string;
   shiftCategoryId: string;
@@ -24,6 +25,7 @@ export default function AddShiftPage() {
   const [shiftForm, setShiftForm] = useState<ShiftForm>({
     name: '',
     dayOfWeek: 0,
+    newDaysOfWeek: [],
     startTime: '',
     endTime: '',
     shiftCategoryId: '',
@@ -163,6 +165,10 @@ export default function AddShiftPage() {
       toast.error("Start and end times are required");
       return;
     }
+    if (shiftForm.isRecurring && shiftForm.newDaysOfWeek.length === 0) {
+      toast.error("Please select at least one day of the week for recurring shifts");
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -173,8 +179,7 @@ export default function AddShiftPage() {
       let startTime, endTime;
       
       if (shiftForm.isRecurring) {
-        // Recurring shift - use time inputs
-        const baseDate = '1969-06-10';
+        const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
         const start = new Date(`${baseDate}T${shiftForm.startTime}`);
         const end = new Date(`${baseDate}T${shiftForm.endTime}`);
         const diffMs = end.getTime() - start.getTime();
@@ -212,6 +217,7 @@ export default function AddShiftPage() {
           endTime,
           shiftCategoryId: Number(shiftForm.shiftCategoryId),
           dayOfWeek: shiftForm.isRecurring ? Number(shiftForm.dayOfWeek) : null,
+          newDaysOfWeek: shiftForm.isRecurring ? shiftForm.newDaysOfWeek : [],
           slots: Number(shiftForm.slots),
           isRecurring: shiftForm.isRecurring,
           fieldRequirements: shiftFields.map(field => ({
@@ -350,7 +356,7 @@ export default function AddShiftPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Day of Week *
                     </label>
-                    <select
+                    {/* <select
                       value={shiftForm.dayOfWeek}
                       onChange={(e) => setShiftForm(prev => ({ ...prev, dayOfWeek: Number(e.target.value) }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -358,9 +364,45 @@ export default function AddShiftPage() {
                       {[...Array(7)].map((_, i) => (
                         <option key={i} value={i}>
                           {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][i]}
-                        </option>
+                        </option> */}
+                    <div className="flex flex-wrap gap-4">
+                      {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                        <label key={i} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={shiftForm.newDaysOfWeek.includes(i)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setShiftForm(prev => {
+                                  const newDaysOfWeek = [...prev.newDaysOfWeek, i];
+                                  return {
+                                    ...prev,
+                                    newDaysOfWeek,
+                                    dayOfWeek: prev.newDaysOfWeek.length === 0 ? i : prev.dayOfWeek
+                                  };
+                                });
+                              } else {
+                                setShiftForm(prev => {
+                                  const newDaysOfWeek = prev.newDaysOfWeek.filter(d => d !== i);
+                                  return {
+                                    ...prev,
+                                    newDaysOfWeek,
+                                    dayOfWeek: prev.newDaysOfWeek.length === 1 && prev.newDaysOfWeek[0] === i ? 0 : prev.dayOfWeek
+                                  };
+                                });
+                              }
+                            }}
+                            className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-gray-700">{day}</span>
+                        </label>
                       ))}
-                    </select>
+                    {/* </select> */}
+                    </div>
+
+                    {shiftForm.newDaysOfWeek.length === 0 && (
+                      <p className="text-red-500 text-sm mt-1">Please select at least one day</p>
+                    )}
                   </div>
                 )}
 

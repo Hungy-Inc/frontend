@@ -704,7 +704,7 @@ export default function IncomingStatsPage() {
           </div>
 
           <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
-            <table className={styles.table} style={{ minWidth: '800px' }}>
+            <table className={`${styles.table} ${styles.colScroll}`} style={{ width: `${(categories.length+2)*16.667}%`}}>
               <thead>
                 <tr>
                   <th>Donation Location</th>

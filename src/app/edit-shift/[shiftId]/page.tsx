@@ -735,33 +735,6 @@ export default function EditShiftPage() {
                 />
               </div>
 
-              {shift.isRecurring && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Days of Week *
-                  </label>
-                  <div className="space-y-2">
-                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => (
-                      <label key={index} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={shiftForm.newDaysOfWeek.includes(index)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setShiftForm({ ...shiftForm, newDaysOfWeek: [...shiftForm.newDaysOfWeek, index] });
-                            } else {
-                              setShiftForm({ ...shiftForm, newDaysOfWeek: shiftForm.newDaysOfWeek.filter(d => d !== index) });
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        {day}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Start Time *

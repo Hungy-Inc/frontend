@@ -68,7 +68,6 @@ export default function KitchenDetailsPage() {
   const [editingMealsValue, setEditingMealsValue] = useState<string>("");
 
   // Donor password state
-  const [donorPassword, setDonorPassword] = useState<string>("");
   const [isEditingDonorPassword, setIsEditingDonorPassword] = useState(false);
   const [editingDonorPassword, setEditingDonorPassword] = useState<string>("");
   const [showDonorPassword, setShowDonorPassword] = useState(false);
@@ -170,16 +169,6 @@ export default function KitchenDetailsPage() {
         const statsData = await statsRes.json();
         setStats(statsData);
       }
-
-      // Fetch donor password
-      const donorPasswordRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${userOrg.id}/donor-password`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (donorPasswordRes.ok) {
-        const donorPasswordData = await donorPasswordRes.json();
-        setDonorPassword(donorPasswordData.donorPagePassword);
-      }
     } catch (err: any) {
       setError(err.message || "Failed to load organization details");
       toast.error(err.message || "Failed to load organization details");
@@ -224,27 +213,6 @@ export default function KitchenDetailsPage() {
     } catch (err: any) {
       console.error('Error fetching weighing data:', err);
       toast.error('Failed to load weighing data');
-    }
-  };
-
-  const fetchDonorPassword = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/donor-password`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setDonorPassword(data.donorPagePassword);
-      }
-    } catch (err: any) {
-      console.error('Error fetching donor password:', err);
-      toast.error('Failed to load donor password');
     }
   };
 
@@ -531,8 +499,6 @@ export default function KitchenDetailsPage() {
         toast.error(errorData.error || 'Failed to update donor password');
         return;
       }
-      const updatedOrg = await res.json();
-      setDonorPassword(updatedOrg.donorPagePassword);
       setIsEditingDonorPassword(false);
       setEditingDonorPassword("");
       setConfirmDonorPassword("");
@@ -1017,7 +983,7 @@ export default function KitchenDetailsPage() {
 
             <div>
               <div>
-                <label style={{ display: 'block', marginBottom: 8, color: '#666' }}>Current Password</label>
+                <label style={{ display: 'block', marginBottom: 8, color: '#666' }}></label>
                 {isEditingDonorPassword ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -1149,44 +1115,14 @@ export default function KitchenDetailsPage() {
                   </div>
                 ) : (
                   <div style={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8
+                    background: '#f8f9fa',
+                    borderRadius: 8,
+                    padding: '9.5px',
+                    border: '1px solid #e9ecef'
                   }}>
-                    <div style={{ 
-                      fontSize: 16, 
-                      fontFamily: 'monospace',
-                      background: '#f8f9fa',
-                      padding: '8px 12px',
-                      borderRadius: 6,
-                      border: '1px solid #e9ecef',
-                      display: 'inline-block',
-                      minWidth: '200px'
-                    }}>
-                      {donorPassword ? (showDonorPassword ? donorPassword : '••••••••') : 'No password set'}
-                    </div>
-                    {donorPassword && (
-                      <button
-                        onClick={() => setShowDonorPassword(!showDonorPassword)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#666',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: 4,
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
-                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                        title={showDonorPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showDonorPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
-                    )}
+                    <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
+                      Click "Edit" to set or update the donor data page password.
+                    </p>
                   </div>
                 )}
                 {isEditingDonorPassword && editingDonorPassword.trim().length > 0 && editingDonorPassword.trim().length < 6 && (

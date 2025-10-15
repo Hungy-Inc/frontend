@@ -516,29 +516,6 @@ export default function InventoryPage() {
                   Export to Excel
                 </button>
               </div>
-          <div className={styles.headerContainer}>
-            <div className={styles.pageTitle}>Current Inventory by Donation Location and Category</div>
-            <div className={styles.filtersContainer}>
-              <div className={styles.filtersRow}>
-                <select className={styles.select} value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}>
-                  {months.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-                <select className={styles.select} value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
-                  {getYearOptions().map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-                <select className={styles.select} value={selectedUnit} onChange={e => setSelectedUnit(e.target.value)}>
-                  {allUnits.map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                <button onClick={handleExportExcel} className={styles.exportBtn}>
-                  Export to Excel
-                </button>
-              </div>
             </div>
           </div>
       <div className={styles.tableWrapper}>
@@ -561,14 +538,14 @@ export default function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {donationLocations.map((donationLocation: string) => (
-                  <tr key={donationLocation}>
-                    <td style={{alignItems:"center", fontWeight:"bold"}} >{donationLocation}</td>
-                    {categories.map((cat: string) => (
-                      <td key={cat}>{formatWeight(tableData[donationLocation][cat]).toFixed(2)}</td>
+                {categories.map((cat: string) => (
+                  <tr key={cat}>
+                    <td style={{alignItems:"center", fontWeight:"bold"}} >{cat}</td>
+                    {donationLocations.map((donationLocation: string) => (
+                      <td key={donationLocation}>{formatWeight(tableData[donationLocation]?.[cat] || 0).toFixed(2)}</td>
                     ))}
                     <td className={styles.totalCol}>
-                      {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + tableData[donationLocation][cat], 0)).toFixed(2)}
+                      {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + (tableData[donationLocation]?.[cat] || 0), 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -576,11 +553,11 @@ export default function InventoryPage() {
                   <td>Total</td>
                   {donationLocations.map((donationLocation: string) => (
                     <td key={donationLocation}>
-                      {formatWeight(Object.values(tableData[donationLocation]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
+                      {formatWeight(Object.values(tableData[donationLocation] || {}).reduce((sum, val) => sum + val, 0)).toFixed(2)}
                     </td>
                   ))}
                   <td className={styles.totalCol}>
-                    {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + Object.values(tableData[donationLocation]).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
+                    {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + Object.values(tableData[donationLocation] || {}).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
                   </td>
                 </tr>
               </tbody>
@@ -619,7 +596,6 @@ export default function InventoryPage() {
           ) : (
             <div className={styles.tableWrapper}>
               <div className={styles.tableContainer}>
-                <table className={`${styles.table} ${styles.colScroll}`}>
                 <table className={`${styles.table} ${styles.colScroll}`}>
                   <thead>
                     <tr>

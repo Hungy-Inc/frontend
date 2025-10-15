@@ -4,6 +4,17 @@ import { useParams, useRouter } from "next/navigation";
 import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff, FaCog, FaTrash, FaPlus, FaCheck, FaBan } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
+interface FieldDefinition {
+  id: number;
+  name: string;
+  type: string;
+  options?: string;
+  isSystemField: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
 // Utility functions for Halifax timezone conversion
 const convertUTCToHalifax = (utcTimeString: string): string => {
   const utcDate = new Date(utcTimeString);
@@ -82,7 +93,6 @@ export default function EditShiftPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [originalShiftForm, setOriginalShiftForm] = useState<any>(null);
-  const [originalRegistrationFields, setOriginalRegistrationFields] = useState<RegistrationFields | null>(null);
   const [originalDefaultUsers, setOriginalDefaultUsers] = useState<number[]>([]);
 
   // Default Users state
@@ -145,15 +155,14 @@ export default function EditShiftPage() {
 
   // Detect changes in form data
   useEffect(() => {
-    if (!originalShiftForm || !originalRegistrationFields) return;
+    if (!originalShiftForm) return;
     
     const shiftChanged = !deepEqual(shiftForm, originalShiftForm);
-    const fieldsChanged = !deepEqual(registrationFields, originalRegistrationFields);
     const usersChanged = !deepEqual(selectedDefaultUsers, originalDefaultUsers);
     
-    const hasChanges = shiftChanged || fieldsChanged || usersChanged;
+    const hasChanges = shiftChanged || usersChanged;
     setHasUnsavedChanges(hasChanges);
-  }, [shiftForm, registrationFields, selectedDefaultUsers, originalShiftForm, originalRegistrationFields, originalDefaultUsers]);
+  }, [shiftForm, selectedDefaultUsers, originalShiftForm, originalDefaultUsers]);
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
@@ -219,16 +228,6 @@ export default function EditShiftPage() {
         isActive: formData.isActive
       });
 
-      // Fetch registration fields
-      const fieldsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/registration-fields`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (!fieldsRes.ok) throw new Error("Failed to fetch registration fields");
-      const fieldsData = await fieldsRes.json();
-      setRegistrationFields(fieldsData);
-      setOriginalRegistrationFields({ ...fieldsData }); // Deep copy for comparison
-
       // Fetch default users for this shift
       fetchDefaultUsersForShift(shiftId);
 
@@ -290,7 +289,6 @@ export default function EditShiftPage() {
         console.error('Failed to fetch default users:', res.status, res.statusText);
         setSelectedDefaultUsers([]);
         setOriginalDefaultUsers([]);
-        setSelectedDefaultUsers(data.map((user: any) => user.id));
       }
     } catch (err) {
       console.error('Error fetching default users:', err);
@@ -424,10 +422,7 @@ export default function EditShiftPage() {
         setAvailableFieldDefs(data);
       }
 
-      toast.success('Registration fields updated successfully!');
-      
-      // Update original values to reflect saved state (deep copy)
-      setOriginalRegistrationFields({ ...registrationFields });
+      toast.success('Available fields loaded successfully!');
     } catch (err) {
       console.error('Error loading available fields:', err);
     } finally {
@@ -743,21 +738,27 @@ export default function EditShiftPage() {
               {shift.isRecurring && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Day of Week *
+                    Days of Week *
                   </label>
-                  <select
-                    value={shiftForm.dayOfWeek}
-                    onChange={(e) => setShiftForm({ ...shiftForm, dayOfWeek: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value={0}>Sunday</option>
-                    <option value={1}>Monday</option>
-                    <option value={2}>Tuesday</option>
-                    <option value={3}>Wednesday</option>
-                    <option value={4}>Thursday</option>
-                    <option value={5}>Friday</option>
-                    <option value={6}>Saturday</option>
-                  </select>
+                  <div className="space-y-2">
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => (
+                      <label key={index} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={shiftForm.newDaysOfWeek.includes(index)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setShiftForm({ ...shiftForm, newDaysOfWeek: [...shiftForm.newDaysOfWeek, index] });
+                            } else {
+                              setShiftForm({ ...shiftForm, newDaysOfWeek: shiftForm.newDaysOfWeek.filter(d => d !== index) });
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        {day}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -797,6 +798,27 @@ export default function EditShiftPage() {
                   Active
                 </label>
               </div>
+            </div>
+
+            {/* Save Button for Shift Details */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <button
+                onClick={handleShiftSave}
+                disabled={saving}
+                className="w-full bg-orange-500 text-white py-2 px-4 rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FaSave className="mr-2" />
+                    Save Shift Details
+                  </>
+                )}
+              </button>
             </div>
           </div>
 

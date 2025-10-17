@@ -73,6 +73,8 @@ export default function KitchenDetailsPage() {
   const [showDonorPassword, setShowDonorPassword] = useState(false);
   const [confirmDonorPassword, setConfirmDonorPassword] = useState<string>("");
   const [showConfirmDonorPassword, setShowConfirmDonorPassword] = useState(false);
+  const [oldDonorPassword, setOldDonorPassword] = useState<string>("");
+  const [showOldDonorPassword, setShowOldDonorPassword] = useState(false);
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
@@ -464,6 +466,7 @@ export default function KitchenDetailsPage() {
     setIsEditingDonorPassword(true);
     setEditingDonorPassword("");
     setConfirmDonorPassword("");
+    setOldDonorPassword("");
   };
 
   const handleSaveDonorPassword = async () => {
@@ -472,8 +475,16 @@ export default function KitchenDetailsPage() {
       toast.error('Password must be at least 6 characters long');
       return;
     }
+    if (inputValue === oldDonorPassword.trim()) {
+      toast.error('New password cannot be same as old password');
+      return;
+    }
     if (inputValue !== confirmDonorPassword.trim()) {
       toast.error('Passwords do not match');
+      return;
+    }
+    if (!oldDonorPassword.trim()) {
+      toast.error('Old password is required');
       return;
     }
     
@@ -481,6 +492,22 @@ export default function KitchenDetailsPage() {
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+      const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/verify-donor-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          password: oldDonorPassword.trim()
+        }),
+      });
+      
+      if (!verifyRes.ok) {
+        const errorData = await verifyRes.json();
+        toast.error(errorData.error || 'Old password is incorrect');
         return;
       }
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/donor-password`, {
@@ -502,6 +529,7 @@ export default function KitchenDetailsPage() {
       setIsEditingDonorPassword(false);
       setEditingDonorPassword("");
       setConfirmDonorPassword("");
+      setOldDonorPassword("");
       toast.success('Donor password updated successfully!');
       
     } catch (error) {
@@ -513,6 +541,7 @@ export default function KitchenDetailsPage() {
     setIsEditingDonorPassword(false);
     setEditingDonorPassword("");
     setConfirmDonorPassword("");
+    setOldDonorPassword("");
   };
 
   // Weighing category functions
@@ -988,6 +1017,48 @@ export default function KitchenDetailsPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input
+                        type={showOldDonorPassword ? "text" : "password"}
+                        value={oldDonorPassword}
+                        onChange={(e) => setOldDonorPassword(e.target.value)}
+                        placeholder="Enter old password"
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #dee2e6',
+                          borderRadius: 6,
+                          padding: '8px 40px 8px 12px',
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: '#333',
+                          width: '250px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowOldDonorPassword(!showOldDonorPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={showOldDonorPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showOldDonorPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
                         type={showDonorPassword ? "text" : "password"}
                         value={editingDonorPassword}
                         onChange={(e) => setEditingDonorPassword(e.target.value)}
@@ -1074,13 +1145,13 @@ export default function KitchenDetailsPage() {
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         onClick={handleSaveDonorPassword}
-                        disabled={!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() !== confirmDonorPassword.trim()}
+                        disabled={!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() === oldDonorPassword.trim() || editingDonorPassword.trim() !== confirmDonorPassword.trim() || !oldDonorPassword.trim() || editingDonorPassword.trim() === confirmDonorPassword.trim()}
                         style={{
-                          background: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() !== confirmDonorPassword.trim()) ? '#ccc' : '#28a745',
+                          background: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() === oldDonorPassword.trim() || editingDonorPassword.trim() !== confirmDonorPassword.trim() || !oldDonorPassword.trim() || editingDonorPassword.trim() === confirmDonorPassword.trim()) ? '#ccc' : '#28a745',
                           border: 'none',
                           borderRadius: 6,
                           padding: '8px 16px',
-                          cursor: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() !== confirmDonorPassword.trim()) ? 'not-allowed' : 'pointer',
+                          cursor: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() === oldDonorPassword.trim() || editingDonorPassword.trim() !== confirmDonorPassword.trim() || !oldDonorPassword.trim() || editingDonorPassword.trim() === confirmDonorPassword.trim()) ? 'not-allowed' : 'pointer',
                           color: '#fff',
                           fontWeight: 600,
                           fontSize: 14,
@@ -1133,6 +1204,21 @@ export default function KitchenDetailsPage() {
                 {isEditingDonorPassword && editingDonorPassword.trim() && confirmDonorPassword.trim() && editingDonorPassword.trim() !== confirmDonorPassword.trim() && (
                   <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
                     Passwords do not match
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim() && editingDonorPassword.trim() === oldDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    New password cannot be same as old password
+                  </div>
+                )}
+                {isEditingDonorPassword && !oldDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    Old password is required
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim() && confirmDonorPassword.trim() && editingDonorPassword.trim() === confirmDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    New password cannot be the same as the confirm password
                   </div>
                 )}
               </div>

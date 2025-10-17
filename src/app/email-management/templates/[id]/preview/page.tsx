@@ -81,6 +81,18 @@ export default function PreviewTemplate({ params }: { params: Promise<{ id: stri
     }
   };
 
+  // Convert {{variable}} to styled tags
+  const convertVariablesToTags = (html: string): string => {
+    // First, check if the HTML already contains styled variable tags to avoid double conversion
+    if (html.includes('email-variable-tag')) {
+      return html;
+    }
+    
+    return html.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
+      return `<span class="email-variable-tag" contenteditable="false" data-variable="{{${variableName}}}">${variableName}</span>`;
+    });
+  };
+
   const replaceVariables = (content: string) => {
     let result = content;
     const variableRegex = /\{\{([^}]+)\}\}/g;
@@ -137,8 +149,8 @@ export default function PreviewTemplate({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const previewContent = previewMode ? replaceVariables(template.htmlContent) : template.htmlContent;
-  const previewSubject = previewMode ? replaceVariables(template.subject) : template.subject;
+  const previewContent = previewMode ? replaceVariables(template.htmlContent) : convertVariablesToTags(template.htmlContent);
+  const previewSubject = previewMode ? replaceVariables(template.subject) : convertVariablesToTags(template.subject);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -244,12 +256,20 @@ export default function PreviewTemplate({ params }: { params: Promise<{ id: stri
               <div className="text-sm text-gray-900">Hungy System &lt;noreply@hungy.ca&gt;</div>
               
               <div className="text-sm font-medium text-gray-700 mb-1 mt-3">To:</div>
-              <div className="text-sm text-gray-900">
-                {previewMode ? 'John Doe &lt;john.doe@example.com&gt;' : '{{user.firstName}} {{user.lastName}} &lt;{{user.email}}&gt;'}
-              </div>
+              <div 
+                className="text-sm text-gray-900"
+                dangerouslySetInnerHTML={{ 
+                  __html: previewMode 
+                    ? 'John Doe &lt;john.doe@example.com&gt;' 
+                    : convertVariablesToTags('{{user.firstName}} {{user.lastName}} &lt;{{user.email}}&gt;')
+                }}
+              />
               
               <div className="text-sm font-medium text-gray-700 mb-1 mt-3">Subject:</div>
-              <div className="text-sm text-gray-900 font-medium">{previewSubject}</div>
+              <div 
+                className="text-sm text-gray-900 font-medium"
+                dangerouslySetInnerHTML={{ __html: previewSubject }}
+              />
             </div>
           </div>
 
@@ -257,7 +277,14 @@ export default function PreviewTemplate({ params }: { params: Promise<{ id: stri
           <div className="border border-gray-200 rounded-lg bg-gray-50 p-4">
             <div className="bg-white rounded border min-h-96">
               {template.htmlContent ? (
-                <div dangerouslySetInnerHTML={{ __html: previewContent }} />
+                <div style={{ padding: '24px', fontFamily: 'Arial, sans-serif' }}>
+                  <div dangerouslySetInnerHTML={{ __html: previewContent }} />
+                  <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #e5e7eb' }}>
+                    <p style={{ color: '#9ca3af', fontSize: '12px', textAlign: 'center', margin: 0 }}>
+                      This is an automated message from "user.organization.name".
+                    </p>
+                  </div>
+                </div>
               ) : (
                 <div className="p-8 text-center text-gray-500 italic">
                   No HTML content available
@@ -265,6 +292,23 @@ export default function PreviewTemplate({ params }: { params: Promise<{ id: stri
               )}
             </div>
           </div>
+
+          {/* CSS for variable tags */}
+          <style jsx global>{`
+            .email-variable-tag {
+              display: inline-block;
+              background-color: #e0f2fe;
+              color: #dc2626;
+              padding: 2px 8px;
+              border-radius: 4px;
+              font-size: 0.875rem;
+              font-weight: 500;
+              margin: 0 2px;
+              cursor: default;
+              user-select: none;
+              white-space: nowrap;
+            }
+          `}</style>
 
           {/* Plain Text Version */}
           {template.textContent && (

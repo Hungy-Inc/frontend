@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FaSave, FaEye, FaArrowLeft } from 'react-icons/fa';
+import { FaSave, FaArrowLeft } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,33 +16,6 @@ const TEMPLATE_TYPES = [
   { value: 'CUSTOM_REMINDER', label: 'Reminder' },
 ];
 
-const SAMPLE_VARIABLES = {
-  user: {
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    organization: {
-      name: 'Community Food Bank'
-    }
-  },
-  shift: {
-    name: 'Morning Kitchen Prep',
-    category: 'Kitchen',
-    startTime: '2024-01-15 08:00 AM',
-    endTime: '2024-01-15 12:00 PM',
-    location: 'Main Kitchen',
-    organization: {
-      name: 'Community Food Bank'
-    }
-  },
-  system: {
-    currentDate: new Date().toLocaleDateString(),
-    currentTime: new Date().toLocaleTimeString(),
-    appName: 'Hungy',
-    supportEmail: 'support@hungy.ca'
-  }
-};
-
 export default function CreateTemplate() {
   const router = useRouter();
   
@@ -54,7 +27,6 @@ export default function CreateTemplate() {
     templateType: 'CUSTOM_MARKETING',
     description: ''
   });
-  const [previewMode, setPreviewMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -72,27 +44,6 @@ export default function CreateTemplate() {
       htmlContent,
       textContent: plainText
     }));
-  };
-
-  const replaceVariables = (content: string) => {
-    let result = content;
-    const variableRegex = /\{\{([^}]+)\}\}/g;
-    result = result.replace(variableRegex, (match, path) => {
-      const keys = path.trim().split('.');
-      let value: any = SAMPLE_VARIABLES;
-      
-      for (const key of keys) {
-        if (value && typeof value === 'object' && key in value) {
-          value = value[key];
-        } else {
-          return match;
-        }
-      }
-      
-      return value !== undefined ? String(value) : match;
-    });
-    
-    return result;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,9 +87,6 @@ export default function CreateTemplate() {
     }
   };
 
-  const previewContent = previewMode ? replaceVariables(formData.htmlContent) : formData.htmlContent;
-  const previewSubject = previewMode ? replaceVariables(formData.subject) : formData.subject;
-
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
@@ -151,9 +99,7 @@ export default function CreateTemplate() {
         <p className="text-gray-600">Create a new custom email template</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Form */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+      <div className="bg-white rounded-lg shadow-sm border p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -240,69 +186,104 @@ export default function CreateTemplate() {
               </div>
             </div>
 
-            <div className="flex space-x-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center space-x-2 px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50"
-              >
-                <FaSave />
-                <span>{loading ? 'Creating...' : 'Create Template'}</span>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => setPreviewMode(!previewMode)}
-                className="flex items-center space-x-2 px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-              >
-                <FaEye />
-                <span>{previewMode ? 'Edit Mode' : 'Preview Mode'}</span>
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex items-center space-x-2 px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50"
+            >
+              <FaSave />
+              <span>{loading ? 'Creating...' : 'Create Template'}</span>
+            </button>
           </form>
-        </div>
+      </div>
 
-        {/* Preview */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Preview</h3>
-            <div className="text-sm text-gray-500">
-              {previewMode ? 'With Sample Data' : 'Raw Template'}
+      {/* Available Variables */}
+      <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
+        <h4 className="text-lg font-semibold text-gray-900 mb-4">Available Variables</h4>
+        <p className="text-sm text-gray-600 mb-6">Use these variables in your email template. They will be automatically replaced with actual values when the email is sent.</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h5 className="text-sm font-semibold text-gray-900 mb-3">User Variables:</h5>
+            <div className="space-y-2">
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">First Name</span>
+                <span className="text-xs text-gray-600">User's first name (e.g., John)</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Last Name</span>
+                <span className="text-xs text-gray-600">User's last name (e.g., Doe)</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Email</span>
+                <span className="text-xs text-gray-600">User's email address</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">User Role</span>
+                <span className="text-xs text-gray-600">User's role (e.g., Volunteer, Staff)</span>
+              </div>
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-            <div className="mb-3">
-              <div className="text-sm font-medium text-gray-700 mb-1">Subject:</div>
-              <div className="text-sm text-gray-900 bg-white p-2 rounded border">
-                {previewSubject || 'No subject'}
+          <div>
+            <h5 className="text-sm font-semibold text-gray-900 mb-3">Shift Variables:</h5>
+            <div className="space-y-2">
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Shift Name</span>
+                <span className="text-xs text-gray-600">Name of the shift (e.g., Morning Kitchen Prep)</span>
               </div>
-            </div>
-
-            <div>
-              <div className="text-sm font-medium text-gray-700 mb-1">Content:</div>
-              <div className="bg-white p-4 rounded border min-h-64">
-                {formData.htmlContent ? (
-                  <div dangerouslySetInnerHTML={{ __html: previewContent }} />
-                ) : (
-                  <div className="text-gray-500 italic">No content yet</div>
-                )}
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Category</span>
+                <span className="text-xs text-gray-600">Category of the shift (e.g., Kitchen, Delivery)</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Start Time</span>
+                <span className="text-xs text-gray-600">When the shift starts (e.g., 8:00 AM)</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">End Time</span>
+                <span className="text-xs text-gray-600">When the shift ends (e.g., 12:00 PM)</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Location</span>
+                <span className="text-xs text-gray-600">Where the shift takes place</span>
               </div>
             </div>
           </div>
 
-          {/* Variable Reference */}
-          <div className="mt-6">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Available Variables:</h4>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div><code>{'{{user.firstName}}'}</code> - User's first name</div>
-              <div><code>{'{{user.lastName}}'}</code> - User's last name</div>
-              <div><code>{'{{user.email}}'}</code> - User's email</div>
-              <div><code>{'{{user.organization.name}}'}</code> - Organization name</div>
-              <div><code>{'{{shift.name}}'}</code> - Shift name</div>
-              <div><code>{'{{shift.startTime}}'}</code> - Shift start time</div>
-              <div><code>{'{{shift.location}}'}</code> - Shift location</div>
-              <div><code>{'{{system.currentDate}}'}</code> - Current date</div>
+          <div>
+            <h5 className="text-sm font-semibold text-gray-900 mb-3">Organization Variables:</h5>
+            <div className="space-y-2">
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Organization Name</span>
+                <span className="text-xs text-gray-600">Name of your organization</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Shift Organization</span>
+                <span className="text-xs text-gray-600">Organization running the shift</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h5 className="text-sm font-semibold text-gray-900 mb-3">System Variables:</h5>
+            <div className="space-y-2">
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Current Date</span>
+                <span className="text-xs text-gray-600">Today's date</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Current Time</span>
+                <span className="text-xs text-gray-600">Current time</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">App Name</span>
+                <span className="text-xs text-gray-600">Name of the application (Hungy)</span>
+              </div>
+              <div className="flex items-start">
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs text-gray-700 font-mono mr-3 shrink-0">Support Email</span>
+                <span className="text-xs text-gray-600">Support contact email</span>
+              </div>
             </div>
           </div>
         </div>

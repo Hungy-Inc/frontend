@@ -19,8 +19,14 @@ export function htmlToPlainText(html: string): string {
 export function stripHtmlTags(html: string): string {
   if (!html) return '';
   
+  // First, convert styled variable tags back to {{variable}} format
+  let result = html.replace(
+    /<span[^>]*class="email-variable-tag"[^>]*data-variable="([^"]+)"[^>]*>.*?<\/span>/g,
+    (match, variable) => variable
+  );
+  
   // Remove HTML tags but preserve line breaks
-  return html
+  return result
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<[^>]*>/g, '')

@@ -67,6 +67,18 @@ export default function KitchenDetailsPage() {
   const [isEditingMealsValue, setIsEditingMealsValue] = useState(false);
   const [editingMealsValue, setEditingMealsValue] = useState<string>("");
 
+  // Forgot password flow state
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<'otp' | 'password'>('otp');
+  const [forgotPasswordOtp, setForgotPasswordOtp] = useState('');
+  const [forgotPasswordNewPassword, setForgotPasswordNewPassword] = useState('');
+  const [forgotPasswordConfirmPassword, setForgotPasswordConfirmPassword] = useState('');
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordResetToken, setForgotPasswordResetToken] = useState('');
+  const [showForgotPasswordNew, setShowForgotPasswordNew] = useState(false);
+  const [showForgotPasswordConfirm, setShowForgotPasswordConfirm] = useState(false);
   // Donor password state
   const [isEditingDonorPassword, setIsEditingDonorPassword] = useState(false);
   const [editingDonorPassword, setEditingDonorPassword] = useState<string>("");
@@ -462,6 +474,76 @@ export default function KitchenDetailsPage() {
     setEditingMealsValue("");
   };
 
+  // Forgot password handlers
+  const handleOpenForgotPassword = async () => {
+    setShowForgotPasswordModal(true);
+    setForgotPasswordStep('otp');
+    setForgotPasswordOtp('');
+    setForgotPasswordNewPassword('');
+    setForgotPasswordConfirmPassword('');
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+    setForgotPasswordLoading(true);
+    
+    // Automatically send OTP to hardcoded email
+    const hardcodedEmail = 'contact.hungy@gmail.com';
+    
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/forgot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: hardcodedEmail })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setForgotPasswordError(data.error || 'Failed to send OTP');
+      } else {
+        setForgotPasswordSuccess(data.message);
+        if (data.otp) {
+          setForgotPasswordSuccess(`${data.message} (Test OTP: ${data.otp})`);
+        }
+      }
+    } catch (err) {
+      setForgotPasswordError('Network error. Please check your connection and try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setForgotPasswordError('');
+    setForgotPasswordLoading(true);
+    
+    const hardcodedEmail = 'contact.hungy@gmail.com';
+    
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: hardcodedEmail, otp: forgotPasswordOtp })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setForgotPasswordError(data.error || 'Invalid OTP');
+      } else {
+        setForgotPasswordResetToken(data.resetToken);
+        setForgotPasswordStep('password');
+        setForgotPasswordSuccess('');
+      }
+    } catch (err) {
+      setForgotPasswordError('Network error. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleResetDonorPassword = async () => {
+    setForgotPasswordError('');
+    setForgotPasswordLoading(true);
   const handleStartEditDonorPassword = () => {
     setIsEditingDonorPassword(true);
     setEditingDonorPassword("");
@@ -491,9 +573,16 @@ export default function KitchenDetailsPage() {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        toast.error('Authentication token not found. Please login again.');
+        setForgotPasswordError('Authentication token not found. Please login again.');
+        setForgotPasswordLoading(false);
         return;
       }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/reset`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
       const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/verify-donor-password`, {
         method: "POST",
         headers: {
@@ -516,16 +605,42 @@ export default function KitchenDetailsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          donorPagePassword: inputValue
-        }),
-      });      
+        body: JSON.stringify({ resetToken: forgotPasswordResetToken, newPassword: forgotPasswordNewPassword })
+      });
+      
+      const data = await res.json();
+      
       if (!res.ok) {
-        const errorData = await res.json();
-        console.error('Error response:', errorData);
-        toast.error(errorData.error || 'Failed to update donor password');
-        return;
+        setForgotPasswordError(data.error || 'Failed to reset password');
+      } else {
+        setForgotPasswordSuccess('Donor password reset successfully!');
+        setTimeout(() => {
+          setShowForgotPasswordModal(false);
+          setForgotPasswordStep('otp');
+          setForgotPasswordOtp('');
+          setForgotPasswordNewPassword('');
+          setForgotPasswordConfirmPassword('');
+          setForgotPasswordError('');
+          setForgotPasswordSuccess('');
+          setForgotPasswordResetToken('');
+        }, 2000);
       }
+    } catch (err) {
+      setForgotPasswordError('Network error. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleCloseForgotPasswordModal = () => {
+    setShowForgotPasswordModal(false);
+    setForgotPasswordStep('otp');
+    setForgotPasswordOtp('');
+    setForgotPasswordNewPassword('');
+    setForgotPasswordConfirmPassword('');
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+    setForgotPasswordResetToken('');
       setIsEditingDonorPassword(false);
       setEditingDonorPassword("");
       setConfirmDonorPassword("");
@@ -543,6 +658,10 @@ export default function KitchenDetailsPage() {
     setConfirmDonorPassword("");
     setOldDonorPassword("");
   };
+
+  const isForgotPasswordValid = forgotPasswordNewPassword.length >= 8;
+  const doForgotPasswordsMatch = forgotPasswordNewPassword === forgotPasswordConfirmPassword && forgotPasswordNewPassword.length > 0;
+  const canSubmitForgotPassword = isForgotPasswordValid && doForgotPasswordsMatch;
 
   // Weighing category functions
   const handleAddCategory = async () => {
@@ -992,26 +1111,36 @@ export default function KitchenDetailsPage() {
           <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Donor Data Password</h2>
-              <button
-                onClick={isEditingDonorPassword ? handleCancelEditDonorPassword : handleStartEditDonorPassword}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#2196f3',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 16
-                }}
-              >
-                <FaEdit />
-                {isEditingDonorPassword ? 'Cancel' : 'Edit'}
-              </button>
             </div>
 
             <div>
               <div>
+                <div style={{ 
+                  background: '#f8f9fa',
+                  borderRadius: 8,
+                  padding: '9.5px',
+                  border: '1px solid #e9ecef',
+                  marginBottom: 12
+                }}>
+                  <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
+                    Click "Forgot Password?" to reset the donor data page password.
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenForgotPassword}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ff9800',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                >
+                  Forgot Password?
+                </button>
                 <label style={{ display: 'block', marginBottom: 8, color: '#666' }}></label>
                 {isEditingDonorPassword ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -1950,6 +2079,265 @@ export default function KitchenDetailsPage() {
                 Save Changes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            padding: '2rem',
+            minWidth: 400,
+            maxWidth: 500,
+            width: '100%',
+            margin: '0 1rem'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.5rem', margin: 0 }}>
+                Reset Donor Password
+              </h2>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginTop: 8 }}>
+                {forgotPasswordStep === 'otp' && 'Enter the 6-digit code sent to contact.hungy@gmail.com'}
+                {forgotPasswordStep === 'password' && 'Enter your new password'}
+              </p>
+            </div>
+
+            {forgotPasswordStep === 'otp' && (
+              <>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="otp" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>OTP Code</label>
+                  <input
+                    id="otp"
+                    type="text"
+                    value={forgotPasswordOtp}
+                    onChange={e => setForgotPasswordOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: 6,
+                      border: '1px solid #eee',
+                      fontSize: '1rem',
+                      textAlign: 'center',
+                      letterSpacing: '0.5rem'
+                    }}
+                    placeholder="000000"
+                    maxLength={6}
+                    disabled={forgotPasswordLoading}
+                  />
+                  <p style={{ fontSize: '0.8rem', color: '#666', marginTop: 4, textAlign: 'center' }}>
+                    Didn't receive the code? Check your spam folder.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleCloseForgotPasswordModal}
+                    style={{
+                      flex: 1,
+                      background: '#f5f5f5',
+                      color: '#666',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={forgotPasswordLoading || forgotPasswordOtp.length !== 6}
+                    style={{
+                      flex: 1,
+                      background: (forgotPasswordLoading || forgotPasswordOtp.length !== 6) ? '#ccc' : '#ff9800',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: (forgotPasswordLoading || forgotPasswordOtp.length !== 6) ? 'not-allowed' : 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    {forgotPasswordLoading ? 'Verifying...' : 'Verify Code'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {forgotPasswordStep === 'password' && (
+              <>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="newPassword" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>New Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id="newPassword"
+                      type={showForgotPasswordNew ? "text" : "password"}
+                      value={forgotPasswordNewPassword}
+                      onChange={e => setForgotPasswordNewPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 40px 0.75rem 0.75rem',
+                        borderRadius: 6,
+                        border: `1px solid ${isForgotPasswordValid ? '#4caf50' : '#e0e0e0'}`,
+                        fontSize: '1rem'
+                      }}
+                      placeholder="Enter new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPasswordNew(!showForgotPasswordNew)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {showForgotPasswordNew ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  {forgotPasswordNewPassword.length > 0 && !isForgotPasswordValid && (
+                    <p style={{ fontSize: '0.8rem', color: '#f44336', marginTop: 4 }}>
+                      Password must be at least 8 characters long
+                    </p>
+                  )}
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="confirmPassword" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>Confirm Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id="confirmPassword"
+                      type={showForgotPasswordConfirm ? "text" : "password"}
+                      value={forgotPasswordConfirmPassword}
+                      onChange={e => setForgotPasswordConfirmPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 40px 0.75rem 0.75rem',
+                        borderRadius: 6,
+                        border: `1px solid ${forgotPasswordConfirmPassword.length > 0 ? (doForgotPasswordsMatch ? '#4caf50' : '#f44336') : '#e0e0e0'}`,
+                        fontSize: '1rem'
+                      }}
+                      placeholder="Confirm new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPasswordConfirm(!showForgotPasswordConfirm)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {showForgotPasswordConfirm ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  {forgotPasswordConfirmPassword.length > 0 && !doForgotPasswordsMatch && (
+                    <p style={{ fontSize: '0.8rem', color: '#f44336', marginTop: 4 }}>
+                      Passwords do not match
+                    </p>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleCloseForgotPasswordModal}
+                    style={{
+                      flex: 1,
+                      background: '#f5f5f5',
+                      color: '#666',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleResetDonorPassword}
+                    disabled={forgotPasswordLoading || !canSubmitForgotPassword}
+                    style={{
+                      flex: 1,
+                      background: (forgotPasswordLoading || !canSubmitForgotPassword) ? '#ccc' : '#ff9800',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: (forgotPasswordLoading || !canSubmitForgotPassword) ? 'not-allowed' : 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    {forgotPasswordLoading ? 'Resetting...' : 'Reset Password'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {forgotPasswordError && (
+              <div style={{
+                color: '#f44336',
+                marginTop: 12,
+                fontSize: '0.9rem',
+                textAlign: 'center',
+                padding: '12px',
+                backgroundColor: '#ffebee',
+                borderRadius: '6px',
+                border: '1px solid #ffcdd2'
+              }}>
+                {forgotPasswordError}
+              </div>
+            )}
+
+            {forgotPasswordSuccess && (
+              <div style={{
+                color: '#4caf50',
+                marginTop: 12,
+                fontSize: '0.9rem',
+                textAlign: 'center',
+                padding: '12px',
+                backgroundColor: '#e8f5e8',
+                borderRadius: '6px',
+                border: '1px solid #c8e6c9'
+              }}>
+                {forgotPasswordSuccess}
+              </div>
+            )}
           </div>
         </div>
       )}

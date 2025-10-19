@@ -62,9 +62,6 @@ export default function ManageShiftsPage() {
   // New state for enhanced features
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
   
-  // Special Events toggle state
-  const [specialEventsMode, setSpecialEventsMode] = useState(false);
-  
   // New state for expandable shifts
   const [expandedShifts, setExpandedShifts] = useState<Set<number>>(new Set());
   const [shiftOccurrences, setShiftOccurrences] = useState<{[key: number]: any[]}>({});
@@ -237,20 +234,7 @@ export default function ManageShiftsPage() {
       fetchShifts(); // Also fetch shifts for occurrence status checking
     }
     // eslint-disable-next-line
-  }, [tab, filterActive, specialEventsMode]);
-
-  // Auto-select Special Events category when mode is active
-  useEffect(() => {
-    if (specialEventsMode && categoryOptions.length > 0) {
-      const specialEventsCategory = categoryOptions.find(cat => cat.name === 'Special Events');
-      if (specialEventsCategory) {
-        setAddRecurring(prev => ({ ...prev, shiftCategoryId: specialEventsCategory.id }));
-      }
-    } else if (!specialEventsMode) {
-      // Clear category selection when Special Events mode is turned off
-      setAddRecurring(prev => ({ ...prev, shiftCategoryId: '' }));
-    }
-  }, [specialEventsMode, categoryOptions]);
+  }, [tab, filterActive]);
 
 
 
@@ -302,17 +286,7 @@ export default function ManageShiftsPage() {
       if (!res.ok) throw new Error("Failed to fetch shifts");
       const data = await res.json();
       
-      // Filter by Special Events category if mode is active
-      let filteredData = data;
-      if (specialEventsMode) {
-        // Find the Special Events category
-        const specialEventsCategory = categoryOptions.find(cat => cat.name === 'Special Events');
-        if (specialEventsCategory) {
-          filteredData = data.filter((shift: any) => shift.shiftCategoryId === specialEventsCategory.id);
-        }
-      }
-      
-      setRecurringShifts(filteredData);
+      setRecurringShifts(data);
     } catch (err) {
       setErrorRecurring("Failed to load shifts.");
       setRecurringShifts([]);
@@ -1723,26 +1697,6 @@ export default function ManageShiftsPage() {
         >
           Shift Categories
         </button>
-        {/* Special Events Toggle Button - Only show on Recurring Shifts tab */}
-        {tab === 'recurringshifts' && (
-          <button
-            onClick={() => setSpecialEventsMode(!specialEventsMode)}
-            style={{
-              padding: '10px 24px',
-              borderRadius: 8,
-              border: '2px solid #ff9800',
-              background: specialEventsMode ? '#ff9800' : 'transparent',
-              color: specialEventsMode ? '#fff' : '#ff9800',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: specialEventsMode ? '0 2px 8px #ffd699' : 'none',
-              transition: 'all 0.15s',
-              marginLeft: 'auto' // Push to the right
-            }}
-          >
-            {specialEventsMode ? '🎉 Special Events ON' : '🎉 Special Events'}
-          </button>
-        )}
       </div>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, minHeight: 200, position: 'relative' }}>
         {tab === 'shiftcategory' && (
@@ -1887,24 +1841,6 @@ export default function ManageShiftsPage() {
             </div>
 
 
-            {/* Special Events Mode Indicator */}
-            {specialEventsMode && (
-              <div style={{ 
-                marginBottom: '16px',
-                padding: '12px 16px',
-                background: '#fff3e0',
-                borderRadius: '8px',
-                border: '1px solid #ffcc80',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '16px' }}>🎉</span>
-                <span style={{ fontWeight: '600', color: '#f57c00' }}>
-                  Special Events Mode Active
-                </span>
-              </div>
-            )}
 
             {loadingRecurring ? (
               <div style={{ textAlign: 'center', color: '#888' }}>Loading...</div>
@@ -1912,7 +1848,7 @@ export default function ManageShiftsPage() {
               <div style={{ textAlign: 'center', color: 'red' }}>{errorRecurring}</div>
             ) : recurringShifts.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#888' }}>
-                {specialEventsMode ? 'No Special Events shifts found.' : 'No recurring shifts found.'}
+                No recurring shifts found.
               </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>

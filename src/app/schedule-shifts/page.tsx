@@ -383,10 +383,18 @@ export default function ScheduleShiftsPage() {
         // Calculate present default users for today
         const presentDefaultUsers = totalDefaultUsers - absentDefaultUsers;
         
-        // Calculate today's signups
-        const todaysSignups = todaysShifts.reduce((sum, shift) => sum + (shift.ShiftSignup ? shift.ShiftSignup.length : 0), 0);
+        // Get default user IDs to exclude them from regular signup count
+        const defaultUserIds = rec.DefaultShiftUser ? rec.DefaultShiftUser.map((du: any) => du.userId) : [];
         
-        // Calculate total filled slots (today's signups + present default users)
+        // Calculate today's signups (excluding default users to avoid double counting)
+        const todaysSignups = todaysShifts.reduce((sum, shift) => {
+          if (!shift.ShiftSignup) return sum;
+          // Count only non-default user signups
+          const nonDefaultSignups = shift.ShiftSignup.filter((signup: any) => !defaultUserIds.includes(signup.userId));
+          return sum + nonDefaultSignups.length;
+        }, 0);
+        
+        // Calculate total filled slots (non-default signups + present default users)
         const totalFilledSlots = todaysSignups + presentDefaultUsers;
         
         const totalSlots = rec.slots || 0;

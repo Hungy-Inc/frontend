@@ -737,38 +737,6 @@ export default function ManageShiftsPage() {
     if (targetMonth !== undefined && targetYear !== undefined) {
       const startDate = new Date(targetYear, targetMonth, 1);
       const endDate = new Date(targetYear, targetMonth + 1, 0); // Last day of the month
-
-      // // Find the first occurrence of this day of week in the target month
-      // let currentDate = new Date(startDate);
-      // while (currentDate.getDay() !== shift.dayOfWeek) {
-      //   currentDate.setDate(currentDate.getDate() + 1);
-      // }
-      
-      // // Generate occurrences for this month only
-      // while (currentDate <= endDate) {
-      //   // Create date without time to avoid timezone issues
-      //   const occurrenceDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-        
-      //   // Set the time for this occurrence
-      //   const startTime = new Date(shift.startTime);
-      //   const endTime = new Date(shift.endTime);
-        
-      //   const occurrenceStart = new Date(occurrenceDate);
-      //   occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-        
-      //   const occurrenceEnd = new Date(occurrenceDate);
-      //   occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
-        
-      //   occurrences.push({
-      //     date: occurrenceDate,
-      //     startTime: occurrenceStart,
-      //     endTime: occurrenceEnd,
-      //     dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
-      //   });
-        
-      //   // Move to next week
-      //   currentDate.setDate(currentDate.getDate() + 7);
-      // }
       
       // Generate occurrences for each day of the week in this month
       for (const dayOfWeek of daysOfWeek) {
@@ -808,58 +776,6 @@ export default function ManageShiftsPage() {
       // Default behavior: Generate 52 occurrences (one year) from current date
       const today = new Date();
       let startDate = new Date();
-
-      // const startDateDay = startDate.getDay();
-      // let dayDiff = shift.dayOfWeek - startDateDay;
-      
-      // // If start date is the recurring day, start from next week
-      // if (dayDiff <= 0) dayDiff += 7;
-      
-      // // Generate 52 occurrences (one year of weekly shifts)
-      // for (let i = 0; i < 52; i++) {
-      //   // Create date without time to avoid timezone issues
-      //   const targetDate = startDate.getDate() + dayDiff + (i * 7);
-      //   const occurrenceDate = new Date(startDate.getFullYear(), startDate.getMonth(), targetDate);
-        
-      //   // Set the time for this occurrence
-      //   const startTime = new Date(shift.startTime);
-      //   const endTime = new Date(shift.endTime);
-        
-      //   const occurrenceStart = new Date(occurrenceDate);
-      //   occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-        
-      //   const occurrenceEnd = new Date(occurrenceDate);
-      //   occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
-        
-      //   // Debug first few occurrences
-      //   if (i < 3) {
-      //     console.log(`🔍 MANAGE-SHIFTS OCCURRENCE ${i}:`, {
-      //       '=== INPUT ===': {
-      //         startDate: startDate,
-      //         dayDiff: dayDiff,
-      //         i: i,
-      //         targetDate: targetDate
-      //       },
-      //       '=== CREATION ===': {
-      //         occurrenceDate: occurrenceDate,
-      //         occurrenceDateString: occurrenceDate.toDateString(),
-      //         occurrenceDateISO: occurrenceDate.toISOString(),
-      //         occurrenceDateLocal: occurrenceDate.toLocaleDateString(),
-      //         occurrenceDateComponents: {
-      //           year: occurrenceDate.getFullYear(),
-      //           month: occurrenceDate.getMonth() + 1,
-      //           day: occurrenceDate.getDate()
-      //         }
-      //       }
-      //     });
-      //   }
-        
-      //   occurrences.push({
-      //     date: occurrenceDate,
-      //     startTime: occurrenceStart,
-      //     endTime: occurrenceEnd,
-      //     dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
-      //   });
       
       // Generate occurrences for each day of the week
       for (const dayOfWeek of daysOfWeek) {
@@ -867,7 +783,7 @@ export default function ManageShiftsPage() {
         let dayDiff = dayOfWeek - startDateDay;
         
         // If start date is the recurring day, start from next week
-        if (dayDiff <= 0) dayDiff += 7;
+        if (dayDiff < 0) dayDiff += 7;
         
         // Generate 52 occurrences (one year of weekly shifts) for this day
         for (let i = 0; i < 52; i++) {

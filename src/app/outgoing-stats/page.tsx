@@ -324,7 +324,7 @@ export default function OutgoingStatsPage() {
             <tbody>
               {displayData.map((row, i) => (
                 <tr key={i}>
-                  <td>{firstColumn === 'Date' ? formatDate(row.date) : row.Month}</td>
+                  <td>{firstColumn === 'Date' ? formatDate(row.date) : (row as any).Month}</td>
                   <td>{row.totalMealsServed}</td>
                   <td>{row.mealsFromFoodBoxes}</td>
                   <td>{row.outreachCount}</td>
@@ -528,7 +528,7 @@ export default function OutgoingStatsPage() {
             <tbody>
               {displayData.map((row, i) => (
                 <tr key={i}>
-                  <td>{firstColumn === 'Date' ? formatDate(row.date) : row.Month}</td>
+                  <td>{firstColumn === 'Date' ? formatDate(row.date) : (row as any).Month}</td>
                   <td className={styles.totalCol}>{row.foodBoxCount}</td>
                 </tr>
               ))}

@@ -80,13 +80,6 @@ export default function KitchenDetailsPage() {
   const [showForgotPasswordNew, setShowForgotPasswordNew] = useState(false);
   const [showForgotPasswordConfirm, setShowForgotPasswordConfirm] = useState(false);
   // Donor password state
-  const [isEditingDonorPassword, setIsEditingDonorPassword] = useState(false);
-  const [editingDonorPassword, setEditingDonorPassword] = useState<string>("");
-  const [showDonorPassword, setShowDonorPassword] = useState(false);
-  const [confirmDonorPassword, setConfirmDonorPassword] = useState<string>("");
-  const [showConfirmDonorPassword, setShowConfirmDonorPassword] = useState(false);
-  const [oldDonorPassword, setOldDonorPassword] = useState<string>("");
-  const [showOldDonorPassword, setShowOldDonorPassword] = useState(false);
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);

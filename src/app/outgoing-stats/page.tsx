@@ -82,6 +82,10 @@ export default function OutgoingStatsPage() {
         setError('');
         const token = localStorage.getItem('token');
         
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+        
         switch (activeTab) {
           case 'consolidated':
             await fetchConsolidatedData(token);
@@ -171,6 +175,9 @@ export default function OutgoingStatsPage() {
   const handleExport = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
       const endpoint = activeTab === 'shift-categories' 
         ? 'filtered' 
         : activeTab;
@@ -201,6 +208,9 @@ export default function OutgoingStatsPage() {
   const handleConsolidatedExport = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
       
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/consolidated-excel/export?month=${selectedMonth}&year=${selectedYear}`,

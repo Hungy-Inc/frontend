@@ -67,6 +67,11 @@ export default function KitchenDetailsPage() {
   const [isEditingMealsValue, setIsEditingMealsValue] = useState(false);
   const [editingMealsValue, setEditingMealsValue] = useState<string>("");
 
+  // Food box meals count state
+  const [foodBoxMealsCount, setFoodBoxMealsCount] = useState<number>(0);
+  const [isEditingFoodBoxMealsCount, setIsEditingFoodBoxMealsCount] = useState(false);
+  const [editingFoodBoxMealsCount, setEditingFoodBoxMealsCount] = useState<string>("");
+
   // Forgot password flow state
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [forgotPasswordStep, setForgotPasswordStep] = useState<'otp' | 'password'>('otp');
@@ -158,11 +163,14 @@ export default function KitchenDetailsPage() {
       // Load incoming dollar value from organization data
       const incomingValue = userOrg.incoming_dollar_value || 0;
       const mealsVal = userOrg.mealsvalue || 10;
+      const foodBoxMealsCountVal = userOrg.foodboxmealscount || 0;
       console.log('Organization data:', userOrg);
       console.log('Incoming dollar value loaded:', incomingValue);
       console.log('Meals value loaded:', mealsVal);
+      console.log('Food box meals count loaded:', foodBoxMealsCountVal);
       setIncomingDollarValue(incomingValue);
       setMealsValue(mealsVal);
+      setFoodBoxMealsCount(foodBoxMealsCountVal);
 
       // Set addresses from already parsed data
       setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
@@ -465,6 +473,76 @@ export default function KitchenDetailsPage() {
   const handleCancelEditMealsValue = () => {
     setIsEditingMealsValue(false);
     setEditingMealsValue("");
+  };
+
+  // Food box meals count handlers
+  const handleStartEditFoodBoxMealsCount = () => {
+    setIsEditingFoodBoxMealsCount(true);
+    setEditingFoodBoxMealsCount(foodBoxMealsCount.toString());
+  };
+
+  const handleSaveFoodBoxMealsCount = async () => {
+    const inputValue = parseInt(editingFoodBoxMealsCount);
+    if (isNaN(inputValue) || inputValue < 0) {
+      toast.error('Please enter a valid positive integer');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+
+      console.log('Saving food box meals count:', inputValue);
+      console.log('Organization ID:', organization.id);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/foodboxmealscount`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          foodboxmealscount: inputValue
+        }),
+      });
+
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.error || 'Failed to update food box meals count');
+        return;
+      }
+      
+      const updatedOrg = await res.json();
+      console.log('Updated organization:', updatedOrg);
+
+      // Update both the organization state and the food box meals count display state
+      setOrganization((prev: any) => ({
+        ...prev,
+        foodboxmealscount: updatedOrg.foodboxmealscount
+      }));
+      
+      // Update the display value state
+      setFoodBoxMealsCount(updatedOrg.foodboxmealscount);
+
+      setIsEditingFoodBoxMealsCount(false);
+      setEditingFoodBoxMealsCount("");
+      toast.success('Food box meals count updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating food box meals count:', error);
+      toast.error('Failed to update food box meals count. Please try again.');
+    }
+  };
+
+  const handleCancelEditFoodBoxMealsCount = () => {
+    setIsEditingFoodBoxMealsCount(false);
+    setEditingFoodBoxMealsCount("");
   };
 
   // Forgot password handlers
@@ -1245,7 +1323,86 @@ export default function KitchenDetailsPage() {
               )}
             </div>
 
-           
+            {/* Recent Weighing Records */}
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Recent Weighing Records</h3>
+              {weighingRecords.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>No weighing records found</div>
+              ) : (
+                <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                  {weighingRecords.slice(0, 10).map((weighing) => (
+                    <div
+                      key={weighing.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        border: '1px solid #eee',
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        background: '#fff'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flex: 1, gap: 16, alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.category}</span>
+                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram_kg_.toFixed(2)} kg</span>
+                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound_lb_.toFixed(2)} lb</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => handleEditWeighing(weighing)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#2196f3',
+                            cursor: 'pointer',
+                            padding: 4
+                          }}
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteWeighing(weighing.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#f44336',
+                            cursor: 'pointer',
+                            padding: 4
+                          }}
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+              <button
+                onClick={() => setShowAddCategory(true)}
+                style={{
+                  background: '#4CAF50',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <FaPlus />
+                Add Category
+              </button>
+            </div>
           </div>
 
           {/* Outgoing Stats Card */}
@@ -1364,83 +1521,107 @@ export default function KitchenDetailsPage() {
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-              <button
-                onClick={() => setShowAddCategory(true)}
-                style={{
-                  background: '#4CAF50',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                <FaPlus />
-                Add Category
-              </button>
-            </div>
-
-            {/* Recent Weighing Records */}
-            <div style={{ marginBottom: 24 }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Recent Weighing Records</h3>
-              {weighingRecords.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>No weighing records found</div>
-              ) : (
-                <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                  {weighingRecords.slice(0, 10).map((weighing) => (
-                    <div
-                      key={weighing.id}
+            {/* Food Box Meals Count Section */}
+            <div style={{ 
+              background: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 24, 
+              marginBottom: 24,
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Food Box Meals Count</h3>
+                <button
+                  onClick={handleStartEditFoodBoxMealsCount}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #dee2e6',
+                    color: '#666',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
+                >
+                  <FaEdit />
+                  Edit
+                </button>
+              </div>
+              
+              {isEditingFoodBoxMealsCount ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      value={editingFoodBoxMealsCount}
+                      onChange={(e) => setEditingFoodBoxMealsCount(e.target.value)}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '12px 16px',
-                        border: '1px solid #eee',
-                        borderRadius: 8,
-                        marginBottom: 8,
-                        background: '#fff'
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: '#333',
+                        width: '150px',
+                        outline: 'none'
+                      }}
+                      placeholder="0"
+                      min="0"
+                      step="1"
+                    />
+                    <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                      meals per box
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleSaveFoodBoxMealsCount}
+                      style={{
+                        background: '#28a745',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
                       }}
                     >
-                      <div style={{ display: 'flex', flex: 1, gap: 16, alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.category}</span>
-                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram_kg_.toFixed(2)} kg</span>
-                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound_lb_.toFixed(2)} lb</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          onClick={() => handleEditWeighing(weighing)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2196f3',
-                            cursor: 'pointer',
-                            padding: 4
-                          }}
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteWeighing(weighing.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#f44336',
-                            cursor: 'pointer',
-                            padding: 4
-                          }}
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                      <FaSave />
+                    </button>
+                    <button
+                      onClick={handleCancelEditFoodBoxMealsCount}
+                      style={{
+                        background: '#dc3545',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                    {foodBoxMealsCount.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                    meals per box
+                  </div>
                 </div>
               )}
             </div>

@@ -46,6 +46,16 @@ export default function Dashboard() {
   const [outLoading, setOutLoading] = useState(true);
   const [outError, setOutError] = useState<string | null>(null);
 
+  // Food Box state
+  const [foodBoxData, setFoodBoxData] = useState<{ totalFoodBoxes: number, totalMealsFromFoodBoxes: number, mealsPerBox: number }>({ totalFoodBoxes: 0, totalMealsFromFoodBoxes: 0, mealsPerBox: 10 });
+  const [foodBoxLoading, setFoodBoxLoading] = useState(true);
+  const [foodBoxError, setFoodBoxError] = useState<string | null>(null);
+
+  // Outreach state
+  const [outreachData, setOutreachData] = useState<{ locationData: { locationName: string, mealsCount: number }[], totalOutreachMeals: number }>({ locationData: [], totalOutreachMeals: 0 });
+  const [outreachLoading, setOutreachLoading] = useState(true);
+  const [outreachError, setOutreachError] = useState<string | null>(null);
+
   // Inventory state
   const [inventoryData, setInventoryData] = useState<{ name: string; weight: number }[]>([]);
   const [invLoading, setInvLoading] = useState(true);
@@ -251,6 +261,54 @@ export default function Dashboard() {
   }, [period, year]);
 
   useEffect(() => {
+    const fetchFoodBoxSummary = async () => {
+      setFoodBoxLoading(true);
+      setFoodBoxError(null);
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No authentication token found');
+        const month = getMonthNumber(period);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/foodbox-summary?month=${month}&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch food box summary');
+        const data = await response.json();
+        setFoodBoxData(data);
+      } catch (err) {
+        setFoodBoxError(err instanceof Error ? err.message : 'An error occurred');
+        setFoodBoxData({ totalFoodBoxes: 0, totalMealsFromFoodBoxes: 0, mealsPerBox: 10 });
+      } finally {
+        setFoodBoxLoading(false);
+      }
+    };
+    fetchFoodBoxSummary();
+  }, [period, year]);
+
+  useEffect(() => {
+    const fetchOutreachSummary = async () => {
+      setOutreachLoading(true);
+      setOutreachError(null);
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No authentication token found');
+        const month = getMonthNumber(period);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/outreach-summary?month=${month}&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch outreach summary');
+        const data = await response.json();
+        setOutreachData(data);
+      } catch (err) {
+        setOutreachError(err instanceof Error ? err.message : 'An error occurred');
+        setOutreachData({ locationData: [], totalOutreachMeals: 0 });
+      } finally {
+        setOutreachLoading(false);
+      }
+    };
+    fetchOutreachSummary();
+  }, [period, year]);
+
+  useEffect(() => {
     const fetchInventoryData = async () => {
       setInvLoading(true);
       setInvError(null);
@@ -432,7 +490,10 @@ export default function Dashboard() {
 
   // Calculate equivalent value based on meals served (excluding Collection category)
   const filteredTable = outTable ? outTable.filter((cat: any) => cat.category.toLowerCase() !== 'collection') : [];
-  const totalMealsServed = filteredTable.reduce((sum, cat: any) => sum + (cat.total || 0), 0);
+  const regularMealsServed = filteredTable.reduce((sum, cat: any) => sum + (cat.total || 0), 0);
+  
+  // Include food box and outreach meals in total
+  const totalMealsServed = regularMealsServed + foodBoxData.totalMealsFromFoodBoxes + outreachData.totalOutreachMeals;
   const equivalentValue = totalMealsServed * mealsValue; // Use organization's meals value
 
   // Extended color palette for pie chart (supports many items)
@@ -714,10 +775,79 @@ export default function Dashboard() {
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Meals Served</div>
                   <div style={{ fontSize: 24, fontWeight: 700, color: '#f24503' }}>{totalMealsServed.toFixed(0)}</div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                    Regular: {regularMealsServed} | Food Box: {foodBoxData.totalMealsFromFoodBoxes} | Outreach: {outreachData.totalOutreachMeals}
+                  </div>
                 </div>
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Equivalent Value</div>
                   <div style={{ fontSize: 24, fontWeight: 700, color: '#f24503' }}>${equivalentValue.toLocaleString()}</div>
+                </div>
+              </div>
+
+              {/* Food Box and Outreach Summary Boxes */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+                {/* Food Box Box */}
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 300 }}>
+                  <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 12 }}>Food Box Distribution</div>
+                  {foodBoxLoading ? (
+                    <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+                  ) : foodBoxError ? (
+                    <div style={{ color: 'red', padding: 8 }}>{foodBoxError}</div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                        <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                          <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Food Boxes</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: '#f24503' }}>{foodBoxData.totalFoodBoxes}</div>
+                        </div>
+                        <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                          <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Meals</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: '#f24503' }}>{foodBoxData.totalMealsFromFoodBoxes}</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>
+                        {foodBoxData.mealsPerBox} meals per box
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Outreach Box */}
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 300 }}>
+                  <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 12 }}>Outreach Activities</div>
+                  {outreachLoading ? (
+                    <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+                  ) : outreachError ? (
+                    <div style={{ color: 'red', padding: 8 }}>{outreachError}</div>
+                  ) : (
+                    <div>
+                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Outreach Meals</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#f24503' }}>{outreachData.totalOutreachMeals}</div>
+                      </div>
+                      {outreachData.locationData.length > 0 && (
+                        <div style={{ maxHeight: 120, overflowY: 'auto' }}>
+                          <table style={{ width: '100%', fontSize: 13 }}>
+                            <thead>
+                              <tr style={{ color: '#888', fontWeight: 600 }}>
+                                <th style={{ textAlign: 'left', padding: '4px 0' }}>Location</th>
+                                <th style={{ textAlign: 'right', padding: '4px 0' }}>Meals</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {outreachData.locationData.map((location, idx) => (
+                                <tr key={idx}>
+                                  <td style={{ padding: '4px 0' }}>{location.locationName}</td>
+                                  <td style={{ textAlign: 'right', padding: '4px 0' }}>{location.mealsCount}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               

@@ -19,10 +19,33 @@ const months = [
   { value: 12, label: 'December' }
 ];
 
+type OutgoingTab = 'consolidated' | 'shift-categories' | 'foodbox' | 'outreach';
+
 type OutgoingRow = {
   [key: string]: string | number;
 };
 
+type ConsolidatedRow = {
+  date: string;
+  totalMealsServed: number;
+  foodBoxesDistributed: number;
+  mealsFromFoodBoxes: number;
+  outreachCount: number;
+  totalImpact: number;
+};
+
+type FoodBoxRow = {
+  date: string;
+  foodBoxCount: number;
+  mealsPerBox: number;
+  totalMeals: number;
+  distributedBy: string;
+};
+
+type OutreachRow = {
+  date: string;
+  [locationName: string]: string | number;
+};
 
 const getYearOptions = () => {
   const currentYear = new Date().getFullYear();
@@ -34,42 +57,104 @@ const getYearOptions = () => {
 };
 
 export default function OutgoingStatsPage() {
-  const [columns, setColumns] = useState<string[]>([]);
-  const [tableData, setTableData] = useState<OutgoingRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  // Tab state
+  const [activeTab, setActiveTab] = useState<OutgoingTab>('consolidated');
+  
+  // Common state
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
+  // Tab-specific state
+  const [consolidatedData, setConsolidatedData] = useState<ConsolidatedRow[]>([]);
+  const [shiftCategoriesData, setShiftCategoriesData] = useState<OutgoingRow[]>([]);
+  const [shiftCategoriesColumns, setShiftCategoriesColumns] = useState<string[]>([]);
+  const [foodBoxData, setFoodBoxData] = useState<FoodBoxRow[]>([]);
+  const [outreachData, setOutreachData] = useState<OutreachRow[]>([]);
+  const [outreachColumns, setOutreachColumns] = useState<string[]>([]);
 
+  // Fetch data based on active tab
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError('');
         const token = localStorage.getItem('token');
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/filtered?month=${selectedMonth}&year=${selectedYear}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }
-        );
-        if (!response.ok) throw new Error('Failed to fetch outgoing stats');
-        const data = await response.json();
-        setColumns(data.columns);
-        setTableData(data.tableData);
+        
+        switch (activeTab) {
+          case 'consolidated':
+            await fetchConsolidatedData(token);
+            break;
+          case 'shift-categories':
+            await fetchShiftCategoriesData(token);
+            break;
+          case 'foodbox':
+            await fetchFoodBoxData(token);
+            break;
+          case 'outreach':
+            await fetchOutreachData(token);
+            break;
+        }
       } catch (err) {
-        setColumns([]);
-        setTableData([]);
-        setError('Failed to load outgoing stats.');
+        setError('Failed to load data.');
       } finally {
         setLoading(false);
       }
     };
-    fetchStats();
-  }, [selectedMonth, selectedYear]);
+    
+    fetchData();
+  }, [activeTab, selectedMonth, selectedYear]);
+
+  const fetchConsolidatedData = async (token: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/consolidated?month=${selectedMonth}&year=${selectedYear}`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    if (!response.ok) throw new Error('Failed to fetch consolidated data');
+    const data = await response.json();
+    setConsolidatedData(data);
+  };
+
+  const fetchShiftCategoriesData = async (token: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/filtered?month=${selectedMonth}&year=${selectedYear}`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    if (!response.ok) throw new Error('Failed to fetch shift categories data');
+    const data = await response.json();
+    setShiftCategoriesColumns(data.columns);
+    setShiftCategoriesData(data.tableData);
+  };
+
+  const fetchFoodBoxData = async (token: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/foodbox?month=${selectedMonth}&year=${selectedYear}`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    if (!response.ok) throw new Error('Failed to fetch food box data');
+    const data = await response.json();
+    setFoodBoxData(data);
+  };
+
+  const fetchOutreachData = async (token: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/outreach?month=${selectedMonth}&year=${selectedYear}`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    if (!response.ok) throw new Error('Failed to fetch outreach data');
+    const data = await response.json();
+    setOutreachColumns(data.columns);
+    setOutreachData(data.tableData);
+  };
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -86,12 +171,14 @@ export default function OutgoingStatsPage() {
   const handleExport = async () => {
     try {
       const token = localStorage.getItem('token');
+      const endpoint = activeTab === 'shift-categories' 
+        ? 'filtered' 
+        : activeTab;
+      
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/filtered/export?month=${selectedMonth}&year=${selectedYear}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/${endpoint}/export?month=${selectedMonth}&year=${selectedYear}`,
         {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         }
       );
       if (!response.ok) throw new Error('Failed to export Excel');
@@ -99,7 +186,7 @@ export default function OutgoingStatsPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `outgoing-stats-${selectedYear}-${selectedMonth}.xlsx`;
+      a.download = `outgoing-stats-${activeTab}-${selectedYear}-${selectedMonth}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -110,24 +197,185 @@ export default function OutgoingStatsPage() {
     }
   };
 
+  // Export consolidated Excel handler
+  const handleConsolidatedExport = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/consolidated-excel/export?month=${selectedMonth}&year=${selectedYear}`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      if (!response.ok) throw new Error('Failed to export consolidated Excel');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `outgoing-stats-consolidated-${selectedYear}-${selectedMonth}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Consolidated export completed successfully!');
+    } catch (err) {
+      toast.error('Failed to export consolidated Excel.');
+    }
+  };
 
-  // Modify getDisplayData to handle meal conversion
-  const getDisplayData = () => {
-    // Remove 'Collections' column from columns
-    const filteredColumns = columns.filter(col => col !== 'Collections');
-    if (selectedMonth !== 0) return { 
-      columns: filteredColumns, 
-      data: tableData.map(row => {
+  // Render tab content
+  const renderTabContent = () => {
+    if (loading) {
+      return <div style={{ padding: 32, textAlign: 'center' }}>Loading...</div>;
+    }
+    
+    if (error) {
+      return <div style={{ padding: 32, textAlign: 'center', color: 'red' }}>{error}</div>;
+    }
+
+    switch (activeTab) {
+      case 'consolidated':
+        return renderConsolidatedTab();
+      case 'shift-categories':
+        return renderShiftCategoriesTab();
+      case 'foodbox':
+        return renderFoodBoxTab();
+      case 'outreach':
+        return renderOutreachTab();
+      default:
+        return null;
+    }
+  };
+
+  const renderConsolidatedTab = () => {
+    if (consolidatedData.length === 0) {
+      return (
+        <div className={styles.tableWrapper}>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            No consolidated data available for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </div>
+        </div>
+      );
+    }
+
+    let displayData = consolidatedData;
+    let firstColumn = 'Date';
+
+    // If "All Months" is selected, aggregate by month
+    if (selectedMonth === 0) {
+      const monthMap: { [month: number]: any } = {};
+      
+      // Initialize all months
+      for (let m = 1; m <= 12; m++) {
+        monthMap[m] = { 
+          Month: months[m].label,
+          totalMealsServed: 0,
+          mealsFromFoodBoxes: 0,
+          outreachCount: 0,
+          totalImpact: 0
+        };
+      }
+
+      // Aggregate data by month
+      consolidatedData.forEach(row => {
+        const d = new Date(row.date);
+        if (isNaN(d.getTime())) return;
+        const m = d.getMonth() + 1;
+        monthMap[m].totalMealsServed += row.totalMealsServed;
+        monthMap[m].mealsFromFoodBoxes += row.mealsFromFoodBoxes;
+        monthMap[m].outreachCount += row.outreachCount;
+        monthMap[m].totalImpact += row.totalImpact;
+      });
+
+      // Convert to array - show all 12 months
+      displayData = Object.values(monthMap);
+      firstColumn = 'Month';
+    }
+
+    return (
+      <div className={styles.tableWrapper}>
+        <div className={styles.tableTitle}>
+          Consolidated Outgoing Overview – <span className={styles.month}>
+            {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </span>
+        </div>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+          <table className={styles.table} style={{ minWidth: '800px' }}>
+            <thead>
+              <tr>
+                <th>{firstColumn}</th>
+                <th>Total Meals Served</th>
+                <th>Meals from Food Boxes</th>
+                <th>Outreach Count</th>
+                <th className={styles.totalCol}>Total Impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayData.map((row, i) => (
+                <tr key={i}>
+                  <td>{firstColumn === 'Date' ? formatDate(row.date) : row.Month}</td>
+                  <td>{row.totalMealsServed}</td>
+                  <td>{row.mealsFromFoodBoxes}</td>
+                  <td>{row.outreachCount}</td>
+                  <td className={styles.totalCol}>{row.totalImpact}</td>
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className={styles.monthlyTotalRow}>
+                <td className={styles.totalCol}>Total</td>
+                <td className={styles.totalCol}>
+                  {displayData.reduce((sum, row) => sum + (row.totalMealsServed || 0), 0)}
+                </td>
+                <td className={styles.totalCol}>
+                  {displayData.reduce((sum, row) => sum + (row.mealsFromFoodBoxes || 0), 0)}
+                </td>
+                <td className={styles.totalCol}>
+                  {displayData.reduce((sum, row) => sum + (row.outreachCount || 0), 0)}
+                </td>
+                <td className={styles.totalCol}>
+                  {displayData.reduce((sum, row) => sum + (row.totalImpact || 0), 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderShiftCategoriesTab = () => {
+    if (shiftCategoriesData.length === 0) {
+      return (
+        <div className={styles.tableWrapper}>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            No shift categories data available for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </div>
+        </div>
+      );
+    }
+
+    // Use existing logic for shift categories
+    const filteredColumns = shiftCategoriesColumns.filter(col => col !== 'Collection');
+    let displayData = shiftCategoriesData.map(row => {
         const newRow = { ...row };
-        delete newRow['Collections'];
-        // Meals are just numbers, no conversion needed
+        delete newRow['Collection'];
         return newRow;
-      }), 
-      firstCol: 'Date' 
-    };
+    });
 
-    // Aggregate by month
+    // Filter out rows with no data (all values are 0 or empty)
+    displayData = displayData.filter(row => {
+      const dataColumns = filteredColumns.filter(col => col !== 'Date');
+      return dataColumns.some(col => {
+        const value = row[col];
+        return value && value !== 0 && value !== '';
+      });
+    });
+
+    // If "All Months" is selected, aggregate by month
+    if (selectedMonth === 0) {
     const monthMap: { [month: number]: any } = {};
+      
     // Initialize all months
     for (let m = 1; m <= 12; m++) {
       monthMap[m] = { Month: months[m].label };
@@ -135,7 +383,9 @@ export default function OutgoingStatsPage() {
         if (col !== 'Date') monthMap[m][col] = 0;
       });
     }
-    tableData.forEach(row => {
+
+      // Aggregate data by month
+      displayData.forEach(row => {
       const d = new Date(row['Date'] as string);
       if (isNaN(d.getTime())) return;
       const m = d.getMonth() + 1;
@@ -145,51 +395,247 @@ export default function OutgoingStatsPage() {
         }
       });
     });
-    // Return display data for all months (meals are just numbers, no conversion needed)
-    const displayData = Object.values(monthMap);
-    const newColumns = ['Month', ...filteredColumns.filter(col => col !== 'Date')];
-    return { columns: newColumns, data: displayData, firstCol: 'Month' };
-  };
-  const { columns: displayColumns, data: displayData, firstCol } = getDisplayData();
 
-  // Calculate totals (meals are just numbers, no conversion needed)
-  const calculateTotals = () => {
-    if (selectedMonth !== 0) {
-      // For monthly view, sum the original tableData
-      const totals: { [key: string]: number } = {};
-      displayColumns.forEach(col => {
-        if (col !== firstCol) {
-          totals[col] = tableData.reduce((sum, row) => {
-            const value = row[col];
-            if (typeof value === 'number') {
-              return sum + value;
-            }
-            return sum;
-          }, 0);
-        }
-      });
-      return totals;
-    } else {
-      // For yearly view, sum the monthly aggregated data
-      const totals: { [key: string]: number } = {};
-      displayColumns.forEach(col => {
-        if (col !== firstCol) {
-          totals[col] = 0;
-          // Recalculate from original tableData
-          tableData.forEach(row => {
-            const d = new Date(row['Date'] as string);
-            if (!isNaN(d.getTime()) && typeof row[col] === 'number') {
-              totals[col] += row[col];
-            }
-          });
-        }
-      });
-      return totals;
+      // Convert to array - show all 12 months
+      const monthlyData = Object.values(monthMap);
+
+      displayData = monthlyData;
+      filteredColumns[0] = 'Month'; // Replace Date with Month
     }
+
+    return (
+      <div className={styles.tableWrapper}>
+        <div className={styles.tableTitle}>
+          Regular Meals – <span className={styles.month}>
+            {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </span>
+        </div>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+          <table className={styles.table} style={{ minWidth: '800px' }}>
+            <thead>
+              <tr>
+                {filteredColumns.map(col => (
+                  <th key={col} className={col === 'Total' ? styles.totalCol : ''}>
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {displayData.map((row, i) => (
+                <tr key={i}>
+                  {filteredColumns.map((col, idx) => (
+                    <td key={col} className={idx === filteredColumns.length - 1 ? styles.totalCol : ''}>
+                      {col === 'Date' ? formatDate(row[col] as string) : 
+                       col === 'Month' ? row[col] : 
+                       row[col] || 0}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className={styles.monthlyTotalRow}>
+                {filteredColumns.map((col, idx) => {
+                  if (col === 'Date' || col === 'Month') {
+                    return <td key={col} className={styles.totalCol}>Total</td>;
+                  }
+                  const total = displayData.reduce((sum, row) => {
+                    const value = row[col];
+                    return sum + (typeof value === 'number' ? value : 0);
+                  }, 0);
+                  return (
+                    <td key={col} className={styles.totalCol}>
+                      {total}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   };
 
-  const totals = calculateTotals();
+  const renderFoodBoxTab = () => {
+    if (foodBoxData.length === 0) {
+      return (
+        <div className={styles.tableWrapper}>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            No food box data available for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </div>
+        </div>
+      );
+    }
 
+    let displayData = foodBoxData;
+    let firstColumn = 'Date';
+
+    // If "All Months" is selected, aggregate by month
+    if (selectedMonth === 0) {
+      const monthMap: { [month: number]: any } = {};
+      
+      // Initialize all months
+      for (let m = 1; m <= 12; m++) {
+        monthMap[m] = { 
+          Month: months[m].label,
+          foodBoxCount: 0,
+          mealsPerBox: 0,
+          totalMeals: 0
+        };
+      }
+
+      // Aggregate data by month
+      foodBoxData.forEach(row => {
+        const d = new Date(row.date);
+        if (isNaN(d.getTime())) return;
+        const m = d.getMonth() + 1;
+        monthMap[m].foodBoxCount += row.foodBoxCount;
+        monthMap[m].mealsPerBox = row.mealsPerBox; // Should be same for all
+        monthMap[m].totalMeals += row.totalMeals;
+      });
+
+      // Convert to array - show all 12 months
+      displayData = Object.values(monthMap);
+      firstColumn = 'Month';
+    }
+
+    return (
+      <div className={styles.tableWrapper}>
+        <div className={styles.tableTitle}>
+          Food Box Distribution – <span className={styles.month}>
+            {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </span>
+        </div>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+          <table className={styles.table} style={{ minWidth: '800px' }}>
+            <thead>
+              <tr>
+                <th>{firstColumn}</th>
+                <th className={styles.totalCol}>Total Food Boxes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayData.map((row, i) => (
+                <tr key={i}>
+                  <td>{firstColumn === 'Date' ? formatDate(row.date) : row.Month}</td>
+                  <td className={styles.totalCol}>{row.foodBoxCount}</td>
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className={styles.monthlyTotalRow}>
+                <td className={styles.totalCol}>Total</td>
+                <td className={styles.totalCol}>
+                  {displayData.reduce((sum, row) => sum + (row.foodBoxCount || 0), 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderOutreachTab = () => {
+    if (outreachData.length === 0) {
+      return (
+        <div className={styles.tableWrapper}>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            No outreach data available for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </div>
+        </div>
+      );
+    }
+
+    let displayData = outreachData;
+    let displayColumns = outreachColumns;
+    let firstColumn = 'Date';
+
+    // If "All Months" is selected, aggregate by month
+    if (selectedMonth === 0) {
+      const monthMap: { [month: number]: any } = {};
+      
+      // Initialize all months
+      for (let m = 1; m <= 12; m++) {
+        monthMap[m] = { Month: months[m].label };
+        outreachColumns.forEach(col => {
+          if (col !== 'Date') monthMap[m][col] = 0;
+        });
+      }
+
+      // Aggregate data by month
+      outreachData.forEach(row => {
+            const d = new Date(row['Date'] as string);
+        if (isNaN(d.getTime())) return;
+        const m = d.getMonth() + 1;
+        outreachColumns.forEach(col => {
+          if (col !== 'Date' && typeof row[col] === 'number') {
+            monthMap[m][col] += Number(row[col]);
+          }
+        });
+      });
+
+      // Convert to array - show all 12 months
+      const monthlyData = Object.values(monthMap);
+
+      displayData = monthlyData;
+      displayColumns = ['Month', ...outreachColumns.filter(col => col !== 'Date')];
+      firstColumn = 'Month';
+    }
+
+    return (
+      <div className={styles.tableWrapper}>
+        <div className={styles.tableTitle}>
+          Outreach Activities – <span className={styles.month}>
+            {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </span>
+        </div>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+          <table className={styles.table} style={{ minWidth: '800px' }}>
+            <thead>
+              <tr>
+                {displayColumns.map(col => (
+                  <th key={col} className={col === 'Total' ? styles.totalCol : ''}>
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {displayData.map((row, i) => (
+                <tr key={i}>
+                  {displayColumns.map((col, idx) => (
+                    <td key={col} className={col === 'Total' ? styles.totalCol : ''}>
+                      {col === 'Date' ? formatDate(row[col] as string) : 
+                       col === 'Month' ? row[col] : 
+                       row[col] || 0}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className={styles.monthlyTotalRow}>
+                {displayColumns.map((col, idx) => {
+                  if (col === 'Date' || col === 'Month') {
+                    return <td key={col} className={styles.totalCol}>Total</td>;
+                  }
+                  const total = displayData.reduce((sum, row) => {
+                    const value = row[col];
+                    return sum + (typeof value === 'number' ? value : 0);
+                  }, 0);
+                  return (
+                    <td key={col} className={styles.totalCol}>
+                      {total}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <main className={styles.main}>
@@ -224,55 +670,42 @@ export default function OutgoingStatsPage() {
           <button className={styles.exportBtn} onClick={handleExport} type="button">
             Export to Excel
           </button>
+          <button className={styles.exportBtn} onClick={handleConsolidatedExport} type="button" style={{ marginLeft: '8px' }}>
+            Consolidated Excel Export
+          </button>
         </div>
       </div>
-      <div className={styles.tableWrapper}>
-        <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: 32, textAlign: 'center' }}>Loading...</div>
-          ) : error ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'red' }}>{error}</div>
-          ) : tableData.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center' }}>No meals served in this month.</div>
-          ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  {displayColumns.map(col => (
-                    <th key={col}>
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displayData.map((row, i) => (
-                  <tr key={i}>
-                    {displayColumns.map((col, idx) => (
-                      <td
-                        key={col}
-                        className={idx === displayColumns.length - 1 ? styles.totalCol : ''}
-                      >
-                        {col === firstCol
-                          ? (firstCol === 'Month' ? row[col] : formatDate(row[col] as string))
-                          : row[col] !== undefined ? row[col] : ''}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                {/* Total row */}
-                <tr className={styles.monthlyTotalRow} style={{ fontWeight: 700 }}>
-                  {displayColumns.map((col, idx) => {
-                    if (col === firstCol) return <td key={col} className={styles.totalCol}>{firstCol === 'Month' ? 'Yearly Total' : 'Monthly Total'}</td>;
-                    const total = totals[col] || 0;
-                    return <td key={col} className={idx === displayColumns.length - 1 ? styles.totalCol : ''}>{total}</td>;
-                  })}
-                </tr>
-              </tbody>
-            </table>
-          )}
-        </div>
+
+      {/* Tab Navigation */}
+      <div className={styles.tabContainer}>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'consolidated' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('consolidated')}
+        >
+          Consolidated Overview
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'shift-categories' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('shift-categories')}
+        >
+          Regular Meals
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'foodbox' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('foodbox')}
+        >
+          Food Box Stats
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'outreach' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('outreach')}
+        >
+          Outreach Stats
+        </button>
       </div>
+
+      {/* Tab Content */}
+      {renderTabContent()}
     </main>
   );
 } 

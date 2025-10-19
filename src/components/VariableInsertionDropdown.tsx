@@ -14,26 +14,10 @@ const VARIABLE_CATEGORIES = [
     label: 'User Information',
     icon: <FaUser className="text-blue-500" />,
     variables: [
-      { 
-        key: '{{user.firstName}}', 
-        label: 'First Name', 
-        description: 'User\'s first name (e.g., John)' 
-      },
-      { 
-        key: '{{user.lastName}}', 
-        label: 'Last Name', 
-        description: 'User\'s last name (e.g., Doe)' 
-      },
-      { 
-        key: '{{user.email}}', 
-        label: 'Email Address', 
-        description: 'User\'s email address' 
-      },
-      { 
-        key: '{{user.role}}', 
-        label: 'User Role', 
-        description: 'User\'s role (e.g., Volunteer, Staff)' 
-      }
+      { key: '{{user.firstName}}', label: 'First Name' },
+      { key: '{{user.lastName}}', label: 'Last Name' },
+      { key: '{{user.email}}', label: 'Email Address' },
+      { key: '{{user.role}}', label: 'User Role' }
     ]
   },
   {
@@ -41,31 +25,11 @@ const VARIABLE_CATEGORIES = [
     label: 'Shift Information',
     icon: <FaCalendarAlt className="text-green-500" />,
     variables: [
-      { 
-        key: '{{shift.name}}', 
-        label: 'Shift Name', 
-        description: 'Name of the shift (e.g., Morning Kitchen Prep)' 
-      },
-      { 
-        key: '{{shift.category}}', 
-        label: 'Shift Category', 
-        description: 'Category of the shift (e.g., Kitchen, Delivery)' 
-      },
-      { 
-        key: '{{shift.startTime}}', 
-        label: 'Start Time', 
-        description: 'When the shift starts (e.g., 8:00 AM)' 
-      },
-      { 
-        key: '{{shift.endTime}}', 
-        label: 'End Time', 
-        description: 'When the shift ends (e.g., 12:00 PM)' 
-      },
-      { 
-        key: '{{shift.location}}', 
-        label: 'Location', 
-        description: 'Where the shift takes place' 
-      }
+      { key: '{{shift.name}}', label: 'Shift Name' },
+      { key: '{{shift.category}}', label: 'Shift Category' },
+      { key: '{{shift.startTime}}', label: 'Start Time' },
+      { key: '{{shift.endTime}}', label: 'End Time' },
+      { key: '{{shift.location}}', label: 'Location' }
     ]
   },
   {
@@ -73,16 +37,8 @@ const VARIABLE_CATEGORIES = [
     label: 'Organization',
     icon: <FaBuilding className="text-purple-500" />,
     variables: [
-      { 
-        key: '{{user.organization.name}}', 
-        label: 'Organization Name', 
-        description: 'Name of your organization' 
-      },
-      { 
-        key: '{{shift.organization.name}}', 
-        label: 'Shift Organization', 
-        description: 'Organization running the shift' 
-      }
+      { key: '{{user.organization.name}}', label: 'Organization Name' },
+      { key: '{{shift.organization.name}}', label: 'Shift Organization' }
     ]
   },
   {
@@ -90,26 +46,10 @@ const VARIABLE_CATEGORIES = [
     label: 'System Information',
     icon: <FaCog className="text-gray-500" />,
     variables: [
-      { 
-        key: '{{system.currentDate}}', 
-        label: 'Current Date', 
-        description: 'Today\'s date' 
-      },
-      { 
-        key: '{{system.currentTime}}', 
-        label: 'Current Time', 
-        description: 'Current time' 
-      },
-      { 
-        key: '{{system.appName}}', 
-        label: 'App Name', 
-        description: 'Name of the application (Hungy)' 
-      },
-      { 
-        key: '{{system.supportEmail}}', 
-        label: 'Support Email', 
-        description: 'Support contact email' 
-      }
+      { key: '{{system.currentDate}}', label: 'Current Date' },
+      { key: '{{system.currentTime}}', label: 'Current Time' },
+      { key: '{{system.appName}}', label: 'App Name' },
+      { key: '{{system.supportEmail}}', label: 'Support Email' }
     ]
   }
 ];
@@ -181,21 +121,14 @@ export default function VariableInsertionDropdown({ onInsertVariable, disabled =
                         <button
                           key={variable.key}
                           onClick={() => handleInsertVariable(variable.key)}
-                          className="w-full text-left px-3 py-2 hover:bg-orange-50 rounded-md transition-colors group"
+                          className="w-full text-left px-3 py-2 hover:bg-orange-50 rounded-md transition-colors group flex items-center justify-between"
                         >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 group-hover:text-orange-700">
-                                {variable.label}
-                              </div>
-                              <div className="text-xs text-gray-500 group-hover:text-orange-600">
-                                {variable.description}
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">
-                              {variable.key}
-                            </div>
-                          </div>
+                          <span className="text-sm font-medium text-gray-900 group-hover:text-orange-700">
+                            {variable.label}
+                          </span>
+                          <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">
+                            {variable.key}
+                          </span>
                         </button>
                       ))}
                     </div>

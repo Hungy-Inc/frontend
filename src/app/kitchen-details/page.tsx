@@ -79,6 +79,14 @@ export default function KitchenDetailsPage() {
   const [forgotPasswordResetToken, setForgotPasswordResetToken] = useState('');
   const [showForgotPasswordNew, setShowForgotPasswordNew] = useState(false);
   const [showForgotPasswordConfirm, setShowForgotPasswordConfirm] = useState(false);
+  // Donor password state
+  const [isEditingDonorPassword, setIsEditingDonorPassword] = useState(false);
+  const [editingDonorPassword, setEditingDonorPassword] = useState<string>("");
+  const [showDonorPassword, setShowDonorPassword] = useState(false);
+  const [confirmDonorPassword, setConfirmDonorPassword] = useState<string>("");
+  const [showConfirmDonorPassword, setShowConfirmDonorPassword] = useState(false);
+  const [oldDonorPassword, setOldDonorPassword] = useState<string>("");
+  const [showOldDonorPassword, setShowOldDonorPassword] = useState(false);
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
@@ -536,6 +544,31 @@ export default function KitchenDetailsPage() {
   const handleResetDonorPassword = async () => {
     setForgotPasswordError('');
     setForgotPasswordLoading(true);
+  const handleStartEditDonorPassword = () => {
+    setIsEditingDonorPassword(true);
+    setEditingDonorPassword("");
+    setConfirmDonorPassword("");
+    setOldDonorPassword("");
+  };
+
+  const handleSaveDonorPassword = async () => {
+    const inputValue = editingDonorPassword.trim();
+    if (!inputValue || inputValue.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+    if (inputValue === oldDonorPassword.trim()) {
+      toast.error('New password cannot be same as old password');
+      return;
+    }
+    if (inputValue !== confirmDonorPassword.trim()) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (!oldDonorPassword.trim()) {
+      toast.error('Old password is required');
+      return;
+    }
     
     try {
       const token = localStorage.getItem("token");
@@ -550,6 +583,27 @@ export default function KitchenDetailsPage() {
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
+      const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/verify-donor-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          password: oldDonorPassword.trim()
+        }),
+      });
+      
+      if (!verifyRes.ok) {
+        const errorData = await verifyRes.json();
+        toast.error(errorData.error || 'Old password is incorrect');
+        return;
+      }
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/donor-password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ resetToken: forgotPasswordResetToken, newPassword: forgotPasswordNewPassword })
       });
@@ -587,6 +641,22 @@ export default function KitchenDetailsPage() {
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
     setForgotPasswordResetToken('');
+      setIsEditingDonorPassword(false);
+      setEditingDonorPassword("");
+      setConfirmDonorPassword("");
+      setOldDonorPassword("");
+      toast.success('Donor password updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating donor password:', error);
+      toast.error('Failed to update donor password. Please try again.');
+    }
+  };
+  const handleCancelEditDonorPassword = () => {
+    setIsEditingDonorPassword(false);
+    setEditingDonorPassword("");
+    setConfirmDonorPassword("");
+    setOldDonorPassword("");
   };
 
   const isForgotPasswordValid = forgotPasswordNewPassword.length >= 8;
@@ -1071,6 +1141,215 @@ export default function KitchenDetailsPage() {
                 >
                   Forgot Password?
                 </button>
+                <label style={{ display: 'block', marginBottom: 8, color: '#666' }}></label>
+                {isEditingDonorPassword ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showOldDonorPassword ? "text" : "password"}
+                        value={oldDonorPassword}
+                        onChange={(e) => setOldDonorPassword(e.target.value)}
+                        placeholder="Enter old password"
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #dee2e6',
+                          borderRadius: 6,
+                          padding: '8px 40px 8px 12px',
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: '#333',
+                          width: '250px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowOldDonorPassword(!showOldDonorPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={showOldDonorPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showOldDonorPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showDonorPassword ? "text" : "password"}
+                        value={editingDonorPassword}
+                        onChange={(e) => setEditingDonorPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #dee2e6',
+                          borderRadius: 6,
+                          padding: '8px 40px 8px 12px',
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: '#333',
+                          width: '250px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowDonorPassword(!showDonorPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={showDonorPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showDonorPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
+                    {/* Confirm New Password */}
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showConfirmDonorPassword ? "text" : "password"}
+                        value={confirmDonorPassword}
+                        onChange={(e) => setConfirmDonorPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #dee2e6',
+                          borderRadius: 6,
+                          padding: '8px 40px 8px 12px',
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: '#333',
+                          width: '250px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmDonorPassword(!showConfirmDonorPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={showConfirmDonorPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showConfirmDonorPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={handleSaveDonorPassword}
+                        disabled={!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() === oldDonorPassword.trim() || editingDonorPassword.trim() !== confirmDonorPassword.trim() || !oldDonorPassword.trim() || editingDonorPassword.trim() === confirmDonorPassword.trim()}
+                        style={{
+                          background: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() === oldDonorPassword.trim() || editingDonorPassword.trim() !== confirmDonorPassword.trim() || !oldDonorPassword.trim() || editingDonorPassword.trim() === confirmDonorPassword.trim()) ? '#ccc' : '#28a745',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '8px 16px',
+                          cursor: (!editingDonorPassword.trim() || editingDonorPassword.trim().length < 6 || editingDonorPassword.trim() === oldDonorPassword.trim() || editingDonorPassword.trim() !== confirmDonorPassword.trim() || !oldDonorPassword.trim() || editingDonorPassword.trim() === confirmDonorPassword.trim()) ? 'not-allowed' : 'pointer',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <FaSave />
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelEditDonorPassword}
+                        style={{
+                          background: '#dc3545',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '8px 16px',
+                          cursor: 'pointer',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <FaTimes />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    background: '#f8f9fa',
+                    borderRadius: 8,
+                    padding: '9.5px',
+                    border: '1px solid #e9ecef'
+                  }}>
+                    <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
+                      Click "Edit" to set or update the donor data page password.
+                    </p>
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim().length > 0 && editingDonorPassword.trim().length < 6 && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    Password must be at least 6 characters long
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim() && confirmDonorPassword.trim() && editingDonorPassword.trim() !== confirmDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    Passwords do not match
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim() && editingDonorPassword.trim() === oldDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    New password cannot be same as old password
+                  </div>
+                )}
+                {isEditingDonorPassword && !oldDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    Old password is required
+                  </div>
+                )}
+                {isEditingDonorPassword && editingDonorPassword.trim() && confirmDonorPassword.trim() && editingDonorPassword.trim() === confirmDonorPassword.trim() && (
+                  <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
+                    New password cannot be the same as the confirm password
+                  </div>
+                )}
               </div>
             </div>
           </div>

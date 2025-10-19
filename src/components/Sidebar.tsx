@@ -19,7 +19,7 @@ const menu = [
   { icon: <FaClock />, label: 'Manage Shifts', href: '/manage-shifts' },
   { icon: <FaCalendarAlt />, label: 'Schedule Shifts', href: '/schedule-shifts' },
   { icon: <FaUtensils />, label: 'Kitchen Details', href: '/kitchen-details' },
-  { icon: <FaCog />, label: 'Field Management', href: '/field-management' },
+  { icon: <FaCog />, label: 'Sign Up Fields', href: '/field-management' },
   { icon: <FaEnvelope />, label: 'Email Management', href: '/email-management' },
 ];
 

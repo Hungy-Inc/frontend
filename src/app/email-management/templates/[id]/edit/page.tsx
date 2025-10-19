@@ -45,6 +45,17 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [originalFormData, setOriginalFormData] = useState({
+    name: '',
+    subject: '',
+    htmlContent: '',
+    textContent: '',
+    templateType: 'CUSTOM_MARKETING',
+    description: '',
+    isActive: true
+  });
 
   useEffect(() => {
     // Get templateId from params
@@ -59,6 +70,44 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
       fetchTemplate();
     }
   }, [templateId, initialLoading]);
+
+  // Deep comparison function for detecting changes
+  const deepEqual = (obj1: any, obj2: any): boolean => {
+    if (obj1 === obj2) return true;
+    if (obj1 == null || obj2 == null) return false;
+    if (typeof obj1 !== 'object' || typeof obj2 !== 'object') return false;
+
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    if (keys1.length !== keys2.length) return false;
+
+    for (const key of keys1) {
+      if (!keys2.includes(key)) return false;
+      if (!deepEqual(obj1[key], obj2[key])) return false;
+    }
+
+    return true;
+  };
+
+  // Detect unsaved changes
+  useEffect(() => {
+    const hasChanges = !deepEqual(formData, originalFormData);
+    setHasUnsavedChanges(hasChanges);
+  }, [formData, originalFormData]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const fetchTemplate = async () => {
     // Prevent multiple calls
@@ -94,7 +143,7 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
       if (foundTemplate) {
         console.log('Found template:', foundTemplate);
         setTemplate(foundTemplate);
-        setFormData({
+        const initialData = {
           name: foundTemplate.name,
           subject: foundTemplate.subject,
           htmlContent: foundTemplate.htmlContent,
@@ -102,7 +151,9 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
           templateType: foundTemplate.templateType,
           description: foundTemplate.description || '',
           isActive: foundTemplate.isActive
-        });
+        };
+        setFormData(initialData);
+        setOriginalFormData(initialData);
       } else {
         console.error('Template not found. Available templates:', data.templates);
         toast.error('Template not found');
@@ -182,6 +233,9 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
       
       await api.updateEmailTemplate(parseInt(templateId), formData);
       toast.success('Template updated successfully');
+      // Update original form data to reflect saved state
+      setOriginalFormData(formData);
+      setHasUnsavedChanges(false);
       router.push('/email-management');
     } catch (error) {
       console.error('Error updating template:', error);
@@ -200,6 +254,24 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      setShowConfirmDialog(true);
+    } else {
+      router.push('/email-management');
+    }
+  };
+
+  const handleLeaveWithoutSaving = () => {
+    setShowConfirmDialog(false);
+    setHasUnsavedChanges(false);
+    router.push('/email-management');
+  };
+
+  const handleStayOnPage = () => {
+    setShowConfirmDialog(false);
   };
 
   const handleDelete = async () => {
@@ -261,22 +333,28 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
         <div className="flex items-center space-x-4 mb-4">
-          <Link href="/email-management" className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+          <button
+            onClick={handleBack}
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+          >
             <FaArrowLeft />
-          </Link>
+          </button>
           <h1 className="text-3xl font-bold text-gray-900">Edit Template</h1>
           {template.isSystem && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               System Template
             </span>
           )}
+          {hasUnsavedChanges && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+              Unsaved Changes
+            </span>
+          )}
         </div>
         <p className="text-gray-600">Edit email template: {template.name}</p>
       </div>
 
-      <div className="max-w-4xl mx-auto">
-        {/* Form */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+      <div className="bg-white rounded-lg shadow-sm border p-6">
           <form onKeyDown={handleKeyDown} className="space-y-6">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -382,8 +460,8 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={loading}
-                className="flex items-center space-x-2 px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50"
+                disabled={loading || !hasUnsavedChanges}
+                className="flex items-center space-x-2 px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FaSave />
                 <span>{loading ? 'Saving...' : 'Save Changes'}</span>
@@ -401,8 +479,35 @@ export default function EditTemplate({ params }: { params: Promise<{ id: string 
               )}
             </div>
           </form>
-        </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Unsaved Changes
+            </h3>
+            <p className="text-gray-600 mb-6">
+              You have unsaved changes. Are you sure you want to leave without saving?
+            </p>
+            <div className="flex space-x-4">
+              <button
+                onClick={handleStayOnPage}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+              >
+                Stay on Page
+              </button>
+              <button
+                onClick={handleLeaveWithoutSaving}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Leave Without Saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

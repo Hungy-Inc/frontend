@@ -546,8 +546,8 @@ export default function KitchenDetailsPage() {
         return;
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/donor-password`, {
-        method: "PUT",
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/reset`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

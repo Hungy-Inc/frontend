@@ -544,6 +544,48 @@ export default function KitchenDetailsPage() {
   const handleResetDonorPassword = async () => {
     setForgotPasswordError('');
     setForgotPasswordLoading(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setForgotPasswordError('Authentication token not found. Please login again.');
+        setForgotPasswordLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/donor-password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ resetToken: forgotPasswordResetToken, newPassword: forgotPasswordNewPassword })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setForgotPasswordError(data.error || 'Failed to reset password');
+      } else {
+        setForgotPasswordSuccess('Donor password reset successfully!');
+        setTimeout(() => {
+          setShowForgotPasswordModal(false);
+          setForgotPasswordStep('otp');
+          setForgotPasswordOtp('');
+          setForgotPasswordNewPassword('');
+          setForgotPasswordConfirmPassword('');
+          setForgotPasswordError('');
+          setForgotPasswordSuccess('');
+          setForgotPasswordResetToken('');
+        }, 2000);
+      }
+    } catch (err) {
+      setForgotPasswordError('Network error. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
   const handleStartEditDonorPassword = () => {
     setIsEditingDonorPassword(true);
     setEditingDonorPassword("");
@@ -578,11 +620,6 @@ export default function KitchenDetailsPage() {
         return;
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/reset`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
       const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/verify-donor-password`, {
         method: "POST",
         headers: {
@@ -605,30 +642,23 @@ export default function KitchenDetailsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ resetToken: forgotPasswordResetToken, newPassword: forgotPasswordNewPassword })
+        body: JSON.stringify({ newPassword: editingDonorPassword.trim() })
       });
       
       const data = await res.json();
       
       if (!res.ok) {
-        setForgotPasswordError(data.error || 'Failed to reset password');
+        toast.error(data.error || 'Failed to update password');
       } else {
-        setForgotPasswordSuccess('Donor password reset successfully!');
-        setTimeout(() => {
-          setShowForgotPasswordModal(false);
-          setForgotPasswordStep('otp');
-          setForgotPasswordOtp('');
-          setForgotPasswordNewPassword('');
-          setForgotPasswordConfirmPassword('');
-          setForgotPasswordError('');
-          setForgotPasswordSuccess('');
-          setForgotPasswordResetToken('');
-        }, 2000);
+        setIsEditingDonorPassword(false);
+        setEditingDonorPassword("");
+        setConfirmDonorPassword("");
+        setOldDonorPassword("");
+        toast.success('Donor password updated successfully!');
       }
-    } catch (err) {
-      setForgotPasswordError('Network error. Please try again.');
-    } finally {
-      setForgotPasswordLoading(false);
+    } catch (error) {
+      console.error('Error updating donor password:', error);
+      toast.error('Failed to update donor password. Please try again.');
     }
   };
 
@@ -641,16 +671,6 @@ export default function KitchenDetailsPage() {
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
     setForgotPasswordResetToken('');
-      setIsEditingDonorPassword(false);
-      setEditingDonorPassword("");
-      setConfirmDonorPassword("");
-      setOldDonorPassword("");
-      toast.success('Donor password updated successfully!');
-      
-    } catch (error) {
-      console.error('Error updating donor password:', error);
-      toast.error('Failed to update donor password. Please try again.');
-    }
   };
   const handleCancelEditDonorPassword = () => {
     setIsEditingDonorPassword(false);
@@ -1313,18 +1333,7 @@ export default function KitchenDetailsPage() {
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div style={{ 
-                    background: '#f8f9fa',
-                    borderRadius: 8,
-                    padding: '9.5px',
-                    border: '1px solid #e9ecef'
-                  }}>
-                    <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
-                      Click "Edit" to set or update the donor data page password.
-                    </p>
-                  </div>
-                )}
+                ) : null}
                 {isEditingDonorPassword && editingDonorPassword.trim().length > 0 && editingDonorPassword.trim().length < 6 && (
                   <div style={{ color: '#f44336', fontSize: 13, marginTop: 4 }}>
                     Password must be at least 6 characters long

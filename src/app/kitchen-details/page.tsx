@@ -580,7 +580,6 @@ export default function KitchenDetailsPage() {
   };
 
   const handleStartEditDonorPassword = () => {
-    setIsEditingDonorPassword(true);
     setEditingDonorPassword("");
     setConfirmDonorPassword("");
     setOldDonorPassword("");
@@ -643,7 +642,6 @@ export default function KitchenDetailsPage() {
       if (!res.ok) {
         toast.error(data.error || 'Failed to update password');
       } else {
-        setIsEditingDonorPassword(false);
         setEditingDonorPassword("");
         setConfirmDonorPassword("");
         setOldDonorPassword("");
@@ -666,7 +664,6 @@ export default function KitchenDetailsPage() {
     setForgotPasswordResetToken('');
   };
   const handleCancelEditDonorPassword = () => {
-    setIsEditingDonorPassword(false);
     setEditingDonorPassword("");
     setConfirmDonorPassword("");
     setOldDonorPassword("");

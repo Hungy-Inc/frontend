@@ -22,6 +22,27 @@ const convertUTCToHalifax = (utcTimeString: string): string => {
   return halifaxDate.toISOString().slice(0, 16);
 };
 
+// Convert UTC time string to Halifax time (HH:MM format)
+const convertUTCTimeToHalifaxTime = (utcTimeString: string): string => {
+  try {
+    // Parse the UTC datetime string
+    const utcDate = new Date(utcTimeString);
+    
+    // Convert to Halifax timezone
+    const halifaxTimeString = utcDate.toLocaleString("en-US", {
+      timeZone: "America/Halifax",
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
+    return halifaxTimeString;
+  } catch (error) {
+    console.error('Error converting UTC time to Halifax time:', error);
+    return utcTimeString.slice(11, 16);
+  }
+};
+
 const convertHalifaxToUTC = (halifaxTimeString: string): string => {
   try {
     // If it's already a full datetime string, parse it directly
@@ -204,10 +225,10 @@ export default function EditShiftPage() {
         name: shiftData.name,
         newDaysOfWeek: daysOfWeek,
         startTime: shiftData.isRecurring 
-          ? convertUTCToHalifax(shiftData.startTime).slice(11, 16) // Extract time part for recurring shifts
+          ? convertUTCTimeToHalifaxTime(shiftData.startTime) // Convert UTC to Halifax time for recurring shifts
           : convertUTCToHalifax(shiftData.startTime), // Full datetime for one-time shifts
         endTime: shiftData.isRecurring 
-          ? convertUTCToHalifax(shiftData.endTime).slice(11, 16) // Extract time part for recurring shifts
+          ? convertUTCTimeToHalifaxTime(shiftData.endTime) // Convert UTC to Halifax time for recurring shifts
           : convertUTCToHalifax(shiftData.endTime), // Full datetime for one-time shifts
         shiftCategoryId: shiftData.shiftCategoryId.toString(),
         location: shiftData.location,
@@ -731,30 +752,6 @@ export default function EditShiftPage() {
                   min="1"
                   value={shiftForm.slots}
                   onChange={(e) => setShiftForm({ ...shiftForm, slots: parseInt(e.target.value) || 1 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Time *
-                </label>
-                <input
-                  type={shift.isRecurring ? "time" : "datetime-local"}
-                  value={shiftForm.startTime}
-                  onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End Time *
-                </label>
-                <input
-                  type={shift.isRecurring ? "time" : "datetime-local"}
-                  value={shiftForm.endTime}
-                  onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>

@@ -220,13 +220,19 @@ export default function FieldManagementPage() {
     try {
       setAdding(true);
       const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
       const response = await fetch(`${apiUrl}/api/fields/definitions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(addData),
+        body: JSON.stringify({
+          ...addData,
+          options: addData.options.filter(opt => opt.trim())
+        }),
       });
 
       if (!response.ok) {
@@ -257,7 +263,10 @@ export default function FieldManagementPage() {
 
   // Update field definition
   const handleUpdateFieldDefinition = async () => {
-    if (!editId) return;
+    if (!editId) {
+      toast.error("No field selected for editing");
+      return;
+    }
 
     // Validate required fields
     if (!editData.name || !editData.label) {
@@ -268,13 +277,19 @@ export default function FieldManagementPage() {
     try {
       setSaving(true);
       const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
       const response = await fetch(`${apiUrl}/api/fields/definitions/${editId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(editData),
+        body: JSON.stringify({
+          ...editData,
+          options: Array.isArray(editData.options) ? editData.options.filter(opt => opt.trim()) : []
+        }),
       });
 
       if (!response.ok) {
@@ -302,6 +317,9 @@ export default function FieldManagementPage() {
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
       const response = await fetch(`${apiUrl}/api/fields/definitions/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -564,7 +582,14 @@ export default function FieldManagementPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Field Type</label>
                         <select
                           value={addData.fieldType}
-                          onChange={(e) => setAddData({...addData, fieldType: e.target.value})}
+                          onChange={(e) => {
+                            const newFieldType = e.target.value;
+                            setAddData({
+                              ...addData, 
+                              fieldType: newFieldType,
+                              options: (newFieldType === 'SELECT' || newFieldType === 'MULTISELECT' || newFieldType === 'BOOLEAN') ? addData.options : []
+                            });
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                         >
                           {fieldTypes.map(type => (
@@ -584,12 +609,20 @@ export default function FieldManagementPage() {
                       </div>
                     </div>
 
-                    {(addData.fieldType === 'SELECT' || addData.fieldType === 'MULTISELECT') && (
+                    {(addData.fieldType === 'SELECT' || addData.fieldType === 'MULTISELECT' || addData.fieldType === 'BOOLEAN') && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Options (one per line)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {addData.fieldType === 'BOOLEAN' ? 'Options (one per line) - User selects one option' : 'Options (one per line)'}
+                        </label>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {addData.fieldType === 'BOOLEAN' 
+                            ? 'Press Enter to add options. User will select only ONE option (e.g., Yes/No, Agree/Disagree).' 
+                            : 'Press Enter to add a new option. Empty lines will be ignored when saving.'
+                          }
+                        </p>
                         <textarea
                           value={addData.options.join('\n')}
-                          onChange={(e) => setAddData({...addData, options: e.target.value.split('\n').filter(opt => opt.trim())})}
+                          onChange={(e) => setAddData({...addData, options: e.target.value.split('\n')})}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                           rows={4}
                           placeholder="Option 1&#10;Option 2&#10;Option 3"
@@ -692,7 +725,14 @@ export default function FieldManagementPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Field Type</label>
                         <select
                           value={editData.fieldType || 'TEXT'}
-                          onChange={(e) => setEditData({...editData, fieldType: e.target.value})}
+                          onChange={(e) => {
+                            const newFieldType = e.target.value;
+                            setEditData({
+                              ...editData, 
+                              fieldType: newFieldType,
+                              options: (newFieldType === 'SELECT' || newFieldType === 'MULTISELECT' || newFieldType === 'BOOLEAN') ? (editData.options || []) : []
+                            });
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                           disabled={editData.isSystemField}
                         >
@@ -716,12 +756,20 @@ export default function FieldManagementPage() {
                       </div>
                     </div>
 
-                    {(editData.fieldType === 'SELECT' || editData.fieldType === 'MULTISELECT') && (
+                    {(editData.fieldType === 'SELECT' || editData.fieldType === 'MULTISELECT' || editData.fieldType === 'BOOLEAN') && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Options (one per line)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {editData.fieldType === 'BOOLEAN' ? 'Options (one per line) - User selects one option' : 'Options (one per line)'}
+                        </label>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {editData.fieldType === 'BOOLEAN' 
+                            ? 'Press Enter to add options. User will select only ONE option (e.g., Yes/No, Agree/Disagree).' 
+                            : 'Press Enter to add a new option. Empty lines will be ignored when saving.'
+                          }
+                        </p>
                         <textarea
-                          value={editData.options ? editData.options.join('\n') : ''}
-                          onChange={(e) => setEditData({...editData, options: e.target.value.split('\n').filter(opt => opt.trim())})}
+                          value={Array.isArray(editData.options) ? editData.options.join('\n') : ''}
+                          onChange={(e) => setEditData({...editData, options: e.target.value.split('\n')})}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                           rows={4}
                           placeholder="Option 1&#10;Option 2&#10;Option 3"
@@ -832,21 +880,31 @@ export default function FieldManagementPage() {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {field.options && field.options.length > 0 ? (
-                              <div className="max-w-xs truncate">
-                                {field.options.slice(0, 2).join(', ')}
-                                {field.options.length > 2 && ` +${field.options.length - 2} more`}
-                              </div>
-                            ) : (
-                              '-'
-                            )}
+                            {(() => {
+                              const options = Array.isArray(field.options) ? field.options : (field.options ? [field.options] : []);
+                              return options.length > 0 ? (
+                                <div className="max-w-xs truncate">
+                                  {options.slice(0, 2).join(', ')}
+                                  {options.length > 2 && ` +${options.length - 2} more`}
+                                </div>
+                              ) : (
+                                '-'
+                              );
+                            })()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
                               <button
                                 onClick={() => {
                                   setEditId(field.id);
-                                  setEditData(field);
+                                  setEditData({
+                                    ...field,
+                                    options: Array.isArray(field.options) ? field.options : (field.options ? [field.options] : []),
+                                    validation: field.validation || {},
+                                    description: field.description || '',
+                                    placeholder: field.placeholder || '',
+                                    isSystemField: field.isSystemField || false
+                                  });
                                 }}
                                 className="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50 disabled:opacity-50"
                                 title="Edit field definition"

@@ -1697,7 +1697,7 @@ export default function ManageShiftsPage() {
         >
           Shift Categories
         </button>
-      </div>
+       </div>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, minHeight: 200, position: 'relative' }}>
         {tab === 'shiftcategory' && (
           <>

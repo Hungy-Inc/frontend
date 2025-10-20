@@ -1,185 +1,132 @@
-"use client";
-import React, { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { 
-  FaCalendarAlt, 
-  FaClock, 
-  FaMapMarkerAlt, 
-  FaUsers, 
-  FaSpinner, 
-  FaCheckCircle, 
-  FaExclamationTriangle,
-  FaArrowLeft
-} from "react-icons/fa";
+'use client';
 
-interface FieldDefinition {
-  id: number;
-  name: string;
-  label: string;
-  description?: string;
-  fieldType: string;
-  options?: string[];
-  isSystemField: boolean;
-}
+import React, { useState, useEffect } from 'react';
+import { FaCheckCircle, FaExclamationTriangle, FaClock, FaMapMarkerAlt, FaUser, FaCalendarAlt } from 'react-icons/fa';
 
-interface ShiftRegistrationField {
-  id: number;
-  fieldDefinitionId: number;
-  isRequired: boolean;
-  isActive: boolean;
-  order: number;
-  fieldDefinition: FieldDefinition;
-}
-
-interface ShiftDetails {
+interface Shift {
   id: number;
   name: string;
   categoryName: string;
+  description: string;
   startTime: string;
   endTime: string;
   location: string;
-  slots: number;
   availableSlots: number;
-  organizationId: number;
-  organizationName: string;
-  signedUpCount: number;
-  defaultUsersCount?: number;
-  totalFilledSlots?: number;
-  dynamicFields: ShiftRegistrationField[];
+  totalSlots: number;
+  dynamicFields: Array<{
+    id: number;
+    fieldDefinitionId: number;
+    isRequired: boolean;
+    isActive: boolean;
+    order: number;
+    fieldDefinition: {
+      id: number;
+      name: string;
+      label: string;
+      description: string;
+      fieldType: 'TEXT' | 'EMAIL' | 'NUMBER' | 'SELECT' | 'MULTISELECT' | 'BOOLEAN' | 'DATE' | 'TEXTAREA';
+      validation: any;
+      options: string[] | null;
+      isSystemField: boolean;
+    };
+  }>;
 }
 
 interface SignupFormData {
-  email: string;
-  firstName: string;
-  lastName: string;
   selectedDate: string;
-  fieldValues: { [key: string]: any }; // Dynamic field values
+  fieldValues: { [key: string]: any };
 }
 
 interface FormErrors {
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  selectedDate?: string;
-  [key: string]: string | undefined; // Allow any string key with string or undefined value
-}
-
-// Helper: Parse YYYY-MM-DD as Halifax local date
-function parseHalifaxDate(dateStr: string): Date {
-  if (!dateStr) return new Date('');
-  const [year, month, day] = dateStr.split('-').map(Number);
-  // Construct a Date object as if the date is midnight in Halifax
-  // Get the UTC time for midnight in Halifax
-  // Halifax is UTC-4 or UTC-3 depending on DST, but for display, we use the timeZone option
-  // So we can use Date.UTC and then display with timeZone: 'America/Halifax'
-  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-}
-
-// Helper to format YYYY-MM-DD as Halifax local date string
-function formatHalifaxDateString(dateStr: string) {
-  if (!dateStr) return '';
-  const [year, month, day] = dateStr.split('-').map(Number);
-  // Create a Date object at noon UTC to avoid timezone issues
-  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  // Always display in Halifax timezone
-  return date.toLocaleDateString('en-CA', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'America/Halifax'
-  });
+  [key: string]: string;
 }
 
 export default function ShiftSignupPage() {
-  const params = useParams();
-  const router = useRouter();
-  const categoryName = decodeURIComponent(params.categoryName as string);
-  const shiftName = decodeURIComponent(params.shiftName as string);
-  
-  // Get date from URL query parameters
-  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const urlDate = searchParams.get('date');
-  
-  const [shift, setShift] = useState<ShiftDetails | null>(null);
+  const [shift, setShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<SignupFormData>({
-    email: "",
-    firstName: "",
-    lastName: "",
-    selectedDate: urlDate || "",
+    selectedDate: '',
     fieldValues: {}
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  // Get URL parameters
+  const [categoryName, setCategoryName] = useState('');
+  const [shiftName, setShiftName] = useState('');
+  const [urlDate, setUrlDate] = useState('');
 
   useEffect(() => {
-    fetchShiftDetails();
-  }, [categoryName, shiftName, formData.selectedDate]);
-
-  // Update form data when URL date changes
-  useEffect(() => {
-    if (urlDate) {
-      setFormData(prev => ({ ...prev, selectedDate: urlDate }));
+    if (typeof window !== 'undefined') {
+      const pathParts = window.location.pathname.split('/');
+      if (pathParts.length >= 4) {
+        setCategoryName(decodeURIComponent(pathParts[2]));
+        setShiftName(decodeURIComponent(pathParts[3]));
+      }
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const dateParam = urlParams.get('date');
+      if (dateParam) {
+        setUrlDate(dateParam);
+        setFormData(prev => ({ ...prev, selectedDate: dateParam }));
+      }
     }
-  }, [urlDate]);
+  }, []);
 
-  const fetchShiftDetails = async () => {
+  // Helper function to format date for Halifax timezone
+  const formatHalifaxDateString = (dateStr: string): string => {
+    if (!dateStr) return '';
     try {
-      setLoading(true);
-      setError("");
-      
-      // Include date parameter if available
-      let url = `${apiUrl}/api/public/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(shiftName)}`;
-      if (formData.selectedDate) {
-        url += `?date=${encodeURIComponent(formData.selectedDate)}`;
-      }
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("Shift not found. Please check the URL and try again.");
-        }
-        throw new Error("Failed to load shift details");
-      }
-      
-      const data = await response.json();
-      setShift(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-CA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'America/Halifax'
+      });
+    } catch (error) {
+      return dateStr;
     }
   };
 
+  // Fetch shift details
+  useEffect(() => {
+    const fetchShiftDetails = async () => {
+      if (!categoryName || !shiftName) return;
+      
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${apiUrl}/api/public/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(shiftName)}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('Shift not found');
+          } else {
+            setError('Failed to load shift details');
+          }
+          return;
+        }
+        
+        const data = await response.json();
+        setShift(data);
+      } catch (err) {
+        console.error('Error fetching shift details:', err);
+        setError('Failed to load shift details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchShiftDetails();
+  }, [categoryName, shiftName]);
+
+  // Form validation
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
     
-    // Always validate basic fields
-    if (!formData.email.trim()) {
-      errors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = "Please enter a valid email address";
-    }
-    
-    if (!formData.firstName.trim()) {
-      errors.firstName = "First name is required";
-    }
-    
-    if (!formData.lastName.trim()) {
-      errors.lastName = "Last name is required";
-    }
-    
-    if (!formData.selectedDate.trim()) {
-      errors.selectedDate = "Please select a date";
-    }
-
     // Validate dynamic fields based on shift requirements
     if (shift?.dynamicFields) {
       for (const fieldReq of shift.dynamicFields) {
@@ -192,10 +139,15 @@ export default function ShiftSignupPage() {
       }
     }
     
+    if (!formData.selectedDate.trim()) {
+      errors.selectedDate = "Please select a date";
+    }
+    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -207,13 +159,36 @@ export default function ShiftSignupPage() {
       setSubmitting(true);
       setError("");
       
+      // Extract system field values from dynamic fields
+      let email = '';
+      let firstName = '';
+      let lastName = '';
+      
+      if (shift?.dynamicFields) {
+        for (const fieldReq of shift.dynamicFields) {
+          const fieldDef = fieldReq.fieldDefinition;
+          const fieldValue = formData.fieldValues[fieldDef.name] || '';
+          
+          if (fieldDef.name === 'email') {
+            email = fieldValue;
+          } else if (fieldDef.name === 'firstName') {
+            firstName = fieldValue;
+          } else if (fieldDef.name === 'lastName') {
+            lastName = fieldValue;
+          }
+        }
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const response = await fetch(`${apiUrl}/api/public/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(shiftName)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
+          email,
+          firstName,
+          lastName,
           shiftDate: formData.selectedDate,
           fieldValues: formData.fieldValues
         }),
@@ -226,34 +201,17 @@ export default function ShiftSignupPage() {
       }
       
       setSuccess(true);
-      setSuccessMessage(data.message);
-      
-      // Refresh shift details to update available slots
-      fetchShiftDetails();
-      
-      // Trigger refresh on admin page if it's open
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('shiftSignupCompleted', {
-          detail: { shiftId: data.shiftSignup?.id }
-        }));
-      }
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setSuccessMessage(data.message || "You have successfully signed up for the shift!");
+    } catch (err: any) {
+      console.error("Shift signup error:", err);
+      setError(err.message || "An unexpected error occurred.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleInputChange = (field: keyof SignupFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (field in formErrors) {
-      setFormErrors(prev => ({ ...prev, [field]: undefined }));
-    }
-  };
-
-  const handleFieldValueChange = (fieldName: string, value: any) => {
+  // Handle field value changes
+  const handleFieldChange = (fieldName: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       fieldValues: {
@@ -261,32 +219,170 @@ export default function ShiftSignupPage() {
         [fieldName]: value
       }
     }));
-    // Clear error when user starts typing
-    const errorKey = `field_${fieldName}`;
-    if (errorKey in formErrors) {
-      setFormErrors(prev => ({ ...prev, [errorKey]: undefined }));
+    
+    // Clear error for this field
+    if (formErrors[`field_${fieldName}`]) {
+      setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`field_${fieldName}`];
+        return newErrors;
+      });
     }
   };
 
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-CA', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'America/Halifax' // Use Atlantic Canada timezone
-    });
+  // Render field input based on type
+  const renderFieldInput = (fieldReq: any) => {
+    const fieldDef = fieldReq.fieldDefinition;
+    const fieldName = fieldDef.name;
+    const fieldValue = formData.fieldValues[fieldName] || '';
+    const hasError = formErrors[`field_${fieldName}`];
+
+    switch (fieldDef.fieldType) {
+      case 'TEXT':
+      case 'EMAIL':
+        return (
+          <input
+            type={fieldDef.fieldType === 'EMAIL' ? 'email' : 'text'}
+            id={fieldName}
+            value={fieldValue}
+            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              hasError ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder={fieldDef.placeholder || `Enter ${fieldDef.label.toLowerCase()}`}
+            required={fieldReq.isRequired}
+          />
+        );
+
+      case 'NUMBER':
+        return (
+          <input
+            type="number"
+            id={fieldName}
+            value={fieldValue}
+            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              hasError ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder={fieldDef.placeholder || `Enter ${fieldDef.label.toLowerCase()}`}
+            required={fieldReq.isRequired}
+          />
+        );
+
+      case 'TEXTAREA':
+        return (
+          <textarea
+            id={fieldName}
+            value={fieldValue}
+            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+            rows={4}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              hasError ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder={fieldDef.placeholder || `Enter ${fieldDef.label.toLowerCase()}`}
+            required={fieldReq.isRequired}
+          />
+        );
+
+      case 'DATE':
+        return (
+          <input
+            type="date"
+            id={fieldName}
+            value={fieldValue}
+            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              hasError ? 'border-red-500' : 'border-gray-300'
+            }`}
+            required={fieldReq.isRequired}
+          />
+        );
+
+      case 'SELECT':
+        return (
+          <select
+            id={fieldName}
+            value={fieldValue}
+            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              hasError ? 'border-red-500' : 'border-gray-300'
+            }`}
+            required={fieldReq.isRequired}
+          >
+            <option value="">Select {fieldDef.label.toLowerCase()}</option>
+            {fieldDef.options?.map((option: string, index: number) => (
+              <option key={index} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        );
+
+      case 'MULTISELECT':
+        return (
+          <div className="space-y-2">
+            {fieldDef.options?.map((option: string, index: number) => (
+              <label key={index} className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={Array.isArray(fieldValue) ? fieldValue.includes(option) : false}
+                  onChange={(e) => {
+                    const currentValues = Array.isArray(fieldValue) ? fieldValue : [];
+                    const newValues = e.target.checked
+                      ? [...currentValues, option]
+                      : currentValues.filter(v => v !== option);
+                    handleFieldChange(fieldName, newValues);
+                  }}
+                  className="mr-2"
+                />
+                <span className="text-sm text-gray-700">{option}</span>
+              </label>
+            ))}
+          </div>
+        );
+
+      case 'BOOLEAN':
+        return (
+          <div className="space-y-2">
+            {fieldDef.options?.map((option: string, index: number) => (
+              <label key={index} className="flex items-center">
+                <input
+                  type="radio"
+                  name={fieldName}
+                  value={option}
+                  checked={fieldValue === option}
+                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+                  className="mr-2"
+                  required={fieldReq.isRequired}
+                />
+                <span className="text-sm text-gray-700">{option}</span>
+              </label>
+            ))}
+          </div>
+        );
+
+      default:
+        return (
+          <input
+            type="text"
+            id={fieldName}
+            value={fieldValue}
+            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              hasError ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder={fieldDef.placeholder || `Enter ${fieldDef.label.toLowerCase()}`}
+            required={fieldReq.isRequired}
+          />
+        );
+    }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl mx-auto mb-4" style={{ color: '#ff9800' }} />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading shift details...</p>
         </div>
       </div>
@@ -298,17 +394,16 @@ export default function ShiftSignupPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
           <FaExclamationTriangle className="text-4xl text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Shift Not Found</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Error</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => router.back()}
-            className="inline-flex items-center px-4 py-2 text-white rounded-lg transition"
+            onClick={() => window.location.href = '/'}
+            className="w-full text-white py-2 px-4 rounded-lg transition"
             style={{ backgroundColor: '#ff9800' }}
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e68900'}
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ff9800'}
           >
-            <FaArrowLeft className="mr-2" />
-            Go Back
+            Go to Home Page
           </button>
         </div>
       </div>
@@ -374,60 +469,13 @@ export default function ShiftSignupPage() {
         {shift && shift.availableSlots <= 0 && (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <FaExclamationTriangle className="text-6xl text-red-500 mx-auto mb-6" />
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Sorry, This Shift is Full!</h2>
-            <div className="bg-gray-50 rounded-lg p-6 mb-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">{shift.name}</h3>
-              <p className="text-lg font-medium mb-2" style={{ color: '#ff9800' }}>{shift.categoryName}</p>
-              <p className="text-gray-600 mb-4">{shift.organizationName}</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                <div className="flex items-center text-gray-700">
-                  <FaClock className="mr-3 flex-shrink-0" style={{ color: '#ff9800' }} />
-                  <div>
-                    <p className="font-medium">Time</p>
-                    <p className="text-sm">
-                      {new Date(shift.startTime).toLocaleTimeString('en-CA', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                        timeZone: 'America/Halifax'
-                      })} - {new Date(shift.endTime).toLocaleTimeString('en-CA', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                        timeZone: 'America/Halifax'
-                      })}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center text-gray-700">
-                  <FaMapMarkerAlt className="mr-3 flex-shrink-0" style={{ color: '#ff9800' }} />
-                  <div>
-                    <p className="font-medium">Location</p>
-                    <p className="text-sm">{shift.location}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center text-gray-700 md:col-span-2">
-                  <FaUsers className="mr-3 flex-shrink-0" style={{ color: '#ff9800' }} />
-                  <div>
-                    <p className="font-medium">Capacity</p>
-                    <p className="text-sm text-red-600 font-semibold">
-                      All {shift.slots} spots have been filled
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <p className="text-gray-600 mb-6 text-lg">
-              Unfortunately, all volunteer spots for this shift have been filled. Please check back later or contact the organization for more information about future opportunities.
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Shift Full</h2>
+            <p className="text-gray-600 mb-6">
+              Sorry, this shift is currently full. Please check back later or choose a different shift.
             </p>
-            
             <button
               onClick={() => window.location.href = '/'}
-              className="px-8 py-3 text-white font-semibold rounded-lg text-lg transition focus:outline-none focus:ring-2 focus:ring-orange-300"
+              className="w-full text-white py-2 px-4 rounded-lg transition"
               style={{ backgroundColor: '#ff9800' }}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e68900'}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ff9800'}
@@ -437,340 +485,121 @@ export default function ShiftSignupPage() {
           </div>
         )}
 
-        {/* Combined Shift Details and Signup Form */}
+        {/* Shift Details */}
         {shift && shift.availableSlots > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            {/* Shift Details Header */}
-            <div className="border-b border-gray-200 pb-6 mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">{shift.name}</h2>
-              <p className="font-medium text-lg mb-1" style={{ color: '#ff9800' }}>{shift.categoryName}</p>
-              <p className="text-gray-600 mb-4">{shift.organizationName}</p>
+          <div className="bg-white rounded-lg shadow-md p-8">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">{shift.name}</h2>
+              <p className="text-gray-600 mb-6">{shift.description}</p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                <div className="flex items-center text-gray-700">
-                  <FaClock className="mr-3 flex-shrink-0" style={{ color: '#ff9800' }} />
-                  <div>
-                    <p className="font-medium">Time</p>
-                    <p className="text-sm">
-                      {new Date(shift.startTime).toLocaleTimeString('en-CA', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                        timeZone: 'America/Halifax'
-                      })} - {new Date(shift.endTime).toLocaleTimeString('en-CA', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                        timeZone: 'America/Halifax'
-                      })}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="flex items-center text-gray-600">
+                  <FaCalendarAlt className="mr-2" />
+                  <span>Category: {shift.categoryName}</span>
                 </div>
-                
-                <div className="flex items-center text-gray-700">
-                  <FaMapMarkerAlt className="mr-3 flex-shrink-0" style={{ color: '#ff9800' }} />
-                  <div>
-                    <p className="font-medium">Location</p>
-                    <p className="text-sm">{shift.location}</p>
-                  </div>
+                <div className="flex items-center text-gray-600">
+                  <FaClock className="mr-2" />
+                  <span>
+                    {new Date(shift.startTime).toLocaleTimeString('en-CA', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: 'America/Halifax'
+                    })} - {new Date(shift.endTime).toLocaleTimeString('en-CA', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: 'America/Halifax'
+                    })}
+                  </span>
                 </div>
-                
-                <div className="flex items-center text-gray-700 md:col-span-2">
-                  <FaUsers className="mr-3 flex-shrink-0" style={{ color: '#ff9800' }} />
-                  <div>
-                    <p className="font-medium">Available Spots</p>
-                    <p className="text-sm">
-                      {shift.availableSlots} of {shift.slots} spots remaining
-                      {shift.defaultUsersCount && shift.defaultUsersCount > 0 && (
-                        <span className="text-orange-600 ml-2">
-                          ({shift.defaultUsersCount} default users assigned)
-                        </span>
-                      )}
-                    </p>
-                  </div>
+                <div className="flex items-center text-gray-600">
+                  <FaMapMarkerAlt className="mr-2" />
+                  <span>{shift.location}</span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <FaUser className="mr-2" />
+                  <span>{shift.availableSlots} of {shift.totalSlots} spots available</span>
                 </div>
               </div>
             </div>
 
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Information</h3>
-            
-            {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-800">{error}</p>
-              </div>
-            )}
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Signup Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Date Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address *
+                <label htmlFor="selectedDate" className="block text-sm font-medium text-gray-700 mb-2">
+                  {urlDate ? 'Selected Date' : 'Select Date'} *
                 </label>
                 <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent ${
-                     formErrors.email ? 'border-red-500' : 'border-gray-300'
-                   }`}
-                   onFocus={(e) => e.target.style.borderColor = '#ff9800'}
-                   onBlur={(e) => e.target.style.borderColor = formErrors.email ? '#ef4444' : '#d1d5db'}
-                  placeholder="Enter your email address"
-                  disabled={submitting}
+                  type="date"
+                  id="selectedDate"
+                  value={formData.selectedDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, selectedDate: e.target.value }))}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                    formErrors.selectedDate ? 'border-red-500' : 'border-gray-300'
+                  } ${urlDate ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  required
+                  readOnly={!!urlDate}
                 />
-                {formErrors.email && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
+                {urlDate && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    Date is pre-selected from the link. This shift is scheduled for this specific date.
+                  </p>
+                )}
+                {formErrors.selectedDate && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.selectedDate}</p>
                 )}
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    First Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange('firstName', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent ${
-                      formErrors.firstName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    onFocus={(e) => e.target.style.borderColor = '#ff9800'}
-                    onBlur={(e) => e.target.style.borderColor = formErrors.firstName ? '#ef4444' : '#d1d5db'}
-                    placeholder="Enter your first name"
-                    disabled={submitting}
-                  />
-                  {formErrors.firstName && (
-                    <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>
-                  )}
+
+              {/* Dynamic Fields */}
+              {shift.dynamicFields && shift.dynamicFields.length > 0 && (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-gray-900">Signup Information</h3>
+                  {shift.dynamicFields
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((fieldReq) => (
+                    <div key={fieldReq.id}>
+                      <label htmlFor={fieldReq.fieldDefinition.name} className="block text-sm font-medium text-gray-700 mb-2">
+                        {fieldReq.fieldDefinition.label}
+                        {fieldReq.isRequired && <span className="text-red-500 ml-1">*</span>}
+                      </label>
+                      {fieldReq.fieldDefinition.description && (
+                        <p className="text-sm text-gray-500 mb-2">{fieldReq.fieldDefinition.description}</p>
+                      )}
+                      {renderFieldInput(fieldReq)}
+                      {formErrors[`field_${fieldReq.fieldDefinition.name}`] && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {formErrors[`field_${fieldReq.fieldDefinition.name}`]}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Last Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange('lastName', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent ${
-                      formErrors.lastName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    onFocus={(e) => e.target.style.borderColor = '#ff9800'}
-                    onBlur={(e) => e.target.style.borderColor = formErrors.lastName ? '#ef4444' : '#d1d5db'}
-                    placeholder="Enter your last name"
-                    disabled={submitting}
-                  />
-                  {formErrors.lastName && (
-                    <p className="text-red-500 text-sm mt-1">{formErrors.lastName}</p>
-                  )}
-                                 </div>
-               </div>
-               
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Shift Date
-                 </label>
-                 <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                   <p className="text-gray-900 font-medium" style={{ color: '#ff9800' }}>
-                     📅 {formData.selectedDate ? formatHalifaxDateString(formData.selectedDate) : 'No date selected'}
-                   </p>
-                 </div>
-                 <input
-                   type="hidden"
-                   value={formData.selectedDate}
-                   name="selectedDate"
-                 />
-               </div>
+              )}
 
-               {/* Dynamic Fields based on shift requirements */}
-               {shift?.dynamicFields && shift.dynamicFields.length > 0 && (
-                     <div className="border-t border-gray-200 pt-4">
-                   <h4 className="text-md font-medium text-gray-900 mb-3">Additional Information</h4>
-                       <div className="space-y-4">
-                     {shift.dynamicFields.map((fieldReq) => {
-                       const fieldDef = fieldReq.fieldDefinition;
-                       const fieldValue = formData.fieldValues[fieldDef.name] || '';
-                       const errorKey = `field_${fieldDef.name}`;
-                       const hasError = errorKey in formErrors ? formErrors[errorKey] : undefined;
-                       
-                       return (
-                         <div key={fieldDef.id}>
-                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                             {fieldDef.label} {fieldReq.isRequired && '*'}
-                             </label>
-                           
-                           {fieldDef.description && (
-                             <p className="text-xs text-gray-500 mb-2">{fieldDef.description}</p>
-                           )}
-                           
-                           {fieldDef.fieldType === 'TEXT' && (
-                             <input
-                               type="text"
-                               value={fieldValue}
-                               onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
-                                 hasError ? 'border-red-500' : 'border-gray-300'
-                               }`}
-                               placeholder={`Enter ${fieldDef.label.toLowerCase()}`}
-                               disabled={submitting}
-                             />
-                           )}
-                           
-                           {fieldDef.fieldType === 'EMAIL' && (
-                             <input
-                               type="email"
-                               value={fieldValue}
-                               onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
-                                 hasError ? 'border-red-500' : 'border-gray-300'
-                               }`}
-                               placeholder={`Enter ${fieldDef.label.toLowerCase()}`}
-                               disabled={submitting}
-                             />
-                           )}
-                           
-                           {fieldDef.fieldType === 'PHONE' && (
-                               <input
-                               type="tel"
-                               value={fieldValue}
-                               onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
-                                 hasError ? 'border-red-500' : 'border-gray-300'
-                                 }`}
-                               placeholder={`Enter ${fieldDef.label.toLowerCase()}`}
-                                 disabled={submitting}
-                               />
-                           )}
-                           
-                           {fieldDef.fieldType === 'DATE' && (
-                               <input
-                               type="date"
-                               value={fieldValue}
-                               onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
-                                 hasError ? 'border-red-500' : 'border-gray-300'
-                                 }`}
-                                 disabled={submitting}
-                               />
-                           )}
-                           
-                           {fieldDef.fieldType === 'NUMBER' && (
-                             <input
-                               type="number"
-                               value={fieldValue}
-                               onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
-                                 hasError ? 'border-red-500' : 'border-gray-300'
-                               }`}
-                               placeholder={`Enter ${fieldDef.label.toLowerCase()}`}
-                               disabled={submitting}
-                             />
-                           )}
-                           
-                           {fieldDef.fieldType === 'TEXTAREA' && (
-                             <textarea
-                               value={fieldValue}
-                               onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
-                                 hasError ? 'border-red-500' : 'border-gray-300'
-                               }`}
-                               placeholder={`Enter ${fieldDef.label.toLowerCase()}`}
-                               rows={3}
-                               disabled={submitting}
-                             />
-                           )}
-                           
-                           {fieldDef.fieldType === 'SELECT' && fieldDef.options && (
-                             <select
-                               value={fieldValue}
-                               onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.value)}
-                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
-                                 hasError ? 'border-red-500' : 'border-gray-300'
-                               }`}
-                               disabled={submitting}
-                             >
-                               <option value="">Select {fieldDef.label.toLowerCase()}</option>
-                               {fieldDef.options.map((option) => (
-                                 <option key={option} value={option}>
-                                   {option}
-                                 </option>
-                               ))}
-                             </select>
-                           )}
-                           
-                           {fieldDef.fieldType === 'MULTI_SELECT' && fieldDef.options && (
-                             <div className="space-y-2">
-                               {fieldDef.options.map((option) => {
-                                 const selectedValues = Array.isArray(fieldValue) ? fieldValue : [];
-                                 const isSelected = selectedValues.includes(option);
-                                 return (
-                                   <label key={option} className="flex items-center">
-                             <input
-                                       type="checkbox"
-                                       checked={isSelected}
-                                       onChange={(e) => {
-                                         const newValues = isSelected
-                                           ? selectedValues.filter(v => v !== option)
-                                           : [...selectedValues, option];
-                                         handleFieldValueChange(fieldDef.name, newValues);
-                                       }}
-                                       className="mr-2"
-                               disabled={submitting}
-                             />
-                                     <span className="text-sm text-gray-700">{option}</span>
-                                   </label>
-                                 );
-                               })}
-                           </div>
-                         )}
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-600">{error}</p>
+                </div>
+              )}
 
-                           {fieldDef.fieldType === 'BOOLEAN' && (
-                             <div className="flex items-center">
-                             <input
-                                 type="checkbox"
-                                 checked={fieldValue === true}
-                                 onChange={(e) => handleFieldValueChange(fieldDef.name, e.target.checked)}
-                                 className="mr-2"
-                               disabled={submitting}
-                             />
-                               <span className="text-sm text-gray-700">{fieldDef.label}</span>
-                           </div>
-                         )}
-                           
-                           {hasError && (
-                             <p className="text-red-500 text-sm mt-1">{formErrors[errorKey]}</p>
-                           )}
-                         </div>
-                       );
-                     })}
-                       </div>
-                     </div>
-               )}
-
-              
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full text-white py-3 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition"
+                className="w-full text-white py-3 px-4 rounded-lg transition font-semibold"
                 style={{ backgroundColor: '#ff9800' }}
-                onMouseOver={(e) => !submitting && (e.currentTarget.style.backgroundColor = '#e68900')}
-                onMouseOut={(e) => !submitting && (e.currentTarget.style.backgroundColor = '#ff9800')}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e68900'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ff9800'}
               >
-                {submitting ? (
-                  <>
-                    <FaSpinner className="animate-spin mr-2" />
-                    Signing Up...
-                  </>
-                ) : (
-                  'Sign Up for Shift'
-                )}
+                {submitting ? 'Signing up...' : 'Sign Up for Shift'}
               </button>
             </form>
-                     </div>
-         )}
-
-
-       </div>
-     </div>
-   );
- } 
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

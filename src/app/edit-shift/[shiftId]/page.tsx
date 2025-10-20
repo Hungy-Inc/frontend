@@ -104,6 +104,9 @@ export default function EditShiftPage() {
   const [availableFieldDefs, setAvailableFieldDefs] = useState<any[]>([]);
   const [fieldLoading, setFieldLoading] = useState(false);
   const [fieldSearchTerm, setFieldSearchTerm] = useState('');
+  const [fieldPage, setFieldPage] = useState(1);
+  const [fieldsPerPage] = useState(10);
+  const [savingFields, setSavingFields] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -145,6 +148,11 @@ export default function EditShiftPage() {
       loadShiftFields();
     }
   }, [shiftId]);
+
+  // Reset pagination when search term changes
+  useEffect(() => {
+    setFieldPage(1);
+  }, [fieldSearchTerm]);
 
   // Utility function for deep comparison
   const deepEqual = (obj1: any, obj2: any): boolean => {
@@ -485,6 +493,42 @@ export default function EditShiftPage() {
     setShiftFields(shiftFields.map(field => 
       field.fieldDefinitionId === fieldId ? { ...field, ...updates } : field
     ));
+  };
+
+  const handleSaveFields = async () => {
+    setSavingFields(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/field-requirements/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fieldRequirements: shiftFields.map(field => ({
+            fieldDefinitionId: field.fieldDefinitionId,
+            isRequired: field.isRequired,
+            isActive: field.isActive
+          }))
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to save field requirements');
+      }
+
+      toast.success('Field requirements saved successfully!');
+      
+      // Refresh the field data to confirm they're saved
+      await loadShiftFields();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save field requirements');
+    } finally {
+      setSavingFields(false);
+    }
   };
 
   const handleBack = () => {
@@ -890,14 +934,100 @@ export default function EditShiftPage() {
               {/* Current Fields */}
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Current Fields</h3>
+                
+                {/* Information Note */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="text-sm font-medium text-blue-800">Field Types</h4>
+                      <div className="mt-2 text-sm text-blue-700">
+                        <p><strong>Default Fields:</strong> First Name, Last Name, Email - These are automatically included in every shift and cannot be removed.</p>
+                        <p className="mt-1"><strong>Custom Fields:</strong> Additional fields you can add from the available fields below to collect specific information for this shift.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 {shiftFields.length === 0 ? (
                   <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <p className="text-gray-500">No fields configured for this shift</p>
-                    <p className="text-gray-400 text-sm mt-1">Add fields from the available fields below</p>
+                    <p className="text-gray-500">No custom fields configured for this shift</p>
+                    <p className="text-gray-400 text-sm mt-1">Add custom fields from the available fields below</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {shiftFields.map((field, index) => (
+                    {/* Default Fields Section */}
+                    {shiftFields.filter(field => field.fieldDefinition?.isSystemField).length > 0 && (
+                      <>
+                        <div className="flex items-center mb-3">
+                          <h4 className="text-sm font-medium text-gray-700">Default Fields</h4>
+                          <div className="flex-1 h-px bg-gray-300 ml-3"></div>
+                        </div>
+                        {shiftFields
+                          .filter(field => field.fieldDefinition?.isSystemField)
+                          .map((field, index) => (
+                            <div key={field.fieldDefinitionId} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="flex-1">
+                                <div className="flex items-center">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {field.fieldDefinition?.name}
+                                  </span>
+                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    ({field.fieldDefinition?.fieldType})
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {field.fieldDefinition?.description}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={field.isRequired}
+                                    onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isRequired: e.target.checked })}
+                                    className="mr-1"
+                                    disabled={field.fieldDefinition?.isSystemField}
+                                  />
+                                  <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    Required
+                                  </span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={field.isActive}
+                                    onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isActive: e.target.checked })}
+                                    className="mr-1"
+                                    disabled={field.fieldDefinition?.isSystemField}
+                                  />
+                                  <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    Active
+                                  </span>
+                                </label>
+                                <span className="text-xs text-blue-600 px-2 py-1 bg-blue-100 rounded">
+                                  System Field
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                      </>
+                    )}
+
+                    {/* Custom Fields Section */}
+                    {shiftFields.filter(field => !field.fieldDefinition?.isSystemField).length > 0 && (
+                      <>
+                        <div className="flex items-center mb-3 mt-6">
+                          <h4 className="text-sm font-medium text-gray-700">Custom Fields</h4>
+                          <div className="flex-1 h-px bg-gray-300 ml-3"></div>
+                        </div>
+                        {shiftFields
+                          .filter(field => !field.fieldDefinition?.isSystemField)
+                          .map((field, index) => (
                       <div key={field.fieldDefinitionId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div className="flex-1">
                           <div className="flex items-center">
@@ -920,8 +1050,11 @@ export default function EditShiftPage() {
                               checked={field.isRequired}
                               onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isRequired: e.target.checked })}
                               className="mr-1"
+                              disabled={field.fieldDefinition?.isSystemField}
                             />
-                            <span className="text-xs text-gray-600">Required</span>
+                            <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
+                              Required
+                            </span>
                           </label>
                           <label className="flex items-center">
                             <input
@@ -929,8 +1062,11 @@ export default function EditShiftPage() {
                               checked={field.isActive}
                               onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isActive: e.target.checked })}
                               className="mr-1"
+                              disabled={field.fieldDefinition?.isSystemField}
                             />
-                            <span className="text-xs text-gray-600">Active</span>
+                            <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
+                              Active
+                            </span>
                           </label>
                           {!field.fieldDefinition?.isSystemField && (
                             <button
@@ -943,7 +1079,9 @@ export default function EditShiftPage() {
                           )}
                         </div>
                       </div>
-                    ))}
+                          ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -952,7 +1090,7 @@ export default function EditShiftPage() {
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-medium text-gray-900">
-                    Available Fields ({availableFieldDefs.filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id)).length})
+                    Available Custom Fields ({availableFieldDefs.filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id) && !fieldDef.isSystemField).length})
                   </h3>
                   <div className="flex items-center gap-2">
                     <button
@@ -996,57 +1134,145 @@ export default function EditShiftPage() {
                     <p className="mt-2 text-gray-600">Loading available fields...</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {availableFieldDefs
-                      .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
-                      .filter(fieldDef => 
-                        fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
-                        fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
-                        fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
-                        fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
-                      )
-                      .map((fieldDef) => (
-                        <div key={fieldDef.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-gray-900">
-                                {fieldDef.name}
-                              </span>
-                              <span className="ml-2 text-xs text-gray-500">
-                                ({fieldDef.fieldType})
-                              </span>
+                  <>
+                    <div className="space-y-3">
+                      {(() => {
+                        const filteredFields = availableFieldDefs
+                          .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
+                          .filter(fieldDef => !fieldDef.isSystemField) // Hide system fields from available list
+                          .filter(fieldDef => 
+                            fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                            fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                            fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                            fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
+                          );
+                        
+                        const startIndex = (fieldPage - 1) * fieldsPerPage;
+                        const endIndex = startIndex + fieldsPerPage;
+                        const paginatedFields = filteredFields.slice(startIndex, endIndex);
+                        
+                        return paginatedFields.map((fieldDef) => (
+                          <div key={fieldDef.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {fieldDef.name}
+                                </span>
+                                <span className="ml-2 text-xs text-gray-500">
+                                  ({fieldDef.fieldType})
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {fieldDef.description}
+                              </p>
                             </div>
-                            <p className="text-xs text-gray-600 mt-1">
-                              {fieldDef.description}
-                            </p>
+                            <button
+                              onClick={() => addFieldToForm(fieldDef)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                            >
+                              Add Field
+                            </button>
                           </div>
-                          <button
-                            onClick={() => addFieldToForm(fieldDef)}
-                            className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                          >
-                            Add Field
-                          </button>
-                        </div>
-                      ))}
-                    {availableFieldDefs.filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id)).length === 0 && (
-                      <div className="text-center py-8 bg-gray-50 rounded-lg">
-                        <p className="text-gray-500">All available fields have been added</p>
-                      </div>
-                    )}
-                    {fieldSearchTerm && availableFieldDefs
-                      .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
-                      .filter(fieldDef => 
-                        fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
-                        fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
-                        fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
-                        fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
-                      ).length === 0 && (
-                      <div className="text-center py-8 bg-gray-50 rounded-lg">
-                        <p className="text-gray-500">No fields found matching "{fieldSearchTerm}".</p>
-                      </div>
-                    )}
-                  </div>
+                        ));
+                      })()}
+                      
+                      {(() => {
+                        const filteredFields = availableFieldDefs
+                          .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
+                          .filter(fieldDef => 
+                            fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                            fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                            fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                            fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
+                          );
+                        
+                        if (filteredFields.length === 0 && !fieldSearchTerm) {
+                          return (
+                            <div className="text-center py-8 bg-gray-50 rounded-lg">
+                              <p className="text-gray-500">All available fields have been added</p>
+                            </div>
+                          );
+                        }
+                        
+                        if (filteredFields.length === 0 && fieldSearchTerm) {
+                          return (
+                            <div className="text-center py-8 bg-gray-50 rounded-lg">
+                              <p className="text-gray-500">No fields found matching "{fieldSearchTerm}".</p>
+                            </div>
+                          );
+                        }
+                        
+                        return null;
+                      })()}
+                    </div>
+                    
+                    {/* Pagination */}
+                    {(() => {
+                      const filteredFields = availableFieldDefs
+                        .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
+                        .filter(fieldDef => !fieldDef.isSystemField) // Hide system fields from available list
+                        .filter(fieldDef => 
+                          fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                          fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                          fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                          fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
+                        );
+                      
+                      const totalPages = Math.ceil(filteredFields.length / fieldsPerPage);
+                      
+                      if (totalPages > 1) {
+                        return (
+                          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                            <div className="text-sm text-gray-700">
+                              Showing {((fieldPage - 1) * fieldsPerPage) + 1} to {Math.min(fieldPage * fieldsPerPage, filteredFields.length)} of {filteredFields.length} fields
+                            </div>
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => setFieldPage(Math.max(1, fieldPage - 1))}
+                                disabled={fieldPage === 1}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Previous
+                              </button>
+                              <span className="px-3 py-1 text-sm text-gray-700">
+                                Page {fieldPage} of {totalPages}
+                              </span>
+                              <button
+                                onClick={() => setFieldPage(Math.min(totalPages, fieldPage + 1))}
+                                disabled={fieldPage === totalPages}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </>
                 )}
+              </div>
+              
+              {/* Save Button for Field Management */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <button
+                  onClick={handleSaveFields}
+                  disabled={savingFields}
+                  className="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {savingFields ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving Field Requirements...
+                    </>
+                  ) : (
+                    <>
+                      <FaSave className="mr-2" />
+                      Save Field Requirements
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

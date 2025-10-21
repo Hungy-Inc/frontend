@@ -21,7 +21,8 @@ import {
   FaFilter,
   FaUserCog,
   FaFileAlt,
-  FaExternalLinkAlt
+  FaExternalLinkAlt,
+  FaCopy
 } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
@@ -128,6 +129,62 @@ export default function ManageUsersPage() {
   const [selectedRole, setSelectedRole] = useState<string>('ADMIN');
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  // Get organization ID from localStorage
+  const getOrganizationId = () => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          return user.organizationId;
+        } catch {
+          return null;
+        }
+      }
+    }
+    return null;
+  };
+
+  // Copy volunteer registration link to clipboard
+  const copyVolunteerRegistrationLink = async () => {
+    try {
+      const organizationId = getOrganizationId();
+      if (!organizationId) {
+        toast.error('Organization ID not found');
+        return;
+      }
+
+      // Fetch organization details from API
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${apiUrl}/api/organizations/${organizationId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || 'Failed to fetch organization details');
+        return;
+      }
+
+      const organization = await response.json();
+      const orgName = organization.name;
+
+      if (!orgName) {
+        toast.error('Organization name not found');
+        return;
+      }
+
+      const baseUrl = window.location.origin;
+      const registrationUrl = `${baseUrl}/${orgName}/volunteer-registration`;
+      
+      await navigator.clipboard.writeText(registrationUrl);
+      toast.success('Volunteer registration link copied to clipboard!');
+    } catch (err) {
+      console.error('Error copying registration link:', err);
+      toast.error('Failed to copy link to clipboard');
+    }
+  };
 
   // Fetch users for management
   const fetchUsers = async () => {
@@ -835,6 +892,14 @@ export default function ManageUsersPage() {
                   <option key={role} value={role}>{role}</option>
                 ))}
               </select>
+              <button
+                onClick={copyVolunteerRegistrationLink}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center gap-2 hover:bg-gray-700 transition"
+                title="Copy volunteer registration link"
+              >
+                <FaCopy />
+                Copy Registration Link
+              </button>
               <button
                 onClick={() => setShowAdd(true)}
                 className="px-4 py-2 text-white rounded-lg flex items-center gap-2"

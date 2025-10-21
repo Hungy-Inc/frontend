@@ -47,7 +47,7 @@ export default function EmailManagement() {
       console.log('Fetching email templates...');
       const data = await api.getEmailTemplates();
       console.log('Email templates data:', data);
-      setTemplates(data.templates);
+      setTemplates(data.templates.filter((template: EmailTemplate) => !template.isSystem));
     } catch (error) {
       console.error('Error fetching email templates:', error);
       toast.error('Error fetching email templates');

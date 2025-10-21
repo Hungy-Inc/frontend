@@ -563,7 +563,7 @@ export default function KitchenDetailsPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/forgot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: hardcodedEmail })
+        body: JSON.stringify({ email: hardcodedEmail, organizationId: organization?.id })
       });
       
       const data = await res.json();

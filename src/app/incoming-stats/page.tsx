@@ -549,39 +549,75 @@ export default function IncomingStatsPage() {
           return;
         }
 
-        const displayValue = parseFloat(newValue);
-        if (isNaN(displayValue) || displayValue < 0) {
-          toast.error('Please enter a valid positive number');
-          return;
-        }
-
-        // Convert from display unit to KG for database storage
-        const weightKg = convertDisplayToKg(displayValue);
-
+        const trimmedValue = newValue.trim();
+        
         const category = categories.find(c => c.name === categoryName);
         if (!category) {
           toast.error('Category not found');
           return;
         }
 
-        if (weightKg === 0) {
-          // Delete the donation item
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/detail-donations/${donorId}/${category.id}?date=${selectedDate}`,
+        // Validate the input
+        const displayValue = parseFloat(trimmedValue);
+        if (isNaN(displayValue) || displayValue < 0) {
+          toast.error('Please enter a valid non-negative number');
+          return;
+        }
+
+        // Convert from display unit to KG for database storage
+        const weightKg = convertDisplayToKg(displayValue);
+
+        if (displayValue === 0) {
+          // For 0 values: First update to 0, then delete
+          // Step 1: Update to 0
+          const updateResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/detail-donations`,
             {
-              method: 'DELETE',
+              method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
-              }
+              },
+              body: JSON.stringify({
+                date: selectedDate,
+                donorId,
+                categoryId: category.id,
+                weightKg: 0
+              })
             }
           );
 
-          if (!response.ok) {
-            throw new Error('Failed to delete donation');
+          if (!updateResponse.ok) {
+            throw new Error('Failed to update donation to 0');
           }
+
+          // Refresh to show 0 in UI
+          await fetchDetailDonations();
+
+          // Step 2: Delete the item after a brief delay so user sees the 0
+          setTimeout(async () => {
+            try {
+              const deleteResponse = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/detail-donations/${donorId}/${category.id}?date=${selectedDate}`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+
+              if (deleteResponse.ok) {
+                // Refresh again to show the deletion
+                await fetchDetailDonations();
+              }
+            } catch (err) {
+              console.error('Error deleting donation:', err);
+            }
+          }, 500); // 500ms delay to show the 0 value
         } else {
-          // Create or update the donation item
+          // For non-zero values: Just update
           const response = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL}/detail-donations`,
             {

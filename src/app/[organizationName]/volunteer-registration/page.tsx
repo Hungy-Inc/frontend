@@ -34,6 +34,124 @@ interface Organization {
   address?: string;
   email: string;
 }
+const FloatingLabelInput = ({ 
+  type = "text", 
+  value, 
+  onChange, 
+  label, 
+  required = false,
+  placeholder = "",
+  ...props 
+}: any) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const hasValue = value && value.toString().length > 0;
+
+  return (
+    <div className="relative">
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        className="w-full px-4 pt-6 pb-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
+        required={required}
+        {...props}
+      />
+      <label
+        className={`absolute left-4 transition-all duration-200 pointer-events-none ${
+          isFocused || hasValue
+            ? 'top-1.5 text-xs text-orange-600 font-medium'
+            : 'top-1/2 -translate-y-1/2 text-base text-gray-500'
+        }`}
+      >
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+    </div>
+  );
+};
+const FloatingLabelTextarea = ({ 
+  value, 
+  onChange, 
+  label, 
+  required = false,
+  rows = 4,
+  ...props 
+}: any) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const hasValue = value && value.toString().length > 0;
+
+  return (
+    <div className="relative">
+      <textarea
+        value={value}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        rows={rows}
+        className="w-full px-4 pt-6 pb-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 resize-none"
+        required={required}
+        {...props}
+      />
+      <label
+        className={`absolute left-4 transition-all duration-200 pointer-events-none ${
+          isFocused || hasValue
+            ? 'top-1.5 text-xs text-orange-600 font-medium'
+            : 'top-6 text-base text-gray-500'
+        }`}
+      >
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+    </div>
+  );
+};
+const FloatingLabelSelect = ({ 
+  value, 
+  onChange, 
+  label, 
+  required = false,
+  options = [],
+  ...props 
+}: any) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const hasValue = value && value.toString().length > 0;
+
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        className="w-full px-4 pt-6 pb-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 appearance-none bg-white"
+        required={required}
+        {...props}
+      >
+        <option value=""></option>
+        {options.map((option: string, idx: number) => (
+          <option key={idx} value={option}>{option}</option>
+        ))}
+      </select>
+      <label
+        className={`absolute left-4 transition-all duration-200 pointer-events-none ${
+          isFocused || hasValue
+            ? 'top-1.5 text-xs text-orange-600 font-medium'
+            : 'top-1/2 -translate-y-1/2 text-base text-gray-500'
+        }`}
+      >
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </div>
+  );
+};
 
 export default function VolunteerRegistrationPage() {
   const params = useParams();
@@ -211,82 +329,88 @@ export default function VolunteerRegistrationPage() {
     const { fieldDefinition } = field;
     const value = formData[fieldDefinition.name] || '';
 
-    const commonClasses = "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent";
-
     switch (fieldDefinition.fieldType) {
       case 'TEXT':
         return (
-          <input
+          <FloatingLabelInput
             type="text"
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            placeholder={fieldDefinition.placeholder || ''}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
           />
         );
 
       case 'EMAIL':
         return (
-          <input
+          <FloatingLabelInput
             type="email"
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            placeholder={fieldDefinition.placeholder || 'your.email@example.com'}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
           />
         );
 
       case 'PHONE':
         return (
-          <input
+          <FloatingLabelInput
             type="tel"
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value.replace(/\D/g, '').slice(0, 10))}
-            placeholder={fieldDefinition.placeholder || '1234567890'}
-            className={commonClasses}
+            onChange={(e: any) => {
+              const onlyDigits = e.target.value.replace(/\D/g, '');
+              const trimmed = onlyDigits.slice(0, 10);
+              handleFieldChange(fieldDefinition.name, trimmed);
+            }}
+            onPaste={(e: any) => {
+              e.preventDefault();
+              const pasted = e.clipboardData.getData('Text').replace(/\D/g, '').slice(0, 10);
+              handleFieldChange(fieldDefinition.name, pasted);
+            }}
+            maxLength={10}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            label={fieldDefinition.label}
             required={field.isRequired}
           />
         );
 
       case 'DATE':
         return (
-          <input
+          <FloatingLabelInput
             type="date"
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
           />
         );
 
       case 'DATETIME':
         return (
-          <input
+          <FloatingLabelInput
             type="datetime-local"
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
           />
         );
 
       case 'NUMBER':
         return (
-          <input
+          <FloatingLabelInput
             type="number"
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            placeholder={fieldDefinition.placeholder || ''}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
           />
         );
 
       case 'BOOLEAN':
         return (
-          <div className="flex items-center">
+          <div className="flex items-center p-4 border border-gray-300 rounded-lg">
             <input
               type="checkbox"
               checked={value}
@@ -294,69 +418,70 @@ export default function VolunteerRegistrationPage() {
               className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
               required={field.isRequired}
             />
-            <label className="ml-2 text-sm text-gray-700">
-              {fieldDefinition.description || 'Yes'}
+            <label className="ml-3 text-sm text-gray-700">
+              {fieldDefinition.label}
+              {field.isRequired && <span className="text-red-500 ml-1">*</span>}
             </label>
           </div>
         );
 
       case 'SELECT':
         return (
-          <select
+          <FloatingLabelSelect
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
-          >
-            <option value="">Select an option</option>
-            {fieldDefinition.options?.map((option: string, idx: number) => (
-              <option key={idx} value={option}>{option}</option>
-            ))}
-          </select>
+            options={fieldDefinition.options}
+          />
         );
 
       case 'MULTISELECT':
         return (
-          <div className="space-y-2">
-            {fieldDefinition.options?.map((option: string, idx: number) => (
-              <div key={idx} className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={value.includes(option)}
-                  onChange={(e) => {
-                    const newValue = e.target.checked
-                      ? [...value, option]
-                      : value.filter((v: string) => v !== option);
-                    handleFieldChange(fieldDefinition.name, newValue);
-                  }}
-                  className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 text-sm text-gray-700">{option}</label>
-              </div>
-            ))}
+          <div className="border border-gray-300 rounded-lg p-4">
+            <p className="text-sm font-medium text-gray-700 mb-3">
+              {fieldDefinition.label}
+              {field.isRequired && <span className="text-red-500 ml-1">*</span>}
+            </p>
+            <div className="space-y-2">
+              {fieldDefinition.options?.map((option: string, idx: number) => (
+                <div key={idx} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={value.includes(option)}
+                    onChange={(e) => {
+                      const newValue = e.target.checked
+                        ? [...value, option]
+                        : value.filter((v: string) => v !== option);
+                      handleFieldChange(fieldDefinition.name, newValue);
+                    }}
+                    className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                  />
+                  <label className="ml-2 text-sm text-gray-700">{option}</label>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
       case 'TEXTAREA':
         return (
-          <textarea
+          <FloatingLabelTextarea
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            placeholder={fieldDefinition.placeholder || ''}
-            rows={4}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
+            rows={4}
           />
         );
 
       default:
         return (
-          <input
+          <FloatingLabelInput
             type="text"
             value={value}
-            onChange={(e) => handleFieldChange(fieldDefinition.name, e.target.value)}
-            placeholder={fieldDefinition.placeholder || ''}
-            className={commonClasses}
+            onChange={(e: any) => handleFieldChange(fieldDefinition.name, e.target.value)}
+            label={fieldDefinition.label}
             required={field.isRequired}
           />
         );
@@ -433,13 +558,6 @@ export default function VolunteerRegistrationPage() {
             {/* Dynamic Fields */}
             {registrationFields.map((field) => (
               <div key={field.id}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {field.fieldDefinition.label}
-                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                {field.fieldDefinition.description && (
-                  <p className="text-sm text-gray-500 mb-2">{field.fieldDefinition.description}</p>
-                )}
                 {renderField(field)}
               </div>
             ))}
@@ -449,7 +567,7 @@ export default function VolunteerRegistrationPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                className="w-full bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors duration-200"
               >
                 {submitting ? (
                   <>

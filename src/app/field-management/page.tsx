@@ -165,9 +165,19 @@ export default function FieldManagementPage() {
   
       const baseUrl = window.location.origin;
       const registrationUrl = `${baseUrl}/${orgName}/volunteer-registration`;
-        
-      await navigator.clipboard.writeText(registrationUrl);
-      toast.success('Volunteer registration link copied to clipboard!');
+      try{
+        await navigator.clipboard.writeText(registrationUrl);
+        toast.success('Volunteer registration link copied to clipboard!');
+      }
+      catch(clipboardErr){
+        const tempInput = document.createElement('input');
+        tempInput.value = registrationUrl;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        toast.success('Volunteer registration link copied to clipboard!');
+      }
     } catch (err) {
       console.error('Error copying registration link:', err);
       toast.error('Failed to copy link to clipboard');

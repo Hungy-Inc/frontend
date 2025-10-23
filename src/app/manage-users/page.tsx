@@ -24,6 +24,7 @@ import {
   FaExternalLinkAlt,
   FaCopy
 } from "react-icons/fa";
+import { ImSpinner2 } from "react-icons/im"; 
 import { toast } from 'react-toastify';
 
 interface User {
@@ -127,6 +128,10 @@ export default function ManageUsersPage() {
   const [defaultPermissionsLoading, setDefaultPermissionsLoading] = useState(false);
   const [savingDefaultPermissions, setSavingDefaultPermissions] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>('ADMIN');
+  const [defaultPermissionFilterTerm, setDefaultPermissionFilterTerm] = useState('');
+
+  // Loading state for user approval
+  const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -178,8 +183,19 @@ export default function ManageUsersPage() {
       const baseUrl = window.location.origin;
       const registrationUrl = `${baseUrl}/${orgName}/volunteer-registration`;
       
-      await navigator.clipboard.writeText(registrationUrl);
-      toast.success('Volunteer registration link copied to clipboard!');
+      try {
+        await navigator.clipboard.writeText(registrationUrl);
+        toast.success('Volunteer registration link copied to clipboard!');
+      } 
+      catch (clipboardErr) {
+        const tempInput = document.createElement('input');
+        tempInput.value = registrationUrl;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        toast.success('Volunteer registration link copied to clipboard!');
+      }
     } catch (err) {
       console.error('Error copying registration link:', err);
       toast.error('Failed to copy link to clipboard');
@@ -337,6 +353,8 @@ export default function ManageUsersPage() {
 
   // User approval/denial functions
   const approveUser = async (userId: string) => {
+    if (loadingUserId === userId) return;
+    setLoadingUserId(userId);
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userId}/approve`, {
@@ -349,6 +367,8 @@ export default function ManageUsersPage() {
       toast.success("User approved successfully!");
     } catch (err) {
       toast.error("Failed to approve user. Please try again.");
+    } finally {
+      setLoadingUserId(null);
     }
   };
 
@@ -780,7 +800,15 @@ export default function ManageUsersPage() {
   // Filter permissions based on filter term (only by permission name)
   const filteredPermissions = userPermissions?.permissions.filter(permission => {
     const matchesFilter = permission.moduleName.toLowerCase().includes(permissionFilterTerm.toLowerCase());
-    return matchesFilter;
+    const isNotExcluded = permission.moduleName !== 'Volunteer Meal counting sub module';
+    return matchesFilter && isNotExcluded;
+  }) || [];
+
+  // Filter default permissions based on filter term (only by permission name)
+  const filteredDefaultPermissions = defaultRolePermissions[selectedRole]?.filter(permission => {
+    const matchesFilter = permission.moduleName.toLowerCase().includes(defaultPermissionFilterTerm.toLowerCase());
+    const isNotExcluded = permission.moduleName !== 'Volunteer Meal counting sub module';
+    return matchesFilter && isNotExcluded;
   }) || [];
 
   if (loading) {
@@ -1039,10 +1067,19 @@ export default function ManageUsersPage() {
                               <>
                                 <button
                                   onClick={() => approveUser(user.id)}
-                                  className="p-2 text-green-600 hover:text-green-800"
+                                  className={`p-2 rounded ${
+                                    loadingUserId === user.id
+                                      ? "text-gray-400 cursor-not-allowed"
+                                      : "text-green-600 hover:text-green-800"
+                                  }`}
+                                  disabled={loadingUserId === user.id}
                                   title="Approve User"
                                 >
-                                  <FaCheck />
+                                  {loadingUserId === user.id ? (
+                                    <ImSpinner2 className="animate-spin" />
+                                  ) : (
+                                    <FaCheck />
+                                  )}
                                 </button>
                                 <button
                                   onClick={() => denyUser(user.id)}
@@ -1070,7 +1107,7 @@ export default function ManageUsersPage() {
                               <FaFileAlt />
                             </button>
                             <button
-                              onClick={() => startEdit(user)}
+                              onClick={() => navigateToUserDetails(user.id)}
                               className="p-2"
                               style={{ color: '#EF5C11' }}
                               onMouseEnter={(e) => e.currentTarget.style.color = '#666666'}
@@ -1302,12 +1339,12 @@ export default function ManageUsersPage() {
                                 <>
                                   {filteredPermissions.filter(p => p.canAccess).length} of {filteredPermissions.length} filtered permissions enabled
                                   <span className="text-gray-400 ml-2">
-                                    ({userPermissions.permissions.filter(p => p.canAccess).length} of {userPermissions.permissions.length} total)
+                                    ({filteredPermissions.filter(p => p.canAccess).length} of {filteredPermissions.length} total)
                                   </span>
                                 </>
                               ) : (
                                 <>
-                                  {userPermissions.permissions.filter(p => p.canAccess).length} of {userPermissions.permissions.length} permissions enabled
+                                  {filteredPermissions.filter(p => p.canAccess).length} of {filteredPermissions.length} permissions enabled
                                 </>
                               )}
                             </div>
@@ -1360,7 +1397,7 @@ export default function ManageUsersPage() {
               {defaultRolePermissions[selectedRole] ? (
                 <div className="bg-white shadow rounded-lg">
                   <div className="px-6 py-4 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-medium text-gray-900">
                         Default Permissions for {selectedRole} Role
                       </h3>
@@ -1379,11 +1416,22 @@ export default function ManageUsersPage() {
                         </button>
                       </div>
                     </div>
+                    <div className="relative">
+                      <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Filter permissions..."
+                        value={defaultPermissionFilterTerm}
+                        onChange={(e) => setDefaultPermissionFilterTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                      />
+                    </div>
                   </div>
                   
                   <div className="p-6">
                     <div className="space-y-4">
-                      {defaultRolePermissions[selectedRole].map((permission) => (
+                      {filteredDefaultPermissions.map((permission) => (
                         <div key={permission.moduleId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                           <div>
                             <h4 className="text-sm font-medium text-gray-900">{permission.moduleName}</h4>
@@ -1409,7 +1457,7 @@ export default function ManageUsersPage() {
                     <div className="mt-6 pt-4 border-t border-gray-200">
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
-                          {defaultRolePermissions[selectedRole].filter(p => p.canAccess).length} of {defaultRolePermissions[selectedRole].length} permissions enabled
+                          {filteredDefaultPermissions.filter(p => p.canAccess).length} of {filteredDefaultPermissions.length} permissions shown
                         </div>
                         <button
                           onClick={() => updateDefaultRolePermissions(selectedRole, defaultRolePermissions[selectedRole])}

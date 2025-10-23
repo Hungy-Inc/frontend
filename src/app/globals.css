@@ -12,6 +12,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+
   body {
     background: var(--hungy-gray);
     color: var(--hungy-black);
@@ -125,6 +129,10 @@ header {
 }
 
 /* Main Content Styles */
+main {
+  scrollbar-gutter: stable;
+}
+
 .location-bar {
   @apply flex justify-between items-center mb-6;
 }

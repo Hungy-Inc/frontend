@@ -23,6 +23,17 @@ import {
 } from "react-icons/fa";
 import { toast } from 'react-toastify';
 
+interface CustomField {
+  id: number;
+  fieldDefinitionId: number;
+  name: string;
+  label: string;
+  description?: string;
+  fieldType: string;
+  isRequired: boolean;
+  value: any;
+}
+
 interface User {
   id: string;
   firstName: string;
@@ -41,6 +52,7 @@ interface User {
   denialReason?: string;
   address?: string;
   organizationName?: string;
+  customFields?: CustomField[];
 }
 
 const roles = ["VOLUNTEER", "STAFF", "ADMIN"];
@@ -74,6 +86,7 @@ export default function UserDetailsPage() {
     phone: '',
     address: ''
   });
+  const [editCustomFields, setEditCustomFields] = useState<Record<number, any>>({});
   const [saving, setSaving] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -96,6 +109,14 @@ export default function UserDetailsPage() {
         phone: data.phone || '',
         address: data.address || ''
       });
+      // Initialize custom field edits
+      const customFieldsMap: Record<number, any> = {};
+      if (data.customFields) {
+        data.customFields.forEach((field: CustomField) => {
+          customFieldsMap[field.fieldDefinitionId] = field.value;
+        });
+      }
+      setEditCustomFields(customFieldsMap);
     } catch (err) {
       setError("Failed to load user details.");
       toast.error("Failed to load user details");
@@ -140,6 +161,14 @@ export default function UserDetailsPage() {
       phone: user.phone || '',
       address: user.address || ''
     });
+    // Initialize custom field edits
+    const customFieldsMap: Record<number, any> = {};
+    if (user.customFields) {
+      user.customFields.forEach((field: CustomField) => {
+        customFieldsMap[field.fieldDefinitionId] = field.value;
+      });
+    }
+    setEditCustomFields(customFieldsMap);
   };
 
   const cancelEdit = () => {
@@ -153,16 +182,51 @@ export default function UserDetailsPage() {
       phone: user.phone || '',
       address: user.address || ''
     });
+    // Reset custom field edits
+    const customFieldsMap: Record<number, any> = {};
+    if (user.customFields) {
+      user.customFields.forEach((field: CustomField) => {
+        customFieldsMap[field.fieldDefinitionId] = field.value;
+      });
+    }
+    setEditCustomFields(customFieldsMap);
   };
 
   const handleEditChange = (field: keyof User, value: string | boolean) => {
     setEditData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleCustomFieldChange = (fieldDefinitionId: number, value: any) => {
+    setEditCustomFields(prev => ({ ...prev, [fieldDefinitionId]: value }));
+  };
+
   const saveEdit = async () => {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
+
+      // Validate phone number if provided
+      if (editData.phone && editData.phone.length !== 10) {
+        toast.error("Phone number must be of 10 digits");
+        setSaving(false);
+        return;
+      }
+      // Validate duplicate email (only if email changed)
+      if (editData.email && editData.email !== user?.email) {
+        const emailCheckResponse = await fetch(`${apiUrl}/api/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (emailCheckResponse.ok) {
+          const allUsers = await emailCheckResponse.json();
+          const newEmail = editData.email as string;
+          const emailExists = allUsers.some((u: any) => u.email.toLowerCase() === newEmail.toLowerCase() && u.id !== user?.id);
+          if (emailExists) {
+            toast.error("This email is already in use by another user");
+            setSaving(false);
+            return;
+          }
+        }
+      }
 
       const updateData = {
         firstName: editData.firstName || '',
@@ -183,6 +247,29 @@ export default function UserDetailsPage() {
       });
 
       if (!response.ok) throw new Error("Failed to update user");
+      
+      // Save custom fields (only filtered ones, excluding basic info fields)
+      if (user) {
+        const filteredFields = getFilteredCustomFields(user);
+        if (filteredFields.length > 0) {
+          for (const field of filteredFields) {
+            if (editCustomFields[field.fieldDefinitionId] !== undefined) {
+              await fetch(`${apiUrl}/api/user-field-values`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  userId: parseInt(userId),
+                  fieldDefinitionId: field.fieldDefinitionId,
+                  value: editCustomFields[field.fieldDefinitionId]
+                }),
+              });
+            }
+          }
+        }
+      }
       
       await fetchUserDetails();
       setIsEditing(false);
@@ -205,12 +292,61 @@ export default function UserDetailsPage() {
     }
   };
 
-  const hasAdditionalDetails = (user: User) => {
-    return !!(user.address);
+  const renderFieldValue = (field: CustomField) => {
+    if (field.value === null || field.value === undefined) {
+      return <p className="text-gray-400 italic">Not provided</p>;
+    }
+
+    switch (field.fieldType) {
+      case 'BOOLEAN':
+        return <p className="text-black">{field.value ? 'Yes' : 'No'}</p>;
+      case 'DATE':
+        try {
+          return <p className="text-black">{new Date(field.value).toLocaleDateString('en-CA')}</p>;
+        } catch {
+          return <p className="text-black">{field.value}</p>;
+        }
+      case 'DATETIME':
+        try {
+          return <p className="text-black">{new Date(field.value).toLocaleString('en-CA')}</p>;
+        } catch {
+          return <p className="text-black">{field.value}</p>;
+        }
+      case 'MULTISELECT':
+        if (Array.isArray(field.value)) {
+          return (
+            <div className="flex flex-wrap gap-2">
+              {field.value.map((item: string, idx: number) => (
+                <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                  {item}
+                </span>
+              ))}
+            </div>
+          );
+        }
+        return <p className="text-black">{JSON.stringify(field.value)}</p>;
+      case 'TEXTAREA':
+        return <p className="text-black whitespace-pre-wrap">{field.value}</p>;
+      default:
+        return <p className="text-black">{String(field.value)}</p>;
+    }
   };
 
-  const shouldShowAdditionalSection = (user: User) => {
-    return hasAdditionalDetails(user) || isEditing;
+  const isBasicInfoField = (fieldName: string): boolean => {
+    const normalizedName = fieldName.toLowerCase().replace(/[\s_-]/g, '');
+    const basicFields = ['firstname', 'lastname', 'email', 'phone', 'role'];
+    return basicFields.includes(normalizedName);
+  };
+
+  const getFilteredCustomFields = (user: User) => {
+    if (!user.customFields) return [];
+    return user.customFields.filter(
+      field => !isBasicInfoField(field.name)
+    );
+  };
+
+  const hasCustomFields = (user: User) => {
+    return getFilteredCustomFields(user).length > 0;
   };
 
   const handleBack = () => {
@@ -372,13 +508,22 @@ export default function UserDetailsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 {isEditing ? (
-                  <input
-                    type="tel"
-                    value={editData.phone || ''}
-                    onChange={(e) => handleEditChange('phone', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    placeholder="Enter phone number"
-                  />
+                  <>
+                    <input
+                      type="tel"
+                      value={editData.phone || ''}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        handleEditChange('phone', value);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="Enter 10-digit phone number"
+                      maxLength={10}
+                    />
+                    {editData.phone && editData.phone.length !== 10 && (
+                      <p className="text-red-500 text-xs mt-1">Phone number must be of 10 digits</p>
+                    )}
+                  </>
                 ) : (
                   <p className="text-black">{user.phone || 'Not provided'}</p>
                 )}
@@ -434,39 +579,86 @@ export default function UserDetailsPage() {
               </div>
             </div>
 
-            {/* Additional Information */}
-            {shouldShowAdditionalSection(user) && (
-              <div className="bg-white shadow rounded-lg">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-medium text-black border-b border-orange-200 pb-2">
-                    Additional Information
-                  </h3>
-                </div>
-                <div className="px-6 py-4">
-                  <div className="space-y-4">
-                    {/* Address */}
-                    {(user.address || isEditing) && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={editData.address || ''}
-                            onChange={(e) => handleEditChange('address', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                            placeholder="Enter address"
-                          />
-                        ) : (
-                          <p className="text-black">{user.address || 'Not provided'}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Custom Fields */}
+        {hasCustomFields(user) && (
+          <div className="bg-white shadow rounded-lg mt-6">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-black">Additional Information</h3>
+            </div>
+            <div className="px-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {getFilteredCustomFields(user).map((field) => {
+                  const currentValue = editCustomFields[field.fieldDefinitionId] !== undefined 
+                    ? editCustomFields[field.fieldDefinitionId] 
+                    : field.value;
+                  
+                  return (
+                    <div key={field.fieldDefinitionId}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {field.label}
+                        {field.isRequired && <span className="text-red-500 ml-1">*</span>}
+                      </label>
+                      {field.description && (
+                        <p className="text-xs text-gray-500 mb-2">{field.description}</p>
+                      )}
+                      {isEditing ? (
+                        <div>
+                          {field.fieldType === 'TEXTAREA' ? (
+                            <textarea
+                              value={currentValue || ''}
+                              onChange={(e) => handleCustomFieldChange(field.fieldDefinitionId, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              placeholder={`Enter ${field.label.toLowerCase()}`}
+                              rows={3}
+                            />
+                          ) : field.fieldType === 'BOOLEAN' ? (
+                            <select
+                              value={currentValue ? 'true' : 'false'}
+                              onChange={(e) => handleCustomFieldChange(field.fieldDefinitionId, e.target.value === 'true')}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            >
+                              <option value="false">No</option>
+                              <option value="true">Yes</option>
+                            </select>
+                          ) : field.fieldType === 'SELECT' ? (
+                            <select
+                              value={currentValue || ''}
+                              onChange={(e) => handleCustomFieldChange(field.fieldDefinitionId, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            >
+                              <option value="">Select an option</option>
+                              {/* Options would come from field definition */}
+                            </select>
+                          ) : field.fieldType === 'DATE' ? (
+                            <input
+                              type="date"
+                              value={currentValue ? new Date(currentValue).toISOString().split('T')[0] : ''}
+                              onChange={(e) => handleCustomFieldChange(field.fieldDefinitionId, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            />
+                          ) : (
+                            <input
+                              type={field.fieldType === 'EMAIL' ? 'email' : field.fieldType === 'PHONE' ? 'tel' : field.fieldType === 'NUMBER' ? 'number' : 'text'}
+                              value={currentValue || ''}
+                              onChange={(e) => handleCustomFieldChange(field.fieldDefinitionId, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              placeholder={`Enter ${field.label.toLowerCase()}`}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        renderFieldValue(field)
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

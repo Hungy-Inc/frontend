@@ -80,11 +80,11 @@ export default function ClientLayout({
   }, [shouldShowSidebarAndHeader]);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f7f7f9" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f7f7f9", overflow: "hidden" }}>
       {shouldShowSidebarAndHeader && <Sidebar />}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {shouldShowSidebarAndHeader && <Header />}
-        <main style={{ flex: 1 }}>{children}</main>
+        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>{children}</main>
       </div>
       {shouldShowSidebarAndHeader && <ReportIssueButton />}
       <ToastContainer

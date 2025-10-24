@@ -132,18 +132,15 @@ export default function EmailManagement() {
           </div>
         </Link>
 
-        <button 
-          onClick={() => toast.info('Send Custom Email feature is currently in development stage. Coming soon!')}
-          className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer"
-        >
+        <Link href="/email-management/send-custom" className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow">
           <div className="flex items-center space-x-3">
             <FaPaperPlane className="text-blue-500 text-xl" />
             <div>
               <h3 className="font-semibold text-gray-900">Send Custom Email</h3>
-              <p className="text-sm text-gray-600">One-time email (Coming Soon)</p>
+              <p className="text-sm text-gray-600">One-time email to any recipient</p>
             </div>
           </div>
-        </button>
+        </Link>
 
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center space-x-3">

@@ -208,16 +208,6 @@ const FieldDefinitionForm: React.FC<{
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Placeholder</label>
-          <input
-            type="text"
-            value={data.placeholder || ''}
-            onChange={(e) => onDataChange({ ...data, placeholder: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-orange-500 focus:border-orange-500"
-            placeholder="Optional placeholder text..."
-          />
-        </div>
       </div>
 
       {showOptions && (
@@ -1484,13 +1474,6 @@ export default function FieldManagementPage() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
               <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg min-h-[60px]">{detailsModalField.description || <span className="italic text-gray-400">No description provided</span>}</p>
             </div>
-
-            {detailsModalField.placeholder && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Placeholder</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{detailsModalField.placeholder}</p>
-              </div>
-            )}
 
             {detailsModalField.options && detailsModalField.options.length > 0 && (
               <div>

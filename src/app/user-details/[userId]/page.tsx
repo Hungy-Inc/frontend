@@ -601,9 +601,6 @@ export default function UserDetailsPage() {
                         {field.label}
                         {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                       </label>
-                      {field.description && (
-                        <p className="text-xs text-gray-500 mb-2">{field.description}</p>
-                      )}
                       {isEditing ? (
                         <div>
                           {field.fieldType === 'TEXTAREA' ? (

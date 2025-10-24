@@ -31,6 +31,7 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  allowedCategories?: string[]; 
 }
 
 const VARIABLE_CATEGORIES = [
@@ -79,7 +80,7 @@ const VARIABLE_CATEGORIES = [
   }
 ];
 
-export default function RichTextEditor({ value, onChange, placeholder = "Start typing your email content...", disabled = false }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = "Start typing your email content...", disabled = false, allowedCategories }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showVariableDropdown, setShowVariableDropdown] = useState(false);
@@ -529,50 +530,60 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Choose Variable Category</h3>
                   
                   <div className="space-y-2">
-                    {VARIABLE_CATEGORIES.map((category) => (
-                      <div key={category.id}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            // If clicking the same category, close it. Otherwise, open the new category
-                            setSelectedCategory(selectedCategory === category.id ? null : category.id);
-                          }}
-                          className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
-                        >
-                          {category.icon}
-                          <span className="text-sm font-medium text-gray-900">{category.label}</span>
-                          <FaChevronDown className={`text-xs text-gray-400 transition-transform ${
-                            selectedCategory === category.id ? 'rotate-180' : ''
-                          }`} />
-                        </button>
-                        
-                        {selectedCategory === category.id && (
-                          <div className="ml-6 mt-2 space-y-1">
-                            {category.variables.map((variable) => (
-                              <button
-                                key={variable.key}
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  insertVariable(variable.key);
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-orange-50 rounded-md transition-colors group flex items-center justify-between"
-                              >
-                                <span className="text-sm font-medium text-gray-900 group-hover:text-orange-700">
-                                  {variable.label}
-                                </span>
-                                <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">
-                                  {variable.key}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {VARIABLE_CATEGORIES
+                      .filter(category => !allowedCategories || allowedCategories.includes(category.id))
+                      .map((category) => (
+                        <div key={category.id}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              // If clicking the same category, close it. Otherwise, open the new category
+                              setSelectedCategory(selectedCategory === category.id ? null : category.id);
+                            }}
+                            className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 rounded-md transition-colors"
+                          >
+                            {category.icon}
+                            <span className="text-sm font-medium text-gray-900">{category.label}</span>
+                            <FaChevronDown className={`text-xs text-gray-400 transition-transform ${
+                              selectedCategory === category.id ? 'rotate-180' : ''
+                            }`} />
+                          </button>
+                          
+                          {selectedCategory === category.id && (
+                            <div className="ml-6 mt-2 space-y-1">
+                              {category.variables
+                                .filter(variable => {
+                                  // If organization category, only show user.organization.name
+                                  if (category.id === 'organization' && allowedCategories?.includes('organization')) {
+                                    return variable.key === '{{user.organization.name}}';
+                                  }
+                                  return true;
+                                })
+                                .map((variable) => (
+                                  <button
+                                    key={variable.key}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      insertVariable(variable.key);
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-orange-50 rounded-md transition-colors group flex items-center justify-between"
+                                  >
+                                    <span className="text-sm font-medium text-gray-900 group-hover:text-orange-700">
+                                      {variable.label}
+                                    </span>
+                                    <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">
+                                      {variable.key}
+                                    </span>
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 </div>
               </div>

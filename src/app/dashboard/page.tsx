@@ -834,7 +834,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>
-                        {foodBoxData.mealsPerBox} meals per box
+                        {foodBoxData.mealsPerBox} meals per food box
                       </div>
                     </div>
                   )}

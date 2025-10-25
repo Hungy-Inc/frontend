@@ -87,12 +87,14 @@ const EditableCell = ({ value, onSave }: { value: number; onSave: (value: string
   if (isEditing) {
     return (
       <input
-        type="text"
+        type="number"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
         autoFocus
+        min="0"
+        step="0.01"
         style={{
           width: '100%',
           padding: '4px',
@@ -247,20 +249,20 @@ export default function IncomingStatsPage() {
     
     // Handle base units
     if (selectedUnit === 'Pounds (lb)') {
-      return (weight * 2.20462).toFixed(2);
+      return parseFloat((weight * 2.20462).toFixed(2)).toString();
     }
     if (selectedUnit === 'Kilograms (kg)') {
-      return weight.toFixed(2);
+      return parseFloat(weight.toFixed(2)).toString();
     }
     
     // Handle custom weighing categories
     const category = weighingCategories.find(c => c.category === selectedUnit);
     if (category && category.kilogram_kg_ > 0) {
       // Convert kg to custom unit (divide by kg per unit)
-      return (weight / category.kilogram_kg_).toFixed(2);
+      return parseFloat((weight / category.kilogram_kg_).toFixed(2)).toString();
     }
     
-    return weight.toFixed(2);
+    return parseFloat(weight.toFixed(2)).toString();
   };
 
   // Helper to get unit label for display
@@ -506,20 +508,20 @@ export default function IncomingStatsPage() {
       
       // Handle base units
       if (selectedUnit === 'Pounds (lb)') {
-        return (weightKg * 2.20462).toFixed(2);
+        return parseFloat((weightKg * 2.20462).toFixed(2));
       }
       if (selectedUnit === 'Kilograms (kg)') {
-        return weightKg.toFixed(2);
+        return parseFloat(weightKg.toFixed(2));
       }
       
       // Handle custom weighing categories
       const category = weighingCategories.find(c => c.category === selectedUnit);
       if (category && category.kilogram_kg_ > 0) {
         // Convert kg to custom unit (divide by kg per unit)
-        return (weightKg / category.kilogram_kg_).toFixed(2);
+        return parseFloat((weightKg / category.kilogram_kg_).toFixed(2));
       }
       
-      return weightKg.toFixed(2);
+      return parseFloat(weightKg.toFixed(2));
     };
 
     const convertDisplayToKg = (displayValue: number) => {
@@ -565,7 +567,8 @@ export default function IncomingStatsPage() {
         }
 
         // Convert from display unit to KG for database storage
-        const weightKg = convertDisplayToKg(displayValue);
+        let weightKg = convertDisplayToKg(displayValue);
+        weightKg = parseFloat(weightKg.toFixed(2));
 
         if (displayValue === 0) {
           // For 0 values: First update to 0, then delete

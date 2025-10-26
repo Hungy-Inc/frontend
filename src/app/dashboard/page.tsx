@@ -382,7 +382,7 @@ export default function Dashboard() {
   };
 
   // Volunteer summary
-  const filteredVolunteers = volunteers.filter(u => u.role === 'VOLUNTEER');
+  const filteredVolunteers = volunteers.filter(u => u.role === 'VOLUNTEER' && u.hours >= 1);
   const totalVolunteers = filteredVolunteers.length;
   const totalHours = Number(filteredVolunteers.reduce((sum, u) => sum + u.hours, 0).toFixed(2));
 
@@ -762,7 +762,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                    {volunteers.slice(0, 8).map((v, idx) => (
+                    {filteredVolunteers.slice(0, 8).map((v, idx) => (
                       <tr key={idx}>
                         <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
                         <td style={{ padding: '8px' }}>{v.role}</td>
@@ -801,14 +801,14 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Meals Served</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#f24503' }}>{totalMealsServed.toFixed(0)}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700}}>{totalMealsServed.toFixed(0)}</div>
                   <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
                     Regular: {regularMealsServed} | Food Box: {foodBoxData.totalMealsFromFoodBoxes} | Outreach: {outreachData.totalOutreachMeals}
                   </div>
                 </div>
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Equivalent Value</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#f24503' }}>${equivalentValue.toLocaleString()}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700}}>${equivalentValue.toLocaleString()}</div>
                 </div>
               </div>
 
@@ -826,11 +826,11 @@ export default function Dashboard() {
                       <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
                         <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
                           <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Food Boxes</div>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: '#f24503' }}>{foodBoxData.totalFoodBoxes}</div>
+                          <div style={{ fontSize: 18, fontWeight: 700}}>{foodBoxData.totalFoodBoxes}</div>
                         </div>
                         <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
                           <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Meals</div>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: '#f24503' }}>{foodBoxData.totalMealsFromFoodBoxes}</div>
+                          <div style={{ fontSize: 18, fontWeight: 700}}>{foodBoxData.totalMealsFromFoodBoxes}</div>
                         </div>
                       </div>
                       <div style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>
@@ -851,13 +851,13 @@ export default function Dashboard() {
                     <div>
                       <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12, marginBottom: 12 }}>
                         <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Outreach Meals</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: '#f24503' }}>{outreachData.totalOutreachMeals}</div>
+                        <div style={{ fontSize: 18, fontWeight: 700}}>{outreachData.totalOutreachMeals}</div>
                       </div>
                       {outreachData.locationData.length > 0 && (
                         <div style={{ maxHeight: 120, overflowY: 'auto' }}>
                           <table style={{ width: '100%', fontSize: 13 }}>
                             <thead>
-                              <tr style={{ color: '#888', fontWeight: 600 }}>
+                              <tr style={{fontWeight: 600}}>
                                 <th style={{ textAlign: 'left', padding: '4px 0' }}>Location</th>
                                 <th style={{ textAlign: 'right', padding: '4px 0' }}>Meals</th>
                               </tr>

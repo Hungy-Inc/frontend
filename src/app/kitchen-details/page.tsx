@@ -161,9 +161,9 @@ export default function KitchenDetailsPage() {
       });
       
       // Load incoming dollar value from organization data
-      const incomingValue = userOrg.incoming_dollar_value || 0;
-      const mealsVal = userOrg.mealsvalue || 10;
-      const foodBoxMealsCountVal = userOrg.foodboxmealscount || 0;
+      const incomingValue = parseFloat(userOrg.incoming_dollar_value) || 0;
+      const mealsVal = parseFloat(userOrg.mealsvalue) || 10;
+      const foodBoxMealsCountVal = parseInt(userOrg.foodboxmealscount) || 0;
       console.log('Organization data:', userOrg);
       console.log('Incoming dollar value loaded:', incomingValue);
       console.log('Meals value loaded:', mealsVal);
@@ -329,9 +329,10 @@ export default function KitchenDetailsPage() {
   const handleStartEditIncomingValue = () => {
     setIsEditingIncomingValue(true);
     // Convert stored kg value to display unit
+    const numValue = typeof incomingDollarValue === 'string' ? parseFloat(incomingDollarValue) : incomingDollarValue;
     const displayValue = incomingValueUnit === "kg" 
-      ? incomingDollarValue 
-      : incomingDollarValue / 2.20462; // Convert $/kg to $/lb (divide, not multiply)
+      ? numValue 
+      : numValue / 2.20462; // Convert $/kg to $/lb (divide by 2.20462, since 1 lb = 0.45359237 kg)
     setEditingIncomingValue(displayValue.toFixed(2));
   };
 
@@ -345,7 +346,7 @@ export default function KitchenDetailsPage() {
     // Convert entered value to per kg for storage (all calculations use per kg)
     const valuePerKg = incomingValueUnit === "kg" 
       ? inputValue 
-      : inputValue / 2.20462; // Convert $/lb to $/kg
+      : inputValue * 2.20462; // Convert $/lb to $/kg (multiply by 2.20462, since 1 lb = 0.45359237 kg)
     
     try {
       const token = localStorage.getItem("token");
@@ -775,7 +776,7 @@ export default function KitchenDetailsPage() {
     setEditWeighingData({
       category: weighing.category,
       weight: weighing.kilogram_kg_.toString(),
-      unit: "kg" as "kg" | "lb"
+      unit: "lb" as "kg" | "lb"
     });
     setShowEditWeighing(true);
   };
@@ -1310,9 +1311,10 @@ export default function KitchenDetailsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
                     ${(() => {
+                      const numValue = typeof incomingDollarValue === 'string' ? parseFloat(incomingDollarValue) : incomingDollarValue;
                       const displayValue = incomingValueUnit === "kg" 
-                        ? incomingDollarValue 
-                        : incomingDollarValue / 2.20462; // Convert $/kg to $/lb (divide, not multiply)
+                        ? numValue 
+                        : numValue / 2.20462; // Convert $/kg to $/lb (divide by 2.20462, since 1 lb = 0.45359237 kg)
                       return displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     })()}
                   </div>

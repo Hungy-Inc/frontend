@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FaEdit, FaTrash, FaPlusCircle, FaToggleOn, FaToggleOff, FaCalendarAlt, FaClock, FaCheck, FaBan, FaTimes, FaPlus, FaSave } from "react-icons/fa";
 import { toast } from 'react-toastify';
+import { createDateStringWithHalifaxOffset } from '@/utils/timezoneUtils';
 
 export default function ManageShiftsPage() {
   const router = useRouter();
@@ -405,8 +406,8 @@ export default function ManageShiftsPage() {
             setAddingRecurring(false);
             return;
           }
-          startTime = `${baseDate}T${addRecurring.startTime}:00-03:00`;
-          endTime = `${baseDate}T${addRecurring.endTime}:00-03:00`;
+          startTime = createDateStringWithHalifaxOffset(baseDate, `${addRecurring.startTime}:00`);
+          endTime = createDateStringWithHalifaxOffset(baseDate, `${addRecurring.endTime}:00`);
         }
       } else {
         // One-time shift - use datetime inputs

@@ -19,7 +19,7 @@ const months = [
   { value: 12, label: 'December' }
 ];
 
-type OutgoingTab = 'consolidated' | 'shift-categories' | 'foodbox' | 'outreach';
+type OutgoingTab = 'consolidated' | 'shift-categories' | 'foodbox' | 'outreach' | 'outreach-locations';
 
 type OutgoingRow = {
   [key: string]: string | number;
@@ -45,6 +45,14 @@ type FoodBoxRow = {
 type OutreachRow = {
   date: string;
   [locationName: string]: string | number;
+};
+
+type OutreachLocation = {
+  id: number;
+  name: string;
+  address: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 const getYearOptions = () => {
@@ -73,6 +81,12 @@ export default function OutgoingStatsPage() {
   const [foodBoxData, setFoodBoxData] = useState<FoodBoxRow[]>([]);
   const [outreachData, setOutreachData] = useState<OutreachRow[]>([]);
   const [outreachColumns, setOutreachColumns] = useState<string[]>([]);
+  const [outreachLocations, setOutreachLocations] = useState<OutreachLocation[]>([]);
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<OutreachLocation | null>(null);
+  const [formData, setFormData] = useState({ name: '', address: '' });
 
   // Fetch data based on active tab
   useEffect(() => {
@@ -98,6 +112,9 @@ export default function OutgoingStatsPage() {
             break;
           case 'outreach':
             await fetchOutreachData(token);
+            break;
+          case 'outreach-locations':
+            await fetchOutreachLocations(token);
             break;
         }
       } catch (err) {
@@ -158,6 +175,18 @@ export default function OutgoingStatsPage() {
     const data = await response.json();
     setOutreachColumns(data.columns);
     setOutreachData(data.tableData);
+  };
+
+  const fetchOutreachLocations = async (token: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/outreach-locations`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    if (!response.ok) throw new Error('Failed to fetch outreach locations');
+    const data = await response.json();
+    setOutreachLocations(data);
   };
 
   const formatDate = (dateStr: string) => {
@@ -234,6 +263,89 @@ export default function OutgoingStatsPage() {
     }
   };
 
+  // Outreach Location CRUD handlers
+  const handleCreate = () => {
+    setEditingLocation(null);
+    setFormData({ name: '', address: '' });
+    setShowModal(true);
+  };
+
+  const handleEdit = (location: OutreachLocation) => {
+    setEditingLocation(location);
+    setFormData({ name: location.name, address: location.address || '' });
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const url = editingLocation
+        ? `${process.env.NEXT_PUBLIC_API_URL}/api/outreach-locations/${editingLocation.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/api/outreach-locations`;
+      
+      const method = editingLocation ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save');
+      }
+
+      setShowModal(false);
+      toast.success(editingLocation ? 'Location updated successfully!' : 'Location created successfully!');
+      
+      // Refresh the list
+      await fetchOutreachLocations(token);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this outreach location?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/outreach-locations/${id}`,
+        {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete');
+      }
+
+      toast.success('Location deleted successfully!');
+      
+      // Refresh the list
+      await fetchOutreachLocations(token);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+    }
+  };
+
   // Render tab content
   const renderTabContent = () => {
     if (loading) {
@@ -253,6 +365,8 @@ export default function OutgoingStatsPage() {
         return renderFoodBoxTab();
       case 'outreach':
         return renderOutreachTab();
+      case 'outreach-locations':
+        return renderOutreachLocationsTab();
       default:
         return null;
     }
@@ -647,6 +761,186 @@ export default function OutgoingStatsPage() {
     );
   };
 
+  const renderOutreachLocationsTab = () => {
+    return (
+      <div className={styles.tableWrapper}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div className={styles.tableTitle}>Outreach Locations</div>
+          <button 
+            onClick={handleCreate}
+            style={{
+              backgroundColor: '#EF5C11',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            + Add Location
+          </button>
+        </div>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+          <table className={styles.table} style={{ minWidth: '800px' }}>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Created At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {outreachLocations.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                    No outreach locations found. Click "Add Location" to create one.
+                  </td>
+                </tr>
+              ) : (
+                outreachLocations.map((location) => (
+                  <tr key={location.id}>
+                    <td>{location.name}</td>
+                    <td>{location.address || '-'}</td>
+                    <td>{new Date(location.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        onClick={() => handleEdit(location)}
+                        style={{
+                          backgroundColor: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          marginRight: '8px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(location.id)}
+                        style={{
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Modal */}
+        {showModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              padding: '2rem',
+              borderRadius: '8px',
+              width: '500px',
+              maxWidth: '90%'
+            }}>
+              <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem', fontWeight: 600 }}>
+                {editingLocation ? 'Edit Outreach Location' : 'Add Outreach Location'}
+              </h2>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    fontSize: '1rem'
+                  }}
+                  placeholder="Enter location name"
+                />
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                  Address
+                </label>
+                <textarea
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    fontSize: '1rem',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Enter address (optional)"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowModal(false)}
+                  style={{
+                    backgroundColor: '#6b7280',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.5rem 1.5rem',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 500
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={!formData.name.trim()}
+                  style={{
+                    backgroundColor: formData.name.trim() ? '#2563eb' : '#9ca3af',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.5rem 1.5rem',
+                    borderRadius: '4px',
+                    cursor: formData.name.trim() ? 'pointer' : 'not-allowed',
+                    fontWeight: 500
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <main className={styles.main}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -711,6 +1005,12 @@ export default function OutgoingStatsPage() {
           onClick={() => setActiveTab('outreach')}
         >
           Outreach Stats
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'outreach-locations' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('outreach-locations')}
+        >
+          Outreach Locations
         </button>
       </div>
 

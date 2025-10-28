@@ -787,14 +787,13 @@ export default function OutgoingStatsPage() {
               <tr>
                 <th>Name</th>
                 <th>Address</th>
-                <th>Created At</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {outreachLocations.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                  <td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
                     No outreach locations found. Click "Add Location" to create one.
                   </td>
                 </tr>
@@ -803,7 +802,6 @@ export default function OutgoingStatsPage() {
                   <tr key={location.id}>
                     <td>{location.name}</td>
                     <td>{location.address || '-'}</td>
-                    <td>{new Date(location.createdAt).toLocaleDateString()}</td>
                     <td>
                       <button
                         onClick={() => handleEdit(location)}

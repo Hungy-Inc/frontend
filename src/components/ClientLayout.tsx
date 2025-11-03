@@ -22,7 +22,8 @@ export default function ClientLayout({
   const isPrivacyPolicyPage = pathname === '/privacy-policy';
   const isTermsOfServicePage = pathname === '/terms-of-service';
   const isVolunteerRegistrationPage = pathname.includes('/volunteer-registration');
-  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage && !isContactPage && !isPrivacyPolicyPage && !isTermsOfServicePage && !isVolunteerRegistrationPage;
+  const isEnterWaitlistPage = pathname.includes('/waitlist');
+  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage && !isContactPage && !isPrivacyPolicyPage && !isTermsOfServicePage && !isVolunteerRegistrationPage && !isEnterWaitlistPage;
   
   const lastNotificationTimestamp = useRef<number>(0);
 

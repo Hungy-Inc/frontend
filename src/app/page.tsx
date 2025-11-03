@@ -110,8 +110,8 @@ export default function Home() {
             <h1 className="text-5xl md:text-6xl font-extrabold text-black drop-shadow mb-4" style={{fontFamily:'Poppins,Inter,sans-serif'}}>Streamline Food Distribution.<br/>Empower Hunger Relief.</h1>
             <p className="text-lg md:text-xl text-black/80 mb-2">Eliminate paperwork, manage volunteers with ease, and track meals in real-time.<br/>No tech skills needed.</p>
             <div className="flex flex-col md:flex-row gap-4 justify-center mt-8 mb-4">
-              <Link href="/contact" className="flex items-center gap-2 w-full md:w-auto bg-[#ff9800] hover:bg-[#ff9800] text-white font-semibold rounded-lg py-4 px-8 text-lg mt-0 transition focus:outline-none focus:ring-2 focus:ring-orange-300 shadow disabled:opacity-60 disabled:cursor-not-allowed">
-                <ArrowIcon /> Get Started
+              <Link href="/waitlist" className="flex items-center gap-2 w-full md:w-auto bg-[#ff9800] hover:bg-[#ff9800] text-white font-semibold rounded-lg py-4 px-8 text-lg mt-0 transition focus:outline-none focus:ring-2 focus:ring-orange-300 shadow disabled:opacity-60 disabled:cursor-not-allowed">
+                <ArrowIcon /> Enter Waitlist
               </Link>
               <button onClick={() => scrollToSection('benefits')} className="flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-semibold shadow hover:bg-gray-900 transition">
                 <StarIcon /> More Info

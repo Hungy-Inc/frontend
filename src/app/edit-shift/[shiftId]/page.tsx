@@ -346,18 +346,19 @@ export default function EditShiftPage() {
       };
 
       if (shift.isRecurring) {
-        // Recurring shift - use time format with Halifax to UTC conversion
-        const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+        // Recurring shift - use fixed reference date to ensure consistent UTC storage
+        // This ensures 9:00 AM always displays as 9:00 AM regardless of DST period
         updateData.newDaysOfWeek = shiftForm.newDaysOfWeek;
-        // Convert Halifax time to UTC for recurring shifts
-        const startTimeUTC = convertHalifaxToUTC(`${baseDate}T${shiftForm.startTime}:00`);
-        const endTimeUTC = convertHalifaxToUTC(`${baseDate}T${shiftForm.endTime}:00`);
+        // Convert Halifax time to UTC using fixed reference date (true = use fixed date)
+        const startTimeUTC = convertHalifaxToUTC(shiftForm.startTime, true);
+        const endTimeUTC = convertHalifaxToUTC(shiftForm.endTime, true);
         updateData.startTime = startTimeUTC;
         updateData.endTime = endTimeUTC;
       } else {
         // One-time shift - use full datetime with Halifax to UTC conversion
-        updateData.startTime = convertHalifaxToUTC(shiftForm.startTime);
-        updateData.endTime = convertHalifaxToUTC(shiftForm.endTime);
+        // For one-time shifts, use actual date (false = use actual date from input)
+        updateData.startTime = convertHalifaxToUTC(shiftForm.startTime, false);
+        updateData.endTime = convertHalifaxToUTC(shiftForm.endTime, false);
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}`, {

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff, FaCog, FaTrash, FaPlus, FaCheck, FaBan } from "react-icons/fa";
 import { toast } from 'react-toastify';
+import { convertHalifaxToUTC } from '@/utils/timezoneUtils';
 
 interface ShiftForm {
   name: string;
@@ -179,29 +180,37 @@ export default function AddShiftPage() {
       let startTime, endTime;
       
       if (shiftForm.isRecurring) {
-        const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
-        const start = new Date(`${baseDate}T${shiftForm.startTime}`);
-        const end = new Date(`${baseDate}T${shiftForm.endTime}`);
+        // Recurring shift - use fixed reference date to ensure consistent UTC storage
+        // This ensures 9:00 AM always displays as 9:00 AM regardless of DST period
+        // Convert Halifax time to UTC using fixed reference date (true = use fixed date)
+        startTime = convertHalifaxToUTC(shiftForm.startTime, true);
+        endTime = convertHalifaxToUTC(shiftForm.endTime, true);
+        
+        // Validate time difference
+        const start = new Date(startTime);
+        const end = new Date(endTime);
         const diffMs = end.getTime() - start.getTime();
         if (diffMs < 60 * 60 * 1000) {
           toast.error('Shift end time must be at least 1 hour after start time.');
           setSaving(false);
           return;
         }
-        startTime = `${baseDate}T${shiftForm.startTime}:00-03:00`;
-        endTime = `${baseDate}T${shiftForm.endTime}:00-03:00`;
       } else {
-        // One-time shift - use datetime inputs
-        const start = new Date(shiftForm.startTime);
-        const end = new Date(shiftForm.endTime);
+        // One-time shift - use datetime inputs (interpreted as Halifax timezone)
+        // For one-time shifts, extract date from input and use that date for conversion
+        // This ensures 9:00 AM on Nov 10 always displays as 9:00 AM regardless of DST period
+        startTime = convertHalifaxToUTC(shiftForm.startTime, false); // false = extract date from input
+        endTime = convertHalifaxToUTC(shiftForm.endTime, false); // false = extract date from input
+        
+        // Validate time difference
+        const start = new Date(startTime);
+        const end = new Date(endTime);
         const diffMs = end.getTime() - start.getTime();
         if (diffMs < 60 * 60 * 1000) {
           toast.error('Shift end time must be at least 1 hour after start time.');
           setSaving(false);
           return;
         }
-        startTime = shiftForm.startTime;
-        endTime = shiftForm.endTime;
       }
       
       // Create the shift

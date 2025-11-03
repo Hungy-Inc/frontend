@@ -47,7 +47,14 @@ export default function EmailManagement() {
       console.log('Fetching email templates...');
       const data = await api.getEmailTemplates();
       console.log('Email templates data:', data);
-      setTemplates(data.templates.filter((template: EmailTemplate) => !template.isSystem));
+      // Filter out waitlist templates that should be hidden from UI
+      const hiddenTemplateNames = ['Waitlist User Confirmation', 'New Waitlist Admin'];
+      const filteredTemplates = (data.templates || []).filter(
+        (template: EmailTemplate) => !hiddenTemplateNames.includes(template.name)
+      );
+      // Show all templates including system templates (except hidden ones)
+      // System templates will have edit/preview but no delete option
+      setTemplates(filteredTemplates);
     } catch (error) {
       console.error('Error fetching email templates:', error);
       toast.error('Error fetching email templates');
@@ -147,7 +154,9 @@ export default function EmailManagement() {
             <FaEnvelope className="text-green-500 text-xl" />
             <div>
               <h3 className="font-semibold text-gray-900">{templates.length}</h3>
-              <p className="text-sm text-gray-600">Total Templates</p>
+              <p className="text-sm text-gray-600">
+                Total Templates ({templates.filter(t => t.isSystem).length} system, {templates.filter(t => !t.isSystem).length} custom)
+              </p>
             </div>
           </div>
         </div>
@@ -209,8 +218,22 @@ export default function EmailManagement() {
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-4">
-                  {templates.map((template) => (
+                <div className="space-y-6">
+                  {/* System Templates Section */}
+                  {templates.filter(t => t.isSystem).length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium mr-2">
+                          System Templates
+                        </span>
+                        <span className="text-sm text-gray-500 font-normal">
+                          ({templates.filter(t => t.isSystem).length})
+                        </span>
+                      </h3>
+                      <div className="grid gap-4">
+                        {templates
+                          .filter(t => t.isSystem)
+                          .map((template) => (
                     <div key={template.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -268,7 +291,80 @@ export default function EmailManagement() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Templates Section */}
+                  {templates.filter(t => !t.isSystem).length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium mr-2">
+                          Custom Templates
+                        </span>
+                        <span className="text-sm text-gray-500 font-normal">
+                          ({templates.filter(t => !t.isSystem).length})
+                        </span>
+                      </h3>
+                      <div className="grid gap-4">
+                        {templates
+                          .filter(t => !t.isSystem)
+                          .map((template) => (
+                            <div key={template.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2">
+                                    <h3 className="text-lg font-semibold text-gray-900">{template.name}</h3>
+                                    {!template.isActive && (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        Inactive
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 mt-1">{template.subject}</p>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Type: {getTemplateTypeLabel(template.templateType)}
+                                  </p>
+                                  {template.description && (
+                                    <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+                                  )}
+                                  <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                    <span>Created: {new Date(template.createdAt).toLocaleDateString()}</span>
+                                    {template.lastUsedAt && (
+                                      <span>Last used: {new Date(template.lastUsedAt).toLocaleDateString()}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Link
+                                    href={`/email-management/templates/${template.id}/edit`}
+                                    className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                                    title="Edit template"
+                                  >
+                                    <FaEdit />
+                                  </Link>
+                                  <Link
+                                    href={`/email-management/templates/${template.id}/preview`}
+                                    className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                                    title="Preview template"
+                                  >
+                                    <FaEye />
+                                  </Link>
+                                  <button
+                                    onClick={() => deleteTemplate(template.id)}
+                                    className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                    title="Delete template"
+                                  >
+                                    <FaTrash />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

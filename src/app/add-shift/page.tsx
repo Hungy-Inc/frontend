@@ -234,16 +234,23 @@ export default function AddShiftPage() {
       // Add default users if any are selected
       if (selectedDefaultUsers.length > 0) {
         try {
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${data.id}/default-users`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              userIds: selectedDefaultUsers
-            })
-          });
+          // Filter out invalid user IDs and ensure they are numbers
+          const validUserIds = selectedDefaultUsers
+            .filter((id): id is number => id != null && !isNaN(Number(id)))
+            .map(id => Number(id));
+          
+          if (validUserIds.length > 0) {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${data.id}/default-users`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                userIds: validUserIds
+              })
+            });
+          }
         } catch (err) {
           console.error('Failed to add default users:', err);
           toast.warning('Shift created but failed to assign default users. You can assign them later.');
@@ -530,29 +537,39 @@ export default function AddShiftPage() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {filteredUsers.map((user: any) => (
-                        <label key={user.id} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                          <input
-                            type="checkbox"
-                            checked={selectedDefaultUsers.includes(user.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                if (selectedDefaultUsers.length >= shiftForm.slots) {
-                                  toast.error(`Cannot select more than ${shiftForm.slots} users (shift slots limit)`);
-                                  return;
-                                }
-                                setSelectedDefaultUsers(prev => [...prev, user.id]);
-                              } else {
-                                setSelectedDefaultUsers(prev => prev.filter(id => id !== user.id));
-                              }
-                            }}
-                            className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                          />
-                          <span className="text-sm">
-                            {user.firstName} {user.lastName} ({user.email})
-                          </span>
-                        </label>
-                      ))}
+                      {filteredUsers
+                        .filter((user: any) => user.id != null && !isNaN(Number(user.id))) // Filter out users without valid IDs
+                        .map((user: any) => {
+                          const userId = Number(user.id); // Ensure ID is a number
+                          return (
+                            <label key={userId} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedDefaultUsers.includes(userId)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    if (selectedDefaultUsers.length >= shiftForm.slots) {
+                                      toast.error(`Cannot select more than ${shiftForm.slots} users (shift slots limit)`);
+                                      return;
+                                    }
+                                    // Only add if user ID is valid
+                                    if (userId != null && !isNaN(userId)) {
+                                      setSelectedDefaultUsers(prev => [...prev, userId]);
+                                    } else {
+                                      toast.error(`Invalid user ID for user: ${user.firstName} ${user.lastName}`);
+                                    }
+                                  } else {
+                                    setSelectedDefaultUsers(prev => prev.filter(id => id !== userId));
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                              />
+                              <span className="text-sm">
+                                {user.firstName} {user.lastName} ({user.email})
+                              </span>
+                            </label>
+                          );
+                        })}
                     </div>
                   );
                 })()}

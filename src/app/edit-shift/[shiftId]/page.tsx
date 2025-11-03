@@ -259,7 +259,11 @@ export default function EditShiftPage() {
       if (res.ok) {
         const data = await res.json();
         console.log('Fetched default users:', data); // Debug log
-        const defaultUserIds = data.defaultUsers.map((du: any) => du.userId);
+        // Ensure all user IDs are numbers and filter out invalid ones
+        const defaultUserIds = data.defaultUsers
+          .map((du: any) => du.userId)
+          .filter((id: any): id is number => id != null && !isNaN(Number(id)))
+          .map((id: any) => Number(id));
         setSelectedDefaultUsers(defaultUserIds);
         setOriginalDefaultUsers([...defaultUserIds]); // Store original for comparison
       } else {
@@ -277,13 +281,22 @@ export default function EditShiftPage() {
     try {
       const token = localStorage.getItem("token");
       
+      // Filter out invalid user IDs and ensure they are numbers
+      const validUserIds = selectedDefaultUsers
+        .filter((id): id is number => id != null && !isNaN(Number(id)))
+        .map(id => Number(id));
+      
+      if (validUserIds.length === 0 && selectedDefaultUsers.length > 0) {
+        throw new Error('No valid user IDs found. Please check your selection.');
+      }
+      
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/default-users`, {
-        method: 'POST',
+        method: 'PUT', // Changed from POST to PUT for bulk update
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ userIds: selectedDefaultUsers })
+        body: JSON.stringify({ userIds: validUserIds })
       });
 
       if (!res.ok) {
@@ -294,7 +307,7 @@ export default function EditShiftPage() {
       toast.success('Default users saved successfully!');
       
       // Update original values to reflect saved state
-      setOriginalDefaultUsers([...selectedDefaultUsers]);
+      setOriginalDefaultUsers([...validUserIds]);
       
       // Refresh the default users to confirm they're saved
       await fetchDefaultUsersForShift(shiftId);
@@ -821,17 +834,25 @@ export default function EditShiftPage() {
                         user.lastName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
                         user.email?.toLowerCase().includes(userSearchTerm.toLowerCase())
                       )
-                      .map((user) => (
-                        <div key={user.id} className="p-3 hover:bg-gray-50">
+                      .filter(user => user.id != null && !isNaN(Number(user.id))) // Filter out users without valid IDs
+                      .map((user) => {
+                        const userId = Number(user.id); // Ensure ID is a number
+                        return (
+                        <div key={userId} className="p-3 hover:bg-gray-50">
                           <label className="flex items-center">
                             <input
                               type="checkbox"
-                              checked={selectedDefaultUsers.includes(user.id)}
+                              checked={selectedDefaultUsers.includes(userId)}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  setSelectedDefaultUsers([...selectedDefaultUsers, user.id]);
+                                  // Only add if user ID is valid
+                                  if (userId != null && !isNaN(userId)) {
+                                    setSelectedDefaultUsers([...selectedDefaultUsers, userId]);
+                                  } else {
+                                    toast.error(`Invalid user ID for user: ${user.firstName} ${user.lastName}`);
+                                  }
                                 } else {
-                                  setSelectedDefaultUsers(selectedDefaultUsers.filter(id => id !== user.id));
+                                  setSelectedDefaultUsers(selectedDefaultUsers.filter(id => id !== userId));
                                 }
                               }}
                               className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
@@ -844,7 +865,8 @@ export default function EditShiftPage() {
                             </div>
                           </label>
                         </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 )}
               </div>

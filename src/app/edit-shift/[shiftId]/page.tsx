@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff, FaCog, FaTrash, FaPlus, FaCheck, FaBan } from "react-icons/fa";
 import { toast } from 'react-toastify';
+import { convertUTCToHalifax, convertUTCTimeToHalifaxTime, convertHalifaxToUTC } from '@/utils/timezoneUtils';
 
 interface FieldDefinition {
   id: number;
@@ -13,59 +14,6 @@ interface FieldDefinition {
   createdAt: string;
   updatedAt: string;
 }
-
-
-// Utility functions for Halifax timezone conversion
-const convertUTCToHalifax = (utcTimeString: string): string => {
-  const utcDate = new Date(utcTimeString);
-  const halifaxDate = new Date(utcDate.toLocaleString("en-US", {timeZone: "America/Halifax"}));
-  return halifaxDate.toISOString().slice(0, 16);
-};
-
-// Convert UTC time string to Halifax time (HH:MM format)
-const convertUTCTimeToHalifaxTime = (utcTimeString: string): string => {
-  try {
-    // Parse the UTC datetime string
-    const utcDate = new Date(utcTimeString);
-    
-    // Convert to Halifax timezone
-    const halifaxTimeString = utcDate.toLocaleString("en-US", {
-      timeZone: "America/Halifax",
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-    
-    return halifaxTimeString;
-  } catch (error) {
-    console.error('Error converting UTC time to Halifax time:', error);
-    return utcTimeString.slice(11, 16);
-  }
-};
-
-const convertHalifaxToUTC = (halifaxTimeString: string): string => {
-  try {
-    // If it's already a full datetime string, parse it directly
-
-    
-    if (halifaxTimeString.includes('T') && halifaxTimeString.includes('-')) {
-      // It's already a datetime string, just return it as UTC
-      return new Date(halifaxTimeString).toISOString();
-    }
-    
-    // If it's just a time string (HH:MM), convert it to UTC
-    const [hours, minutes] = halifaxTimeString.split(':');
-    const halifaxDate = new Date();
-    halifaxDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-    
-    // Convert Halifax time to UTC
-    const utcDate = new Date(halifaxDate.toLocaleString("en-US", {timeZone: "UTC"}));
-    return utcDate.toISOString();
-  } catch (error) {
-    console.error('Error converting Halifax time to UTC:', error);
-    return halifaxTimeString;
-  }
-};
 
 interface ShiftDetails {
   id: number;

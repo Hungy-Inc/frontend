@@ -23,8 +23,8 @@ export default function Dashboard() {
   const [year, setYear] = useState(currentYear);
   const [unit, setUnit] = useState('Pounds (lb)');
 
-  // Incoming stats state
-  const [orgTotals, setOrgTotals] = useState<{ [org: string]: { weight: number, value: number } }>({});
+  // Incoming stats state - now keyed by ID (string) with name included
+  const [orgTotals, setOrgTotals] = useState<{ [id: string]: { name: string, weight: number, value: number } }>({});
   const [grandTotalWeight, setGrandTotalWeight] = useState<number>(0);
   const [grandTotalValue, setGrandTotalValue] = useState<number>(0);
   const [incomingDollarValue, setIncomingDollarValue] = useState<number>(0);
@@ -703,9 +703,9 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                    {Object.entries(orgTotals).map(([donor, totals]) => (
-                      <tr key={donor}>
-                        <td style={{ padding: '8px 8px 8px 0' }}>{donor}</td>
+                    {Object.entries(orgTotals).map(([id, totals]) => (
+                      <tr key={id}>
+                        <td style={{ padding: '8px 8px 8px 0' }}>{totals.name}</td>
                         <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToIncomingUnit(totals.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                         <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>
                           ${(Number(totals.weight.toFixed(2)) * Number(incomingDollarValue.toFixed(2))).toFixed(2)}

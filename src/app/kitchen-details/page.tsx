@@ -67,10 +67,16 @@ export default function KitchenDetailsPage() {
   const [isEditingMealsValue, setIsEditingMealsValue] = useState(false);
   const [editingMealsValue, setEditingMealsValue] = useState<string>("");
 
-  // Food box meals count state
+  // Food box meals count state (meals per lb)
   const [foodBoxMealsCount, setFoodBoxMealsCount] = useState<number>(0);
   const [isEditingFoodBoxMealsCount, setIsEditingFoodBoxMealsCount] = useState(false);
   const [editingFoodBoxMealsCount, setEditingFoodBoxMealsCount] = useState<string>("");
+  const [foodBoxMealsCountUnit, setFoodBoxMealsCountUnit] = useState<"kg" | "lb">("lb"); // Default to lb
+
+  // Backpack meals count state (meals per backpack)
+  const [backpackMealsCount, setBackpackMealsCount] = useState<number>(0);
+  const [isEditingBackpackMealsCount, setIsEditingBackpackMealsCount] = useState(false);
+  const [editingBackpackMealsCount, setEditingBackpackMealsCount] = useState<string>("");
 
   // Forgot password flow state
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
@@ -163,14 +169,17 @@ export default function KitchenDetailsPage() {
       // Load incoming dollar value from organization data
       const incomingValue = parseFloat(userOrg.incoming_dollar_value) || 0;
       const mealsVal = parseFloat(userOrg.mealsvalue) || 10;
-      const foodBoxMealsCountVal = parseInt(userOrg.foodboxmealscount) || 0;
+      const foodBoxMealsCountVal = parseFloat(userOrg.foodboxmealscount) || 0;
+      const backpackMealsCountVal = parseFloat(userOrg.backpackmealscount) || 0;
       console.log('Organization data:', userOrg);
       console.log('Incoming dollar value loaded:', incomingValue);
       console.log('Meals value loaded:', mealsVal);
       console.log('Food box meals count loaded:', foodBoxMealsCountVal);
+      console.log('Backpack meals count loaded:', backpackMealsCountVal);
       setIncomingDollarValue(incomingValue);
       setMealsValue(mealsVal);
       setFoodBoxMealsCount(foodBoxMealsCountVal);
+      setBackpackMealsCount(backpackMealsCountVal);
 
       // Set addresses from already parsed data
       setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
@@ -479,14 +488,27 @@ export default function KitchenDetailsPage() {
   // Food box meals count handlers
   const handleStartEditFoodBoxMealsCount = () => {
     setIsEditingFoodBoxMealsCount(true);
-    setEditingFoodBoxMealsCount(foodBoxMealsCount.toString());
+    // Display current value in selected unit (default lb)
+    // If stored as per lb, show as is for lb, or convert to kg for display
+    const displayValue = foodBoxMealsCountUnit === 'kg' 
+      ? (foodBoxMealsCount / 2.20462).toFixed(2)
+      : foodBoxMealsCount.toFixed(2);
+    setEditingFoodBoxMealsCount(displayValue);
   };
 
   const handleSaveFoodBoxMealsCount = async () => {
-    const inputValue = parseInt(editingFoodBoxMealsCount);
+    const inputValue = parseFloat(editingFoodBoxMealsCount);
     if (isNaN(inputValue) || inputValue < 0) {
-      toast.error('Please enter a valid positive integer');
+      toast.error('Please enter a valid positive number');
       return;
+    }
+    
+    // Convert to meals per lb (stored in database)
+    // If user entered per kg, convert to per lb: mealsPerKg * 2.20462 = mealsPerLb
+    // If user entered per lb, use as is
+    let mealsPerLb = inputValue;
+    if (foodBoxMealsCountUnit === 'kg') {
+      mealsPerLb = inputValue * 2.20462; // Convert kg to lb
     }
     
     try {
@@ -496,7 +518,7 @@ export default function KitchenDetailsPage() {
         return;
       }
 
-      console.log('Saving food box meals count:', inputValue);
+      console.log('Saving food box meals count:', mealsPerLb, 'per lb (input:', inputValue, foodBoxMealsCountUnit, ')');
       console.log('Organization ID:', organization.id);
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/foodboxmealscount`, {
@@ -506,7 +528,7 @@ export default function KitchenDetailsPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          foodboxmealscount: inputValue
+          foodboxmealscount: mealsPerLb
         }),
       });
 
@@ -528,11 +550,13 @@ export default function KitchenDetailsPage() {
         foodboxmealscount: updatedOrg.foodboxmealscount
       }));
       
-      // Update the display value state
-      setFoodBoxMealsCount(updatedOrg.foodboxmealscount);
+      // Update the display value state (stored as per lb, display in selected unit)
+      const updatedValue = parseFloat(updatedOrg.foodboxmealscount) || 0;
+      setFoodBoxMealsCount(updatedValue);
 
       setIsEditingFoodBoxMealsCount(false);
       setEditingFoodBoxMealsCount("");
+      setFoodBoxMealsCountUnit("lb"); // Reset to default
       toast.success('Food box meals count updated successfully!');
       
     } catch (error) {
@@ -544,6 +568,77 @@ export default function KitchenDetailsPage() {
   const handleCancelEditFoodBoxMealsCount = () => {
     setIsEditingFoodBoxMealsCount(false);
     setEditingFoodBoxMealsCount("");
+  };
+
+  // Backpack meals count handlers
+  const handleStartEditBackpackMealsCount = () => {
+    setIsEditingBackpackMealsCount(true);
+    setEditingBackpackMealsCount(backpackMealsCount.toFixed(2));
+  };
+
+  const handleSaveBackpackMealsCount = async () => {
+    const inputValue = parseFloat(editingBackpackMealsCount);
+    if (isNaN(inputValue) || inputValue < 0) {
+      toast.error('Please enter a valid positive number');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+
+      console.log('Saving backpack meals count:', inputValue);
+      console.log('Organization ID:', organization.id);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/backpackmealscount`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          backpackmealscount: inputValue
+        }),
+      });
+
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.error || 'Failed to update backpack meals count');
+        return;
+      }
+      
+      const updatedOrg = await res.json();
+      console.log('Updated organization:', updatedOrg);
+
+      // Update both the organization state and the backpack meals count display state
+      setOrganization((prev: any) => ({
+        ...prev,
+        backpackmealscount: updatedOrg.backpackmealscount
+      }));
+      
+      // Update the display value state
+      const updatedValue = parseFloat(updatedOrg.backpackmealscount) || 0;
+      setBackpackMealsCount(updatedValue);
+
+      setIsEditingBackpackMealsCount(false);
+      setEditingBackpackMealsCount("");
+      toast.success('Backpack meals count updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating backpack meals count:', error);
+      toast.error('Failed to update backpack meals count. Please try again.');
+    }
+  };
+
+  const handleCancelEditBackpackMealsCount = () => {
+    setIsEditingBackpackMealsCount(false);
+    setEditingBackpackMealsCount("");
   };
 
   // Forgot password handlers
@@ -1532,7 +1627,7 @@ export default function KitchenDetailsPage() {
               border: '1px solid #e9ecef'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Food Box Meals Count</h3>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Food Box Meals Count (per weight)</h3>
                 <button
                   onClick={handleStartEditFoodBoxMealsCount}
                   style={{
@@ -1575,12 +1670,42 @@ export default function KitchenDetailsPage() {
                         width: '150px',
                         outline: 'none'
                       }}
-                      placeholder="0"
+                      placeholder="0.00"
                       min="0"
-                      step="1"
+                      step="0.01"
                     />
+                    <select
+                      value={foodBoxMealsCountUnit}
+                      onChange={(e) => {
+                        const newUnit = e.target.value as "kg" | "lb";
+                        setFoodBoxMealsCountUnit(newUnit);
+                        // Convert display value when unit changes
+                        const currentValue = parseFloat(editingFoodBoxMealsCount) || 0;
+                        if (newUnit === 'kg') {
+                          // Converting from lb to kg: divide by 2.20462
+                          setEditingFoodBoxMealsCount((currentValue / 2.20462).toFixed(2));
+                        } else {
+                          // Converting from kg to lb: multiply by 2.20462
+                          setEditingFoodBoxMealsCount((currentValue * 2.20462).toFixed(2));
+                        }
+                      }}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: '#333',
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="lb">per lb</option>
+                      <option value="kg">per kg</option>
+                    </select>
                     <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
-                      meals per box
+                      meals
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -1619,10 +1744,115 @@ export default function KitchenDetailsPage() {
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
-                    {foodBoxMealsCount.toLocaleString()}
+                    {foodBoxMealsCount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
-                    meals per box
+                    meals per lb
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Backpack Meals Count Section */}
+            <div style={{ 
+              background: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 24, 
+              marginBottom: 24,
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Backpack Meals Count</h3>
+                <button
+                  onClick={handleStartEditBackpackMealsCount}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #dee2e6',
+                    color: '#666',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
+                >
+                  <FaEdit />
+                  Edit
+                </button>
+              </div>
+              
+              {isEditingBackpackMealsCount ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      value={editingBackpackMealsCount}
+                      onChange={(e) => setEditingBackpackMealsCount(e.target.value)}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: '#333',
+                        width: '150px',
+                        outline: 'none'
+                      }}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                    <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                      meals per backpack
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleSaveBackpackMealsCount}
+                      style={{
+                        background: '#28a745',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      onClick={handleCancelEditBackpackMealsCount}
+                      style={{
+                        background: '#dc3545',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                    {backpackMealsCount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                    meals per backpack
                   </div>
                 </div>
               )}

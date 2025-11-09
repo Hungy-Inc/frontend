@@ -42,13 +42,28 @@ export default function Dashboard() {
   const [outTable, setOutTable] = useState<any[]>([]);
   const [outLoading, setOutLoading] = useState(true);
   const [outError, setOutError] = useState<string | null>(null);
+  
+  // New outgoing stats from updated API
+  const [backpackMeals, setBackpackMeals] = useState<number>(0);
+  const [totalBackpacks, setTotalBackpacks] = useState<number>(0);
+  const [foodboxMeals, setFoodboxMeals] = useState<number>(0);
+  const [totalFoodBoxes, setTotalFoodBoxes] = useState<number>(0);
+  const [totalFoodBoxWeightKg, setTotalFoodBoxWeightKg] = useState<number>(0);
+  const [totalFoodBoxWeightLb, setTotalFoodBoxWeightLb] = useState<number>(0);
+  const [outreachMeals, setOutreachMeals] = useState<number>(0);
+  const [totalMealsServed, setTotalMealsServed] = useState<number>(0);
+  const [equivalentValue, setEquivalentValue] = useState<number>(0);
 
-  // Food Box state
+  // Filter states for Backpack and FoodBox
+  const [backpackFilter, setBackpackFilter] = useState<'meals' | 'backpacks'>('meals');
+  const [foodboxFilter, setFoodboxFilter] = useState<'meals' | 'foodboxes' | 'lbs' | 'kgs'>('meals');
+
+  // Food Box state (kept for backward compatibility, but will be replaced)
   const [foodBoxData, setFoodBoxData] = useState<{ totalFoodBoxes: number, totalMealsFromFoodBoxes: number, mealsPerBox: number }>({ totalFoodBoxes: 0, totalMealsFromFoodBoxes: 0, mealsPerBox: 10 });
   const [foodBoxLoading, setFoodBoxLoading] = useState(true);
   const [foodBoxError, setFoodBoxError] = useState<string | null>(null);
 
-  // Outreach state
+  // Outreach state (kept for backward compatibility, but will be replaced)
   const [outreachData, setOutreachData] = useState<{ locationData: { locationName: string, mealsCount: number }[], totalOutreachMeals: number }>({ locationData: [], totalOutreachMeals: 0 });
   const [outreachLoading, setOutreachLoading] = useState(true);
   const [outreachError, setOutreachError] = useState<string | null>(null);
@@ -248,6 +263,28 @@ export default function Dashboard() {
         if (!response.ok) throw new Error('Failed to fetch outgoing stats');
         const data = await response.json();
         setOutTable(data.data || []);
+        
+        // Set new outgoing stats from updated API
+        if (data.backpack) {
+          setBackpackMeals(data.backpack.totalMeals || 0);
+          setTotalBackpacks(data.backpack.totalBackpacks || 0);
+        }
+        if (data.foodbox) {
+          setFoodboxMeals(data.foodbox.totalMeals || 0);
+          setTotalFoodBoxes(data.foodbox.totalFoodBoxes || 0);
+          setTotalFoodBoxWeightKg(data.foodbox.totalWeightKg || 0);
+          setTotalFoodBoxWeightLb(data.foodbox.totalWeightLb || 0);
+        }
+        if (data.outreach) {
+          setOutreachMeals(data.outreach.totalMeals || 0);
+        }
+        setTotalMealsServed(data.totalMealsServed || 0);
+        setEquivalentValue(data.equivalentValue || 0);
+        
+        // Update mealsValue if provided
+        if (data.mealsValue) {
+          setMealsValue(data.mealsValue);
+        }
       } catch (err) {
         setOutError(err instanceof Error ? err.message : 'An error occurred');
         setOutTable([]);
@@ -486,13 +523,8 @@ export default function Dashboard() {
   }
   const totalDistributed = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
 
-  // Calculate equivalent value based on meals served (excluding Collection category)
-  const filteredTable = outTable ? outTable.filter((cat: any) => cat.category.toLowerCase() !== 'collection') : [];
-  const regularMealsServed = filteredTable.reduce((sum, cat: any) => sum + (cat.total || 0), 0);
-  
-  // Include food box and outreach meals in total
-  const totalMealsServed = regularMealsServed + foodBoxData.totalMealsFromFoodBoxes + outreachData.totalOutreachMeals;
-  const equivalentValue = totalMealsServed * mealsValue; // Use organization's meals value
+  // Use totals from API response (already calculated correctly)
+  // totalMealsServed and equivalentValue are now set from API response
 
   // Extended color palette for pie chart (supports many items)
   const getPieChartColors = (count: number) => {
@@ -801,78 +833,120 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Meals Served</div>
-                  <div style={{ fontSize: 24, fontWeight: 700}}>{totalMealsServed.toFixed(0)}</div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                    Regular: {regularMealsServed} | Food Box: {foodBoxData.totalMealsFromFoodBoxes} | Outreach: {outreachData.totalOutreachMeals}
-                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 700}}>{totalMealsServed.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
                 </div>
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Equivalent Value</div>
-                  <div style={{ fontSize: 24, fontWeight: 700}}>${equivalentValue.toLocaleString()}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700}}>${equivalentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
               </div>
 
-              {/* Food Box and Outreach Summary Boxes */}
+              {/* Backpack, FoodBox, and Outreach Summary Boxes */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-                {/* Food Box Box */}
-                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 300 }}>
-                  <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 12 }}>Food Box Distribution</div>
-                  {foodBoxLoading ? (
+                {/* Backpack Box */}
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 200 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, color: '#f24503' }}>Backpack</div>
+                    <select
+                      value={backpackFilter}
+                      onChange={(e) => setBackpackFilter(e.target.value as 'meals' | 'backpacks')}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        background: '#fff',
+                        color: '#333',
+                        fontWeight: 500,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="meals">Meals</option>
+                      <option value="backpacks">Backpacks</option>
+                    </select>
+                  </div>
+                  {outLoading ? (
                     <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
-                  ) : foodBoxError ? (
-                    <div style={{ color: 'red', padding: 8 }}>{foodBoxError}</div>
                   ) : (
                     <div>
-                      <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-                        <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
-                          <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Food Boxes</div>
-                          <div style={{ fontSize: 18, fontWeight: 700}}>{foodBoxData.totalFoodBoxes}</div>
+                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>
+                          {backpackFilter === 'meals' ? 'Total Meals' : 'Total Backpacks'}
                         </div>
-                        <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
-                          <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Meals</div>
-                          <div style={{ fontSize: 18, fontWeight: 700}}>{foodBoxData.totalMealsFromFoodBoxes}</div>
+                        <div style={{ fontSize: 18, fontWeight: 700}}>
+                          {backpackFilter === 'meals' 
+                            ? backpackMeals.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            : totalBackpacks.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                          }
                         </div>
                       </div>
-                      <div style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>
-                        {foodBoxData.mealsPerBox} meals per food box
+                    </div>
+                  )}
+                </div>
+
+                {/* Food Box Box */}
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 200 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, color: '#f24503' }}>Food Box</div>
+                    <select
+                      value={foodboxFilter}
+                      onChange={(e) => setFoodboxFilter(e.target.value as 'meals' | 'foodboxes' | 'lbs' | 'kgs')}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        background: '#fff',
+                        color: '#333',
+                        fontWeight: 500,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="meals">Meals</option>
+                      <option value="foodboxes">Food Boxes</option>
+                      <option value="lbs">Lbs</option>
+                      <option value="kgs">Kgs</option>
+                    </select>
+                  </div>
+                  {outLoading ? (
+                    <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+                  ) : (
+                    <div>
+                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>
+                          {foodboxFilter === 'meals' ? 'Total Meals' :
+                           foodboxFilter === 'foodboxes' ? 'Total Food Boxes' :
+                           foodboxFilter === 'lbs' ? 'Total Weight (lbs)' :
+                           'Total Weight (kgs)'}
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 700}}>
+                          {foodboxFilter === 'meals' 
+                            ? foodboxMeals.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            : foodboxFilter === 'foodboxes'
+                            ? totalFoodBoxes.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            : foodboxFilter === 'lbs'
+                            ? totalFoodBoxWeightLb.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : totalFoodBoxWeightKg.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          }
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
 
                 {/* Outreach Box */}
-                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 300 }}>
-                  <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 12 }}>Outreach Activities</div>
-                  {outreachLoading ? (
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 200 }}>
+                  <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 12 }}>Outreach</div>
+                  {outLoading ? (
                     <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
-                  ) : outreachError ? (
-                    <div style={{ color: 'red', padding: 8 }}>{outreachError}</div>
                   ) : (
                     <div>
-                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Outreach Meals</div>
-                        <div style={{ fontSize: 18, fontWeight: 700}}>{outreachData.totalOutreachMeals}</div>
+                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Meals</div>
+                        <div style={{ fontSize: 18, fontWeight: 700}}>{outreachMeals.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
                       </div>
-                      {outreachData.locationData.length > 0 && (
-                        <div style={{ maxHeight: 120, overflowY: 'auto' }}>
-                          <table style={{ width: '100%', fontSize: 13 }}>
-                            <thead>
-                              <tr style={{fontWeight: 600}}>
-                                <th style={{ textAlign: 'left', padding: '4px 0' }}>Location</th>
-                                <th style={{ textAlign: 'right', padding: '4px 0' }}>Meals</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {outreachData.locationData.map((location, idx) => (
-                                <tr key={idx}>
-                                  <td style={{ padding: '4px 0' }}>{location.locationName}</td>
-                                  <td style={{ textAlign: 'right', padding: '4px 0' }}>{location.mealsCount}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>

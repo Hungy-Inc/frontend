@@ -19,7 +19,7 @@ const months = [
   { value: 12, label: 'December' }
 ];
 
-type OutgoingTab = 'consolidated' | 'shift-categories' | 'foodbox' | 'outreach' | 'outreach-locations';
+type OutgoingTab = 'consolidated' | 'shift-categories' | 'foodbox' | 'backpack' | 'outreach' | 'outreach-locations';
 
 type OutgoingRow = {
   [key: string]: string | number;
@@ -30,6 +30,8 @@ type ConsolidatedRow = {
   totalMealsServed: number;
   foodBoxesDistributed: number;
   mealsFromFoodBoxes: number;
+  backpacksDistributed: number;
+  mealsFromBackpacks: number;
   outreachCount: number;
   totalImpact: number;
 };
@@ -37,7 +39,16 @@ type ConsolidatedRow = {
 type FoodBoxRow = {
   date: string;
   foodBoxCount: number;
-  mealsPerBox: number;
+  weightKg: number;
+  mealsPerLb: number;
+  totalMeals: number;
+  distributedBy: string;
+};
+
+type BackpackRow = {
+  date: string;
+  backpackCount: number;
+  mealsPerBackpack: number;
   totalMeals: number;
   distributedBy: string;
 };
@@ -79,9 +90,14 @@ export default function OutgoingStatsPage() {
   const [shiftCategoriesData, setShiftCategoriesData] = useState<OutgoingRow[]>([]);
   const [shiftCategoriesColumns, setShiftCategoriesColumns] = useState<string[]>([]);
   const [foodBoxData, setFoodBoxData] = useState<FoodBoxRow[]>([]);
+  const [backpackData, setBackpackData] = useState<BackpackRow[]>([]);
   const [outreachData, setOutreachData] = useState<OutreachRow[]>([]);
   const [outreachColumns, setOutreachColumns] = useState<string[]>([]);
   const [outreachLocations, setOutreachLocations] = useState<OutreachLocation[]>([]);
+
+  // Filter states for FoodBox and Backpack tabs
+  const [foodboxFilter, setFoodboxFilter] = useState<'meals' | 'foodboxes' | 'lbs' | 'kgs'>('meals');
+  const [backpackFilter, setBackpackFilter] = useState<'meals' | 'backpacks'>('meals');
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -109,6 +125,9 @@ export default function OutgoingStatsPage() {
             break;
           case 'foodbox':
             await fetchFoodBoxData(token);
+            break;
+          case 'backpack':
+            await fetchBackpackData(token);
             break;
           case 'outreach':
             await fetchOutreachData(token);
@@ -164,6 +183,18 @@ export default function OutgoingStatsPage() {
     setFoodBoxData(data);
   };
 
+  const fetchBackpackData = async (token: string) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/backpack?month=${selectedMonth}&year=${selectedYear}`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    if (!response.ok) throw new Error('Failed to fetch backpack data');
+    const data = await response.json();
+    setBackpackData(data);
+  };
+
   const fetchOutreachData = async (token: string) => {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/outreach?month=${selectedMonth}&year=${selectedYear}`,
@@ -190,13 +221,16 @@ export default function OutgoingStatsPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
+    // Parse date string components directly to avoid timezone conversion issues
+    // When backend sends "2025-11-08", we need to parse it as a local date, not UTC
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return dateStr;
+    const d = new Date(year, month - 1, day);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-CA', { 
+    return d.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
-      day: 'numeric',
-      timeZone: 'America/Halifax'
+      day: 'numeric'
     });
   };
 
@@ -209,7 +243,14 @@ export default function OutgoingStatsPage() {
       }
       const endpoint = activeTab === 'shift-categories' 
         ? 'filtered' 
+        : activeTab === 'outreach-locations'
+        ? null // No export for outreach-locations
         : activeTab;
+      
+      if (!endpoint) {
+        toast.error('Export not available for this tab');
+        return;
+      }
       
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/${endpoint}/export?month=${selectedMonth}&year=${selectedYear}`,
@@ -363,6 +404,8 @@ export default function OutgoingStatsPage() {
         return renderShiftCategoriesTab();
       case 'foodbox':
         return renderFoodBoxTab();
+      case 'backpack':
+        return renderBackpackTab();
       case 'outreach':
         return renderOutreachTab();
       case 'outreach-locations':
@@ -396,6 +439,7 @@ export default function OutgoingStatsPage() {
           Month: months[m].label,
           totalMealsServed: 0,
           mealsFromFoodBoxes: 0,
+          mealsFromBackpacks: 0,
           outreachCount: 0,
           totalImpact: 0
         };
@@ -407,7 +451,8 @@ export default function OutgoingStatsPage() {
         if (isNaN(d.getTime())) return;
         const m = d.getMonth() + 1;
         monthMap[m].totalMealsServed += row.totalMealsServed;
-        monthMap[m].mealsFromFoodBoxes += row.mealsFromFoodBoxes;
+        monthMap[m].mealsFromFoodBoxes += row.mealsFromFoodBoxes || 0;
+        monthMap[m].mealsFromBackpacks += row.mealsFromBackpacks || 0;
         monthMap[m].outreachCount += row.outreachCount;
         monthMap[m].totalImpact += row.totalImpact;
       });
@@ -431,6 +476,7 @@ export default function OutgoingStatsPage() {
                 <th>{firstColumn}</th>
                 <th>Total Meals Served</th>
                 <th>Meals from Food Boxes</th>
+                <th>Meals from Backpack</th>
                 <th>Outreach Count</th>
                 <th className={styles.totalCol}>Total Impact</th>
               </tr>
@@ -440,9 +486,10 @@ export default function OutgoingStatsPage() {
                 <tr key={i}>
                   <td>{firstColumn === 'Date' ? formatDate(row.date) : (row as any).Month}</td>
                   <td>{row.totalMealsServed}</td>
-                  <td>{row.mealsFromFoodBoxes}</td>
+                  <td>{Number(row.mealsFromFoodBoxes || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>{Number(row.mealsFromBackpacks || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td>{row.outreachCount}</td>
-                  <td className={styles.totalCol}>{row.totalImpact}</td>
+                  <td className={styles.totalCol}>{Number(row.totalImpact || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               ))}
               {/* Total row */}
@@ -452,13 +499,16 @@ export default function OutgoingStatsPage() {
                   {displayData.reduce((sum, row) => sum + (row.totalMealsServed || 0), 0)}
                 </td>
                 <td className={styles.totalCol}>
-                  {displayData.reduce((sum, row) => sum + (row.mealsFromFoodBoxes || 0), 0)}
+                  {displayData.reduce((sum, row) => sum + (row.mealsFromFoodBoxes || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td className={styles.totalCol}>
+                  {displayData.reduce((sum, row) => sum + (row.mealsFromBackpacks || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
                 <td className={styles.totalCol}>
                   {displayData.reduce((sum, row) => sum + (row.outreachCount || 0), 0)}
                 </td>
                 <td className={styles.totalCol}>
-                  {displayData.reduce((sum, row) => sum + (row.totalImpact || 0), 0)}
+                  {displayData.reduce((sum, row) => sum + (row.totalImpact || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>
             </tbody>
@@ -581,6 +631,143 @@ export default function OutgoingStatsPage() {
     );
   };
 
+  const renderBackpackTab = () => {
+    if (backpackData.length === 0) {
+      return (
+        <div className={styles.tableWrapper}>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            No backpack data available for {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+          </div>
+        </div>
+      );
+    }
+
+    let displayData = backpackData;
+    let firstColumn = 'Date';
+
+    // If individual month is selected, sum up multiple entries from same date
+    if (selectedMonth !== 0) {
+      const dateMap: { [date: string]: any } = {};
+      
+      backpackData.forEach(row => {
+        const date = row.date;
+        if (!dateMap[date]) {
+          dateMap[date] = {
+            date: date,
+            totalMeals: 0
+          };
+        }
+        dateMap[date].totalMeals += row.totalMeals || 0;
+      });
+
+      displayData = Object.values(dateMap).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+
+    // If "All Months" is selected, aggregate by month
+    if (selectedMonth === 0) {
+      const monthMap: { [month: number]: any } = {};
+      
+      // Initialize all months
+      for (let m = 1; m <= 12; m++) {
+        monthMap[m] = { 
+          Month: months[m].label,
+          totalMeals: 0
+        };
+      }
+
+      // Aggregate data by month
+      backpackData.forEach(row => {
+        const d = new Date(row.date);
+        if (isNaN(d.getTime())) return;
+        const m = d.getMonth() + 1;
+        monthMap[m].totalMeals += row.totalMeals || 0;
+      });
+
+      // Convert to array - show all 12 months
+      displayData = Object.values(monthMap);
+      firstColumn = 'Month';
+    }
+
+    // Calculate totals for display
+    const totalMeals = displayData.reduce((sum, row) => sum + (row.totalMeals || 0), 0);
+    const totalBackpacks = backpackData.reduce((sum, row) => sum + (row.backpackCount || 0), 0);
+
+    return (
+      <div className={styles.tableWrapper}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div className={styles.tableTitle}>
+            Backpack Distribution – <span className={styles.month}>
+              {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+            </span>
+          </div>
+          <select
+            value={backpackFilter}
+            onChange={(e) => setBackpackFilter(e.target.value as 'meals' | 'backpacks')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 6,
+              border: '1px solid #ddd',
+              background: '#fff',
+              color: '#333',
+              fontWeight: 500,
+              fontSize: 14,
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="meals">Meals</option>
+            <option value="backpacks">Backpacks</option>
+          </select>
+        </div>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+          <table className={styles.table} style={{ minWidth: '800px' }}>
+            <thead>
+              <tr>
+                <th>{firstColumn}</th>
+                <th className={styles.totalCol}>
+                  {backpackFilter === 'meals' ? 'Total Meals' : 'Total Backpacks'}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayData.map((row, i) => (
+                <tr key={i}>
+                  <td>{firstColumn === 'Date' ? formatDate(row.date) : (row as any).Month}</td>
+                  <td className={styles.totalCol}>
+                    {backpackFilter === 'meals' 
+                      ? Number(row.totalMeals || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : (() => {
+                          // For backpacks, we need to calculate from total meals
+                          // Find the meals per backpack from the original data
+                          const mealsPerBackpack = backpackData.length > 0 ? (backpackData[0].mealsPerBackpack || 10) : 10;
+                          const backpacks = (row.totalMeals || 0) / mealsPerBackpack;
+                          return backpacks.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        })()
+                    }
+                  </td>
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className={styles.monthlyTotalRow}>
+                <td className={styles.totalCol}>Total</td>
+                <td className={styles.totalCol}>
+                  {backpackFilter === 'meals' 
+                    ? totalMeals.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : (() => {
+                        const mealsPerBackpack = backpackData.length > 0 ? (backpackData[0].mealsPerBackpack || 10) : 10;
+                        const totalBackpacksCalc = totalMeals / mealsPerBackpack;
+                        return totalBackpacksCalc.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      })()
+                  }
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const renderFoodBoxTab = () => {
     if (foodBoxData.length === 0) {
       return (
@@ -595,6 +782,33 @@ export default function OutgoingStatsPage() {
     let displayData = foodBoxData;
     let firstColumn = 'Date';
 
+    // When individual month is selected, group by date and sum up meals
+    // Each row already has totalMeals calculated as: count * weightKg * 2.20462 * mealsPerLb
+    // We sum those totalMeals for all rows on the same date
+    if (selectedMonth !== 0) {
+      const dateMap: { [date: string]: any } = {};
+      
+      foodBoxData.forEach(row => {
+        const date = row.date;
+        if (!dateMap[date]) {
+          dateMap[date] = {
+            date: date,
+            foodBoxCount: 0,
+            weightKg: 0,
+            totalMeals: 0,
+            mealsPerLb: row.mealsPerLb || 0
+          };
+        }
+        // Sum up individual counts and weights for display purposes
+        dateMap[date].foodBoxCount += row.foodBoxCount || 0;
+        dateMap[date].weightKg += row.weightKg || 0;
+        // Sum up already-calculated totalMeals (this is the key - don't recalculate!)
+        dateMap[date].totalMeals += row.totalMeals || 0;
+      });
+
+      displayData = Object.values(dateMap).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+
     // If "All Months" is selected, aggregate by month
     if (selectedMonth === 0) {
       const monthMap: { [month: number]: any } = {};
@@ -604,19 +818,22 @@ export default function OutgoingStatsPage() {
         monthMap[m] = { 
           Month: months[m].label,
           foodBoxCount: 0,
-          mealsPerBox: 0,
-          totalMeals: 0
+          weightKg: 0,
+          totalMeals: 0,
+          mealsPerLb: 0
         };
       }
 
-      // Aggregate data by month
+      // Aggregate data by month - sum already-calculated totalMeals
       foodBoxData.forEach(row => {
         const d = new Date(row.date);
         if (isNaN(d.getTime())) return;
         const m = d.getMonth() + 1;
-        monthMap[m].foodBoxCount += row.foodBoxCount;
-        monthMap[m].mealsPerBox = row.mealsPerBox; // Should be same for all
-        monthMap[m].totalMeals += row.totalMeals;
+        monthMap[m].foodBoxCount += row.foodBoxCount || 0;
+        monthMap[m].weightKg += row.weightKg || 0;
+        // Sum up already-calculated totalMeals (don't recalculate!)
+        monthMap[m].totalMeals += row.totalMeals || 0;
+        monthMap[m].mealsPerLb = row.mealsPerLb || 0; // Should be same for all
       });
 
       // Convert to array - show all 12 months
@@ -624,33 +841,82 @@ export default function OutgoingStatsPage() {
       firstColumn = 'Month';
     }
 
+    // Calculate totals for display
+    const totalFoodBoxes = displayData.reduce((sum, row) => sum + (row.foodBoxCount || 0), 0);
+    const totalWeightKg = displayData.reduce((sum, row) => sum + (row.weightKg || 0), 0);
+    const totalWeightLb = totalWeightKg * 2.20462;
+    const totalMeals = displayData.reduce((sum, row) => sum + (row.totalMeals || 0), 0);
+
     return (
       <div className={styles.tableWrapper}>
-        <div className={styles.tableTitle}>
-          Food Box Distribution – <span className={styles.month}>
-            {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
-          </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div className={styles.tableTitle}>
+            Food Box Distribution – <span className={styles.month}>
+              {selectedMonth === 0 ? 'All Time' : months[selectedMonth].label} {selectedYear}
+            </span>
+          </div>
+          <select
+            value={foodboxFilter}
+            onChange={(e) => setFoodboxFilter(e.target.value as 'meals' | 'foodboxes' | 'lbs' | 'kgs')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 6,
+              border: '1px solid #ddd',
+              background: '#fff',
+              color: '#333',
+              fontWeight: 500,
+              fontSize: 14,
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="meals">Meals</option>
+            <option value="foodboxes">Food Boxes</option>
+            <option value="lbs">Lbs</option>
+            <option value="kgs">Kgs</option>
+          </select>
         </div>
         <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
           <table className={styles.table} style={{ minWidth: '800px' }}>
             <thead>
               <tr>
                 <th>{firstColumn}</th>
-                <th className={styles.totalCol}>Total Food Boxes</th>
+                <th className={styles.totalCol}>
+                  {foodboxFilter === 'meals' ? 'Total Meals' :
+                   foodboxFilter === 'foodboxes' ? 'Total Food Boxes' :
+                   foodboxFilter === 'lbs' ? 'Total Weight (lbs)' :
+                   'Total Weight (kgs)'}
+                </th>
               </tr>
             </thead>
             <tbody>
               {displayData.map((row, i) => (
                 <tr key={i}>
                   <td>{firstColumn === 'Date' ? formatDate(row.date) : (row as any).Month}</td>
-                  <td className={styles.totalCol}>{row.foodBoxCount}</td>
+                  <td className={styles.totalCol}>
+                    {foodboxFilter === 'meals' 
+                      ? Number(row.totalMeals || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : foodboxFilter === 'foodboxes'
+                      ? (row.foodBoxCount || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })
+                      : foodboxFilter === 'lbs'
+                      ? Number((row.weightKg || 0) * 2.20462).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : Number(row.weightKg || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    }
+                  </td>
                 </tr>
               ))}
               {/* Total row */}
               <tr className={styles.monthlyTotalRow}>
                 <td className={styles.totalCol}>Total</td>
                 <td className={styles.totalCol}>
-                  {displayData.reduce((sum, row) => sum + (row.foodBoxCount || 0), 0)}
+                  {foodboxFilter === 'meals' 
+                    ? totalMeals.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : foodboxFilter === 'foodboxes'
+                    ? totalFoodBoxes.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                    : foodboxFilter === 'lbs'
+                    ? totalWeightLb.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : totalWeightKg.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  }
                 </td>
               </tr>
             </tbody>
@@ -997,6 +1263,12 @@ export default function OutgoingStatsPage() {
           onClick={() => setActiveTab('foodbox')}
         >
           Food Box Stats
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'backpack' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('backpack')}
+        >
+          Backpack Stats
         </button>
         <button
           className={`${styles.tabButton} ${activeTab === 'outreach' ? styles.activeTab : ''}`}

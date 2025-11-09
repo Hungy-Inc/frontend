@@ -12,7 +12,7 @@ type DonationCategory = {
 type DonationLocation = {
   id: number;
   name: string;
-  location: string | null;
+  location: string;
   contactInfo: string | null;
 };
 
@@ -460,7 +460,7 @@ export default function InventoryPage() {
     setEditingDonationLocation(donationLocation);
     setDonationLocationFormData({ 
       name: donationLocation.name, 
-      location: donationLocation.location || '', 
+      location: donationLocation.location, 
       contactInfo: donationLocation.contactInfo || '' 
     });
     setShowEditDonationLocationModal(true);
@@ -689,7 +689,7 @@ export default function InventoryPage() {
                     {donationLocationsList.map((donationLocation) => (
                       <tr key={donationLocation.id}>
                         <td>{donationLocation.name}</td>
-                        <td>{donationLocation.location || '-'}</td>
+                        <td>{donationLocation.location}</td>
                         <td>{donationLocation.contactInfo || '-'}</td>
                         <td>
                           <button
@@ -961,7 +961,7 @@ export default function InventoryPage() {
             </div>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                Location (optional)
+                Location *
               </label>
               <input
                 type="text"
@@ -1014,14 +1014,14 @@ export default function InventoryPage() {
               </button>
               <button
                 onClick={handleAddDonationLocation}
-                disabled={!donationLocationFormData.name.trim()}
+                disabled={!donationLocationFormData.name.trim() || !donationLocationFormData.location.trim()}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: donationLocationFormData.name.trim() ? '#10b981' : '#9ca3af',
+                  backgroundColor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? '#10b981' : '#9ca3af',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: donationLocationFormData.name.trim() ? 'pointer' : 'not-allowed'
+                  cursor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? 'pointer' : 'not-allowed'
                 }}
               >
                 Add Donation Location
@@ -1073,7 +1073,7 @@ export default function InventoryPage() {
             </div>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                Location (optional)
+                Location *
               </label>
               <input
                 type="text"
@@ -1127,14 +1127,14 @@ export default function InventoryPage() {
               </button>
               <button
                 onClick={handleEditDonationLocation}
-                disabled={!donationLocationFormData.name.trim()}
+                disabled={!donationLocationFormData.name.trim() || !donationLocationFormData.location.trim()}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: donationLocationFormData.name.trim() ? '#3b82f6' : '#9ca3af',
+                  backgroundColor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? '#3b82f6' : '#9ca3af',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: donationLocationFormData.name.trim() ? 'pointer' : 'not-allowed'
+                  cursor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? 'pointer' : 'not-allowed'
                 }}
               >
                 Update Donation Location

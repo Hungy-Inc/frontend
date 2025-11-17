@@ -71,18 +71,114 @@ export default function QRCodesPage() {
   }, [router]);
 
   const handlePrint = (index: number) => {
-    // Set data attribute to identify which QR code to print
-    document.body.setAttribute('data-print-qr-index', index.toString());
+    if (!baseUrl || !organizationName) return;
     
-    // Small delay to ensure DOM updates
-    setTimeout(() => {
-      window.print();
-      
-      // Clean up after print dialog closes
-      setTimeout(() => {
-        document.body.removeAttribute('data-print-qr-index');
-      }, 100);
-    }, 50);
+    const qrCodes = [
+      {
+        name: 'Breakfast',
+        shiftName: 'Breakfast',
+        url: `${baseUrl}/meal-count/${organizationName}/breakfast`,
+      },
+      {
+        name: 'Lunch',
+        shiftName: 'Lunch',
+        url: `${baseUrl}/meal-count/${organizationName}/lunch`,
+      },
+      {
+        name: 'Supper',
+        shiftName: 'Supper',
+        url: `${baseUrl}/meal-count/${organizationName}/supper`,
+      }
+    ];
+
+    const qr = qrCodes[index];
+    
+    // Get the QR code SVG from the DOM
+    const qrElement = document.querySelector(`[data-qr-index="${index}"] svg`);
+    if (!qrElement) {
+      toast.error('QR code not found');
+      return;
+    }
+    
+    const qrSvg = qrElement.outerHTML;
+
+    // Create a completely new window with only name and QR code
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Please allow popups to print');
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${qr.name} QR Code</title>
+          <style>
+            @page {
+              margin: 0;
+              size: A4;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            html, body {
+              width: 100%;
+              height: 100%;
+              background: white;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-family: Arial, sans-serif;
+            }
+            .print-container {
+              text-align: center;
+              width: 100%;
+              padding: 40px;
+            }
+            .qr-name {
+              font-size: 48px;
+              font-weight: bold;
+              color: #000;
+              margin-bottom: 50px;
+            }
+            .qr-code-wrapper {
+              display: inline-block;
+              background: white;
+              padding: 20px;
+            }
+            .qr-code-wrapper svg {
+              display: block;
+              width: 400px;
+              height: 400px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            <div class="qr-name">${qr.name}</div>
+            <div class="qr-code-wrapper">
+              ${qrSvg}
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.onafterprint = function() {
+                  window.close();
+                };
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const handleCopyLink = async (url: string, index: number) => {
@@ -250,112 +346,11 @@ export default function QRCodesPage() {
         </div> */}
       </div>
 
-      {/* Print Styles */}
+      {/* Print Styles - Only for general page printing, not individual QR codes */}
       <style jsx global>{`
         @media print {
-          @page {
-            margin: 0;
-            size: A4;
-          }
-          
-          body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          
-          /* Hide everything by default */
-          aside,
-          header,
-          button,
-          nav,
-          footer,
           .print\\:hidden {
             display: none !important;
-          }
-          
-          /* Hide main container wrapper elements */
-          body > div[style*="display: flex"] > div:first-child,
-          body > div[style*="display: flex"] > div:last-child {
-            display: none !important;
-          }
-          
-          /* Hide page header and instructions */
-          body[data-print-qr-index] .max-w-6xl > div:first-child,
-          body[data-print-qr-index] .max-w-6xl > div:last-child {
-            display: none !important;
-          }
-          
-          /* Hide all QR cards by default */
-          body[data-print-qr-index] [data-qr-card-index] {
-            display: none !important;
-          }
-          
-          /* Show only the selected QR code card */
-          body[data-print-qr-index="0"] [data-qr-card-index="0"],
-          body[data-print-qr-index="1"] [data-qr-card-index="1"],
-          body[data-print-qr-index="2"] [data-qr-card-index="2"] {
-            display: block !important;
-            position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-            border: none !important;
-            box-shadow: none !important;
-          }
-          
-          /* Show the inner div container */
-          body[data-print-qr-index] [data-qr-card-index] > div {
-            display: block !important;
-            text-align: center !important;
-            width: 100% !important;
-          }
-          
-          /* Hide buttons and other elements */
-          body[data-print-qr-index] [data-qr-card-index] button,
-          body[data-print-qr-index] [data-qr-card-index] p,
-          body[data-print-qr-index] [data-qr-card-index] .text-xs {
-            display: none !important;
-          }
-          
-          /* Show only the title (h2) */
-          body[data-print-qr-index] [data-qr-card-index] h2 {
-            display: block !important;
-            font-size: 48px !important;
-            margin: 0 0 50px 0 !important;
-            padding: 0 !important;
-            color: #000 !important;
-            text-align: center !important;
-            font-weight: bold !important;
-          }
-          
-          /* Show the QR code container div */
-          body[data-print-qr-index] [data-qr-card-index] [data-qr-index] {
-            display: block !important;
-            margin: 0 auto !important;
-            padding: 0 !important;
-            background: white !important;
-            text-align: center !important;
-            width: auto !important;
-          }
-          
-          /* Show QR code SVG and all its elements */
-          body[data-print-qr-index] [data-qr-card-index] [data-qr-index] svg {
-            display: block !important;
-            visibility: visible !important;
-            width: 400px !important;
-            height: 400px !important;
-            margin: 0 auto !important;
-          }
-          
-          body[data-print-qr-index] [data-qr-card-index] [data-qr-index] svg * {
-            display: block !important;
-            visibility: visible !important;
           }
         }
       `}</style>

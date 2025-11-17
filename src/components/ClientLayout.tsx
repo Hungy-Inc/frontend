@@ -23,7 +23,8 @@ export default function ClientLayout({
   const isTermsOfServicePage = pathname === '/terms-of-service';
   const isVolunteerRegistrationPage = pathname.includes('/volunteer-registration');
   const isEnterWaitlistPage = pathname.includes('/waitlist');
-  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage && !isContactPage && !isPrivacyPolicyPage && !isTermsOfServicePage && !isVolunteerRegistrationPage && !isEnterWaitlistPage;
+  const isMealCountPage = pathname.startsWith('/meal-count');
+  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage && !isContactPage && !isPrivacyPolicyPage && !isTermsOfServicePage && !isVolunteerRegistrationPage && !isEnterWaitlistPage && !isMealCountPage;
   
   const lastNotificationTimestamp = useRef<number>(0);
 
@@ -81,11 +82,11 @@ export default function ClientLayout({
   }, [shouldShowSidebarAndHeader]);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f7f7f9", overflow: "hidden" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: shouldShowSidebarAndHeader ? "#f7f7f9" : "transparent", overflow: "hidden" }}>
       {shouldShowSidebarAndHeader && <Sidebar />}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {shouldShowSidebarAndHeader && <Header />}
-        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>{children}</main>
+        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", background: shouldShowSidebarAndHeader ? undefined : "transparent" }}>{children}</main>
       </div>
       {shouldShowSidebarAndHeader && <ReportIssueButton />}
       <ToastContainer

@@ -1,7 +1,7 @@
 'use client';
 
 import styles from './Sidebar.module.css';
-import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog, FaEnvelope } from 'react-icons/fa';
+import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog, FaEnvelope, FaQrcode } from 'react-icons/fa';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -21,6 +21,7 @@ const menu = [
   { icon: <FaCog />, label: 'Sign Up Fields', href: '/field-management' },
   { icon: <FaEnvelope />, label: 'Email Management', href: '/email-management' },
   { icon: <FaUtensils />, label: 'Kitchen Details', href: '/kitchen-details' },
+  { icon: <FaQrcode />, label: 'QR Codes', href: '/qr-codes' },
 ];
 
 export default function Sidebar() {

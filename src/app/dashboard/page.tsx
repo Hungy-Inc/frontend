@@ -3,13 +3,10 @@
 import { useState, useEffect } from 'react';
 import { FaFileExport, FaUsers, FaChartBar, FaArrowUp, FaArrowDown, FaCog, FaUserCircle } from 'react-icons/fa';
 import { FiDownload } from 'react-icons/fi';
-import { Pie } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'react-toastify';
-
-ChartJS.register(ArcElement, Tooltip, Legend);
 
 export default function Dashboard() {
   // Get current year and month
@@ -26,8 +23,8 @@ export default function Dashboard() {
   const [year, setYear] = useState(currentYear);
   const [unit, setUnit] = useState('Pounds (lb)');
 
-  // Incoming stats state
-  const [orgTotals, setOrgTotals] = useState<{ [org: string]: { weight: number, value: number } }>({});
+  // Incoming stats state - now keyed by ID (string) with name included
+  const [orgTotals, setOrgTotals] = useState<{ [id: string]: { name: string, weight: number, value: number } }>({});
   const [grandTotalWeight, setGrandTotalWeight] = useState<number>(0);
   const [grandTotalValue, setGrandTotalValue] = useState<number>(0);
   const [incomingDollarValue, setIncomingDollarValue] = useState<number>(0);
@@ -45,11 +42,37 @@ export default function Dashboard() {
   const [outTable, setOutTable] = useState<any[]>([]);
   const [outLoading, setOutLoading] = useState(true);
   const [outError, setOutError] = useState<string | null>(null);
+  
+  // New outgoing stats from updated API
+  const [backpackMeals, setBackpackMeals] = useState<number>(0);
+  const [totalBackpacks, setTotalBackpacks] = useState<number>(0);
+  const [foodboxMeals, setFoodboxMeals] = useState<number>(0);
+  const [totalFoodBoxes, setTotalFoodBoxes] = useState<number>(0);
+  const [totalFoodBoxWeightKg, setTotalFoodBoxWeightKg] = useState<number>(0);
+  const [totalFoodBoxWeightLb, setTotalFoodBoxWeightLb] = useState<number>(0);
+  const [outreachMeals, setOutreachMeals] = useState<number>(0);
+  const [totalMealsServed, setTotalMealsServed] = useState<number>(0);
+  const [equivalentValue, setEquivalentValue] = useState<number>(0);
+
+  // Filter states for Backpack and FoodBox
+  const [backpackFilter, setBackpackFilter] = useState<'meals' | 'backpacks'>('meals');
+  const [foodboxFilter, setFoodboxFilter] = useState<'meals' | 'foodboxes' | 'lbs' | 'kgs'>('meals');
+
+  // Food Box state (kept for backward compatibility, but will be replaced)
+  const [foodBoxData, setFoodBoxData] = useState<{ totalFoodBoxes: number, totalMealsFromFoodBoxes: number, mealsPerBox: number }>({ totalFoodBoxes: 0, totalMealsFromFoodBoxes: 0, mealsPerBox: 10 });
+  const [foodBoxLoading, setFoodBoxLoading] = useState(true);
+  const [foodBoxError, setFoodBoxError] = useState<string | null>(null);
+
+  // Outreach state (kept for backward compatibility, but will be replaced)
+  const [outreachData, setOutreachData] = useState<{ locationData: { locationName: string, mealsCount: number }[], totalOutreachMeals: number }>({ locationData: [], totalOutreachMeals: 0 });
+  const [outreachLoading, setOutreachLoading] = useState(true);
+  const [outreachError, setOutreachError] = useState<string | null>(null);
 
   // Inventory state
   const [inventoryData, setInventoryData] = useState<{ name: string; weight: number }[]>([]);
   const [invLoading, setInvLoading] = useState(true);
   const [invError, setInvError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   // Filter options
   const periodOptions = [
@@ -240,6 +263,28 @@ export default function Dashboard() {
         if (!response.ok) throw new Error('Failed to fetch outgoing stats');
         const data = await response.json();
         setOutTable(data.data || []);
+        
+        // Set new outgoing stats from updated API
+        if (data.backpack) {
+          setBackpackMeals(data.backpack.totalMeals || 0);
+          setTotalBackpacks(data.backpack.totalBackpacks || 0);
+        }
+        if (data.foodbox) {
+          setFoodboxMeals(data.foodbox.totalMeals || 0);
+          setTotalFoodBoxes(data.foodbox.totalFoodBoxes || 0);
+          setTotalFoodBoxWeightKg(data.foodbox.totalWeightKg || 0);
+          setTotalFoodBoxWeightLb(data.foodbox.totalWeightLb || 0);
+        }
+        if (data.outreach) {
+          setOutreachMeals(data.outreach.totalMeals || 0);
+        }
+        setTotalMealsServed(data.totalMealsServed || 0);
+        setEquivalentValue(data.equivalentValue || 0);
+        
+        // Update mealsValue if provided
+        if (data.mealsValue) {
+          setMealsValue(data.mealsValue);
+        }
       } catch (err) {
         setOutError(err instanceof Error ? err.message : 'An error occurred');
         setOutTable([]);
@@ -248,6 +293,54 @@ export default function Dashboard() {
       }
     };
     fetchOutgoingStats();
+  }, [period, year]);
+
+  useEffect(() => {
+    const fetchFoodBoxSummary = async () => {
+      setFoodBoxLoading(true);
+      setFoodBoxError(null);
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No authentication token found');
+        const month = getMonthNumber(period);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/foodbox-summary?month=${month}&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch food box summary');
+        const data = await response.json();
+        setFoodBoxData(data);
+      } catch (err) {
+        setFoodBoxError(err instanceof Error ? err.message : 'An error occurred');
+        setFoodBoxData({ totalFoodBoxes: 0, totalMealsFromFoodBoxes: 0, mealsPerBox: 10 });
+      } finally {
+        setFoodBoxLoading(false);
+      }
+    };
+    fetchFoodBoxSummary();
+  }, [period, year]);
+
+  useEffect(() => {
+    const fetchOutreachSummary = async () => {
+      setOutreachLoading(true);
+      setOutreachError(null);
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No authentication token found');
+        const month = getMonthNumber(period);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/outreach-summary?month=${month}&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch outreach summary');
+        const data = await response.json();
+        setOutreachData(data);
+      } catch (err) {
+        setOutreachError(err instanceof Error ? err.message : 'An error occurred');
+        setOutreachData({ locationData: [], totalOutreachMeals: 0 });
+      } finally {
+        setOutreachLoading(false);
+      }
+    };
+    fetchOutreachSummary();
   }, [period, year]);
 
   useEffect(() => {
@@ -326,8 +419,9 @@ export default function Dashboard() {
   };
 
   // Volunteer summary
-  const totalVolunteers = volunteers.length;
-  const totalHours = Number(volunteers.reduce((sum, v) => sum + v.hours, 0).toFixed(2));
+  const filteredVolunteers = volunteers.filter(u => u.role === 'VOLUNTEER' && u.hours >= 1);
+  const totalVolunteers = filteredVolunteers.length;
+  const totalHours = Number(filteredVolunteers.reduce((sum, u) => sum + u.hours, 0).toFixed(2));
 
   // Custom units state (move these above helpers)
   const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);
@@ -429,10 +523,8 @@ export default function Dashboard() {
   }
   const totalDistributed = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
 
-  // Calculate equivalent value based on meals served (excluding Collection category)
-  const filteredTable = outTable ? outTable.filter((cat: any) => cat.category.toLowerCase() !== 'collection') : [];
-  const totalMealsServed = filteredTable.reduce((sum, cat: any) => sum + (cat.total || 0), 0);
-  const equivalentValue = totalMealsServed * mealsValue; // Use organization's meals value
+  // Use totals from API response (already calculated correctly)
+  // totalMealsServed and equivalentValue are now set from API response
 
   // Extended color palette for pie chart (supports many items)
   const getPieChartColors = (count: number) => {
@@ -456,15 +548,44 @@ export default function Dashboard() {
     return colors;
   };
 
-  // Pie chart data (use inventory unit)
-  const pieData = {
-    labels: inventoryData.map(item => item.name),
-    datasets: [
-      {
-        data: inventoryData.map(item => convertToInventoryUnit(item.weight)),
-        backgroundColor: getPieChartColors(inventoryData.length),
-      },
-    ],
+  // Pie chart data for Recharts (use inventory unit)
+  const pieChartData = inventoryData.map((item, index) => ({
+    name: item.name,
+    value: convertToInventoryUnit(item.weight),
+    color: getPieChartColors(inventoryData.length)[index]
+  }));
+
+  // Handlers for interactive pie chart
+  const onPieEnter = (_: any, index: number) => {
+    setActiveIndex(index);
+  };
+
+  const onPieLeave = () => {
+    setActiveIndex(null);
+  };
+
+  const renderCustomLabel = ({
+    cx, cy, midAngle, innerRadius, outerRadius, percent
+  }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    if (percent < 0.05) return null;
+
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        style={{ fontWeight: 600, fontSize: 14 }}
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
   };
 
   // Helper to download Excel files
@@ -512,6 +633,30 @@ export default function Dashboard() {
             <div style={{ color: '#888', fontSize: 15, marginTop: 2 }}>Overview of all operations</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Consolidated Export Button */}
+            <button
+              className="export-btn"
+              style={{ 
+                color: '#fff', 
+                background: '#ff9800', 
+                border: 'none', 
+                fontWeight: 600, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 6, 
+                cursor: 'pointer',
+                padding: '8px 16px',
+                borderRadius: 8,
+                fontSize: 14
+              }}
+              onClick={() => {
+                const month = getMonthNumber(period);
+                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/export-consolidated?month=${month}&year=${year}&incomingUnit=${incomingUnit}&inventoryUnit=${inventoryUnit}`;
+                downloadExcel(url, `consolidated-dashboard-${year}-${month}.xlsx`);
+              }}
+            >
+              <FiDownload /> Export to Excel
+            </button>
             {/* Period Filter */}
             <select value={period} onChange={e => setPeriod(e.target.value)} style={{ padding: '8px 18px 8px 12px', borderRadius: 8, border: '1px solid #eee', background: '#fff', color: '#222', fontWeight: 500, fontSize: 15, marginRight: 2 }}>
               {periodOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -590,9 +735,9 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                    {Object.entries(orgTotals).map(([donor, totals]) => (
-                      <tr key={donor}>
-                        <td style={{ padding: '8px 8px 8px 0' }}>{donor}</td>
+                    {Object.entries(orgTotals).map(([id, totals]) => (
+                      <tr key={id}>
+                        <td style={{ padding: '8px 8px 8px 0' }}>{totals.name}</td>
                         <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToIncomingUnit(totals.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                         <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>
                           ${(Number(totals.weight.toFixed(2)) * Number(incomingDollarValue.toFixed(2))).toFixed(2)}
@@ -649,7 +794,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                    {volunteers.slice(0, 8).map((v, idx) => (
+                    {filteredVolunteers.slice(0, 8).map((v, idx) => (
                       <tr key={idx}>
                         <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
                         <td style={{ padding: '8px' }}>{v.role}</td>
@@ -688,11 +833,122 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Meals Served</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#f24503' }}>{totalMealsServed.toFixed(0)}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700}}>{totalMealsServed.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
                 </div>
                 <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Equivalent Value</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#f24503' }}>${equivalentValue.toLocaleString()}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700}}>${equivalentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+              </div>
+
+              {/* Backpack, FoodBox, and Outreach Summary Boxes */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+                {/* Backpack Box */}
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 200 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, color: '#f24503' }}>Backpack</div>
+                    <select
+                      value={backpackFilter}
+                      onChange={(e) => setBackpackFilter(e.target.value as 'meals' | 'backpacks')}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        background: '#fff',
+                        color: '#333',
+                        fontWeight: 500,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="meals">Meals</option>
+                      <option value="backpacks">Backpacks</option>
+                    </select>
+                  </div>
+                  {outLoading ? (
+                    <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+                  ) : (
+                    <div>
+                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>
+                          {backpackFilter === 'meals' ? 'Total Meals' : 'Total Backpacks'}
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 700}}>
+                          {backpackFilter === 'meals' 
+                            ? backpackMeals.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            : totalBackpacks.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Food Box Box */}
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 200 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, color: '#f24503' }}>Food Box</div>
+                    <select
+                      value={foodboxFilter}
+                      onChange={(e) => setFoodboxFilter(e.target.value as 'meals' | 'foodboxes' | 'lbs' | 'kgs')}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        background: '#fff',
+                        color: '#333',
+                        fontWeight: 500,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="meals">Meals</option>
+                      <option value="foodboxes">Food Boxes</option>
+                      <option value="lbs">Lbs</option>
+                      <option value="kgs">Kgs</option>
+                    </select>
+                  </div>
+                  {outLoading ? (
+                    <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+                  ) : (
+                    <div>
+                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>
+                          {foodboxFilter === 'meals' ? 'Total Meals' :
+                           foodboxFilter === 'foodboxes' ? 'Total Food Boxes' :
+                           foodboxFilter === 'lbs' ? 'Total Weight (lbs)' :
+                           'Total Weight (kgs)'}
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 700}}>
+                          {foodboxFilter === 'meals' 
+                            ? foodboxMeals.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            : foodboxFilter === 'foodboxes'
+                            ? totalFoodBoxes.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            : foodboxFilter === 'lbs'
+                            ? totalFoodBoxWeightLb.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : totalFoodBoxWeightKg.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Outreach Box */}
+                <div style={{ flex: 1, background: '#f7f7f9', borderRadius: 10, padding: 16, minWidth: 200 }}>
+                  <div style={{ fontWeight: 700, color: '#f24503', marginBottom: 12 }}>Outreach</div>
+                  {outLoading ? (
+                    <div style={{ textAlign: 'center', padding: 16 }}>Loading...</div>
+                  ) : (
+                    <div>
+                      <div style={{ background: '#FFF5ED', borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 4, fontSize: 14 }}>Total Meals</div>
+                        <div style={{ fontSize: 18, fontWeight: 700}}>{outreachMeals.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -813,15 +1069,79 @@ export default function Dashboard() {
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
             {/* Pie Chart and Legend - left half */}
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 24, minWidth: 0 }}>
+              {/* Interactive Pie Chart */}
               <div style={{ width: '100%', maxWidth: 260, height: 260 }}>
-                <Pie data={pieData} options={{ plugins: { legend: { display: false } } }} />
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={renderCustomLabel}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                      onMouseEnter={onPieEnter}
+                      onMouseLeave={onPieLeave}
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          opacity={activeIndex === null || activeIndex === index ? 1 : 0.3}
+                          stroke={activeIndex === index ? '#ffffff' : 'none'}
+                          strokeWidth={activeIndex === index ? 3 : 0}
+                          style={{
+                            filter: activeIndex === index ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' : 'none',
+                            cursor: 'pointer'
+                          }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                      }}
+                      formatter={(value: any) => [`${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${getInventoryUnitLabel()}`, 'Quantity']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              {/* Custom Legend */}
+              {/* Interactive Legend */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {pieData.labels.map((label, idx) => (
-                  <div key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ display: 'inline-block', width: 18, height: 18, borderRadius: 4, background: pieData.datasets[0].backgroundColor[idx] as string }}></span>
-                    <span style={{ fontSize: 15 }}>{label}</span>
+                {pieChartData.map((entry, index) => (
+                  <div 
+                    key={index} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 8,
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      backgroundColor: activeIndex === index ? 'rgba(0,0,0,0.05)' : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseLeave={() => setActiveIndex(null)}
+                  >
+                    <span 
+                      style={{ 
+                        display: 'inline-block', 
+                        width: 18, 
+                        height: 18, 
+                        borderRadius: 4, 
+                        background: entry.color,
+                        transform: activeIndex === index ? 'scale(1.15)' : 'scale(1)',
+                        boxShadow: activeIndex === index ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}
+                    ></span>
+                    <span style={{ fontSize: 15 }}>{entry.name}</span>
                   </div>
                 ))}
               </div>
@@ -839,8 +1159,17 @@ export default function Dashboard() {
                   {invLoading ? (
                     <tr><td colSpan={2} style={{ textAlign: 'center', padding: 16 }}>Loading...</td></tr>
                   ) : (
-                    inventoryData.map(item => (
-                      <tr key={item.name}>
+                    inventoryData.map((item, idx) => (
+                      <tr 
+                        key={item.name}
+                        style={{
+                          backgroundColor: activeIndex === idx ? 'rgba(0,0,0,0.03)' : 'transparent',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s ease'
+                        }}
+                        onMouseEnter={() => setActiveIndex(idx)}
+                        onMouseLeave={() => setActiveIndex(null)}
+                      >
                         <td style={{ padding: '8px 8px 8px 0' }}>{item.name}</td>
                         <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToInventoryUnit(item.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                       </tr>

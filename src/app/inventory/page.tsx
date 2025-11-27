@@ -12,7 +12,7 @@ type DonationCategory = {
 type DonationLocation = {
   id: number;
   name: string;
-  location: string | null;
+  location: string;
   contactInfo: string | null;
 };
 
@@ -460,7 +460,7 @@ export default function InventoryPage() {
     setEditingDonationLocation(donationLocation);
     setDonationLocationFormData({ 
       name: donationLocation.name, 
-      location: donationLocation.location || '', 
+      location: donationLocation.location, 
       contactInfo: donationLocation.contactInfo || '' 
     });
     setShowEditDonationLocationModal(true);
@@ -493,45 +493,29 @@ export default function InventoryPage() {
       {/* Inventory Tab */}
       {activeTab === 'inventory' && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-            <div className={styles.pageTitle} style={{ marginBottom: 0 }}>Current Inventory by Donation Location and Category</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <select
-                className={styles.select}
-                value={selectedMonth}
-                onChange={e => setSelectedMonth(Number(e.target.value))}
-                style={{ marginRight: 8 }}
-              >
-                {months.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              <select
-                className={styles.select}
-                value={selectedYear}
-                onChange={e => setSelectedYear(Number(e.target.value))}
-                style={{ marginRight: 8 }}
-              >
-                {getYearOptions().map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <select
-                className={styles.select}
-                value={selectedUnit}
-                onChange={e => setSelectedUnit(e.target.value)}
-                style={{ marginRight: 8 }}
-              >
-                {allUnits.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleExportExcel}
-                className={styles.exportBtn}
-              >
-                Export to Excel
-              </button>
+          <div className={styles.headerContainer}>
+            <div className={styles.pageTitle}>Current Inventory by Donation Location and Category</div>
+            <div className={styles.filtersContainer}>
+              <div className={styles.filtersRow}>
+                <select className={styles.select} value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}>
+                  {months.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                <select className={styles.select} value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
+                  {getYearOptions().map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <select className={styles.select} value={selectedUnit} onChange={e => setSelectedUnit(e.target.value)}>
+                  {allUnits.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                <button onClick={handleExportExcel} className={styles.exportBtn}>
+                  Export to Excel
+                </button>
+              </div>
             </div>
           </div>
       <div className={styles.tableWrapper}>
@@ -543,37 +527,37 @@ export default function InventoryPage() {
           ) : donationLocations.length === 0 || categories.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center' }}>No inventory data found.</div>
           ) : (
-            <table className={styles.table}>
+            <table className={`${styles.table} ${styles.colScroll}`} style={{ width:`${(categories.length + 2) * 16.6667}%` }}>
               <thead>
                 <tr>
-                  <th>Donation Location</th>
-                  {categories.map(cat => (
-                    <th key={cat}>{cat} ({getUnitLabel()})</th>
+                  <th>Donation Category</th>
+                  {donationLocations.map(donationLocation => (
+                    <th key={donationLocation}>{donationLocation} ({getUnitLabel()})</th>
                   ))}
                   <th>Total ({getUnitLabel()})</th>
                 </tr>
               </thead>
               <tbody>
-                {donationLocations.map((donationLocation: string) => (
-                  <tr key={donationLocation}>
-                    <td>{donationLocation}</td>
-                    {categories.map((cat: string) => (
-                      <td key={cat}>{formatWeight(tableData[donationLocation][cat]).toFixed(2)}</td>
+                {categories.map((cat: string) => (
+                  <tr key={cat}>
+                    <td style={{alignItems:"center", fontWeight:"bold"}} >{cat}</td>
+                    {donationLocations.map((donationLocation: string) => (
+                      <td key={donationLocation}>{formatWeight(tableData[donationLocation]?.[cat] || 0).toFixed(2)}</td>
                     ))}
                     <td className={styles.totalCol}>
-                      {formatWeight(Object.values(tableData[donationLocation]).reduce((sum, val) => sum + val, 0)).toFixed(2)}
+                      {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + (tableData[donationLocation]?.[cat] || 0), 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))}
                 <tr className={styles.monthlyTotalRow}>
                   <td>Total</td>
-                  {categories.map((cat: string) => (
-                    <td key={cat}>
-                      {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + tableData[donationLocation][cat], 0)).toFixed(2)}
+                  {donationLocations.map((donationLocation: string) => (
+                    <td key={donationLocation}>
+                      {formatWeight(Object.values(tableData[donationLocation] || {}).reduce((sum, val) => sum + val, 0)).toFixed(2)}
                     </td>
                   ))}
                   <td className={styles.totalCol}>
-                    {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + Object.values(tableData[donationLocation]).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
+                    {formatWeight(donationLocations.reduce((sum, donationLocation) => sum + Object.values(tableData[donationLocation] || {}).reduce((s, v) => s + v, 0), 0)).toFixed(2)}
                   </td>
                 </tr>
               </tbody>
@@ -612,7 +596,7 @@ export default function InventoryPage() {
           ) : (
             <div className={styles.tableWrapper}>
               <div className={styles.tableContainer}>
-                <table className={styles.table}>
+                <table className={`${styles.table} ${styles.colScroll}`}>
                   <thead>
                     <tr>
                       <th>Name</th>
@@ -692,7 +676,7 @@ export default function InventoryPage() {
           ) : (
             <div className={styles.tableWrapper}>
               <div className={styles.tableContainer}>
-                <table className={styles.table}>
+                <table className={`${styles.table} ${styles.colScroll}`}>
                   <thead>
                     <tr>
                       <th>Name</th>
@@ -705,7 +689,7 @@ export default function InventoryPage() {
                     {donationLocationsList.map((donationLocation) => (
                       <tr key={donationLocation.id}>
                         <td>{donationLocation.name}</td>
-                        <td>{donationLocation.location || '-'}</td>
+                        <td>{donationLocation.location}</td>
                         <td>{donationLocation.contactInfo || '-'}</td>
                         <td>
                           <button
@@ -977,7 +961,7 @@ export default function InventoryPage() {
             </div>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                Location (optional)
+                Location *
               </label>
               <input
                 type="text"
@@ -1030,14 +1014,14 @@ export default function InventoryPage() {
               </button>
               <button
                 onClick={handleAddDonationLocation}
-                disabled={!donationLocationFormData.name.trim()}
+                disabled={!donationLocationFormData.name.trim() || !donationLocationFormData.location.trim()}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: donationLocationFormData.name.trim() ? '#10b981' : '#9ca3af',
+                  backgroundColor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? '#10b981' : '#9ca3af',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: donationLocationFormData.name.trim() ? 'pointer' : 'not-allowed'
+                  cursor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? 'pointer' : 'not-allowed'
                 }}
               >
                 Add Donation Location
@@ -1089,7 +1073,7 @@ export default function InventoryPage() {
             </div>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                Location (optional)
+                Location *
               </label>
               <input
                 type="text"
@@ -1143,14 +1127,14 @@ export default function InventoryPage() {
               </button>
               <button
                 onClick={handleEditDonationLocation}
-                disabled={!donationLocationFormData.name.trim()}
+                disabled={!donationLocationFormData.name.trim() || !donationLocationFormData.location.trim()}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: donationLocationFormData.name.trim() ? '#3b82f6' : '#9ca3af',
+                  backgroundColor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? '#3b82f6' : '#9ca3af',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: donationLocationFormData.name.trim() ? 'pointer' : 'not-allowed'
+                  cursor: (donationLocationFormData.name.trim() && donationLocationFormData.location.trim()) ? 'pointer' : 'not-allowed'
                 }}
               >
                 Update Donation Location

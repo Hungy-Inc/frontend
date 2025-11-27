@@ -87,12 +87,14 @@ const EditableCell = ({ value, onSave }: { value: number; onSave: (value: string
   if (isEditing) {
     return (
       <input
-        type="text"
+        type="number"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
         autoFocus
+        min="0"
+        step="0.01"
         style={{
           width: '100%',
           padding: '4px',
@@ -116,7 +118,9 @@ export default function IncomingStatsPage() {
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [selectedUnit, setSelectedUnit] = useState(baseUnits[1]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // Default to current year
-  const [donors, setDonors] = useState<string[]>([]);
+  const [donors, setDonors] = useState<{ id: number; name: string; location?: string }[]>([]);
+  const [donorIdToName, setDonorIdToName] = useState<{ [id: number]: string }>({});
+  const [donorIdToLocation, setDonorIdToLocation] = useState<{ [id: number]: string }>({});
   const [tableData, setTableData] = useState<TableRow[]>([]);
   const [totals, setTotals] = useState<{ [key: string]: number }>({});
   const [rowTotals, setRowTotals] = useState<number[]>([]);
@@ -198,7 +202,38 @@ export default function IncomingStatsPage() {
       }
 
       const data = await response.json();
-      setDonors(data.donors || []);
+      // Handle both old format (string[]) and new format ({ id, name }[])
+      const donorsData = data.donors || [];
+      if (donorsData.length > 0 && typeof donorsData[0] === 'string') {
+        // Old format: convert to new format
+        const donorIdToNameMap: { [id: number]: string } = {};
+        const newDonors = donorsData.map((name: string, index: number) => {
+          const id = index + 1; // Fallback ID
+          donorIdToNameMap[id] = name;
+          return { id, name };
+        });
+        setDonors(newDonors);
+        setDonorIdToName(donorIdToNameMap);
+      } else {
+        // New format: { id, name, location? }[]
+        setDonors(donorsData);
+        // Build ID to name and location mappings
+        const donorIdToNameMap: { [id: number]: string } = {};
+        const donorIdToLocationMap: { [id: number]: string } = {};
+        donorsData.forEach((donor: { id: number; name: string; location?: string }) => {
+          donorIdToNameMap[donor.id] = donor.name;
+          donorIdToLocationMap[donor.id] = donor.location || '';
+        });
+        setDonorIdToName(donorIdToNameMap);
+        setDonorIdToLocation(donorIdToLocationMap);
+        // Also use provided mappings if available
+        if (data.donorIdToName) {
+          setDonorIdToName(data.donorIdToName);
+        }
+        if (data.donorIdToLocation) {
+          setDonorIdToLocation(data.donorIdToLocation);
+        }
+      }
       setTableData(data.tableData || []);
       setTotals(data.totals || {});
       setRowTotals(data.rowTotals || []);
@@ -247,20 +282,20 @@ export default function IncomingStatsPage() {
     
     // Handle base units
     if (selectedUnit === 'Pounds (lb)') {
-      return (weight * 2.20462).toFixed(2);
+      return parseFloat((weight * 2.20462).toFixed(2)).toString();
     }
     if (selectedUnit === 'Kilograms (kg)') {
-      return weight.toFixed(2);
+      return parseFloat(weight.toFixed(2)).toString();
     }
     
     // Handle custom weighing categories
     const category = weighingCategories.find(c => c.category === selectedUnit);
     if (category && category.kilogram_kg_ > 0) {
       // Convert kg to custom unit (divide by kg per unit)
-      return (weight / category.kilogram_kg_).toFixed(2);
+      return parseFloat((weight / category.kilogram_kg_).toFixed(2)).toString();
     }
     
-    return weight.toFixed(2);
+    return parseFloat(weight.toFixed(2)).toString();
   };
 
   // Helper to get unit label for display
@@ -326,16 +361,88 @@ export default function IncomingStatsPage() {
       return { columns: ['Date', 'Total'], data: [], firstCol: 'Date' };
     }
 
+    // Convert tableData from donor_ID keys to display format with names
+    // IMPORTANT: Process ALL donor keys in tableData, not just ones in donors array
+    // This ensures no data is skipped
+    // Handle duplicate names by appending ID to make them unique
+    const convertTableDataForDisplay = (data: TableRow[]) => {
+      // First, collect all unique donor IDs from tableData to ensure we don't miss any
+      const allDonorIds = new Set<number>();
+      data.forEach((row: any) => {
+        Object.keys(row).forEach((key) => {
+          if (key.startsWith('donor_')) {
+            const donorId = parseInt(key.replace('donor_', ''));
+            allDonorIds.add(donorId);
+          }
+        });
+      });
+      
+      // Also add all donors from the donors array (in case they have no donations but should be shown)
+      donors.forEach((donor) => {
+        allDonorIds.add(donor.id);
+      });
+      
+      // Build display name for each donor ID
+      // If name is duplicate, append ID to make it unique
+      const donorDisplayNames: { [id: number]: string } = {};
+      const nameCount: { [name: string]: number } = {};
+      
+      // First pass: count occurrences of each name
+      allDonorIds.forEach((donorId) => {
+        const name = donorIdToName[donorId] || `Donor ${donorId}`;
+        nameCount[name] = (nameCount[name] || 0) + 1;
+      });
+      
+      // Second pass: assign display names (append location if duplicate)
+      allDonorIds.forEach((donorId) => {
+        const name = donorIdToName[donorId] || `Donor ${donorId}`;
+        const location = donorIdToLocation[donorId] || '';
+        if (nameCount[name] > 1) {
+          // Duplicate name - append location to make it unique
+          if (location) {
+            donorDisplayNames[donorId] = `${name} (${location})`;
+          } else {
+            // Fallback to ID if location is empty
+            donorDisplayNames[donorId] = `${name} (ID: ${donorId})`;
+          }
+        } else {
+          // Unique name - use as is
+          donorDisplayNames[donorId] = name;
+        }
+      });
+      
+      return data.map((row: any) => {
+        const convertedRow: any = { date: row.date };
+        
+        // Process all donor IDs found in tableData
+        allDonorIds.forEach((donorId) => {
+          const key = `donor_${donorId}`;
+          const displayName = donorDisplayNames[donorId];
+          convertedRow[displayName] = row[key] || 0;
+        });
+        
+        return convertedRow;
+      });
+    };
+
+    const displayTableData = convertTableDataForDisplay(tableData);
+    // Get unique display names (sorted for consistency)
+    const donorNames = Array.from(new Set(
+      displayTableData.flatMap(row => 
+        Object.keys(row).filter(key => key !== 'date' && key !== 'Total')
+      )
+    )).sort();
+
     if (selectedMonth !== 0) {
       // Calculate row totals for each row
-      const dataWithTotals = tableData.map((row, index) => {
-        const rowTotal = rowTotals[index] || donors.reduce((sum, donor) => {
-          const value = typeof row[donor] === 'number' ? Number(row[donor]) : 0;
+      const dataWithTotals = displayTableData.map((row, index) => {
+        const rowTotal = rowTotals[index] || donorNames.reduce((sum, donorName) => {
+          const value = typeof row[donorName] === 'number' ? Number(row[donorName]) : 0;
           return sum + value;
         }, 0);
         return { ...row, Total: rowTotal };
       });
-      return { columns: ['Date', ...donors, 'Total'], data: dataWithTotals, firstCol: 'Date' };
+      return { columns: ['Date', ...donorNames, 'Total'], data: dataWithTotals, firstCol: 'Date' };
     }
 
     // Aggregate by month for 'All Months' view
@@ -343,21 +450,21 @@ export default function IncomingStatsPage() {
     // Initialize all months
     for (let m = 1; m <= 12; m++) {
       monthMap[m] = { Month: months[m].label };
-      donors.forEach(donor => {
-        monthMap[m][donor] = 0;
+      donorNames.forEach(donorName => {
+        monthMap[m][donorName] = 0;
       });
       monthMap[m]['Total'] = 0;
     }
 
-    tableData.forEach(row => {
+    displayTableData.forEach(row => {
       const d = new Date(row['date'] as string);
       if (isNaN(d.getTime())) return;
       const m = d.getMonth() + 1;
       let rowTotal = 0;
-      donors.forEach(donor => {
-        if (typeof row[donor] === 'number') {
-          const value = Number(row[donor]);
-          monthMap[m][donor] += value;
+      donorNames.forEach(donorName => {
+        if (typeof row[donorName] === 'number') {
+          const value = Number(row[donorName]);
+          monthMap[m][donorName] += value;
           rowTotal += value;
         }
       });
@@ -366,7 +473,7 @@ export default function IncomingStatsPage() {
 
     // Build display data for all months
     const displayData = Object.values(monthMap);
-    const newColumns = ['Month', ...donors, 'Total'];
+    const newColumns = ['Month', ...donorNames, 'Total'];
     return { columns: newColumns, data: displayData, firstCol: 'Month' };
   };
 
@@ -378,7 +485,48 @@ export default function IncomingStatsPage() {
     if (col === 'Total') {
       return convertWeight(grandTotal);
     }
-    return convertWeight(totals[col] || 0);
+    
+    // Handle display names that may have location or "(ID: X)" appended for duplicates
+    // First try to match by exact display name (name + location)
+    // Extract location or ID if present, or find by name
+    const locationMatch = col.match(/^(.+?)\s*\((.+?)\)$/);
+    if (locationMatch) {
+      // Display name has location or ID appended - extract the base name
+      const baseName = locationMatch[1];
+      const suffix = locationMatch[2];
+      
+      // Check if suffix is an ID (starts with "ID: ")
+      const idMatch = suffix.match(/^ID:\s*(\d+)$/);
+      if (idMatch) {
+        // It's an ID - use it directly
+        const donorId = idMatch[1];
+        return convertWeight(totals[donorId] || 0);
+      } else {
+        // It's a location - find donor by name and location
+        const matchingDonor = donors.find(d => 
+          d.name === baseName && (donorIdToLocation[d.id] || '') === suffix
+        );
+        if (matchingDonor) {
+          return convertWeight(totals[matchingDonor.id.toString()] || 0);
+        }
+      }
+    } else {
+      // No location/ID appended - find donor by exact name match
+      const matchingDonor = donors.find(d => d.name === col);
+      if (matchingDonor) {
+        return convertWeight(totals[matchingDonor.id.toString()] || 0);
+      }
+      
+      // If no exact match, sum all donors with same name (fallback)
+      const matchingDonors = donors.filter(d => d.name === col);
+      if (matchingDonors.length > 0) {
+        const total = matchingDonors.reduce((sum, donor) => {
+          return sum + (totals[donor.id.toString()] || 0);
+        }, 0);
+        return convertWeight(total);
+      }
+    }
+    return convertWeight(0);
   };
 
   const renderIncomingStatsTab = () => {
@@ -506,20 +654,20 @@ export default function IncomingStatsPage() {
       
       // Handle base units
       if (selectedUnit === 'Pounds (lb)') {
-        return (weightKg * 2.20462).toFixed(2);
+        return parseFloat((weightKg * 2.20462).toFixed(2));
       }
       if (selectedUnit === 'Kilograms (kg)') {
-        return weightKg.toFixed(2);
+        return parseFloat(weightKg.toFixed(2));
       }
       
       // Handle custom weighing categories
       const category = weighingCategories.find(c => c.category === selectedUnit);
       if (category && category.kilogram_kg_ > 0) {
         // Convert kg to custom unit (divide by kg per unit)
-        return (weightKg / category.kilogram_kg_).toFixed(2);
+        return parseFloat((weightKg / category.kilogram_kg_).toFixed(2));
       }
       
-      return weightKg.toFixed(2);
+      return parseFloat(weightKg.toFixed(2));
     };
 
     const convertDisplayToKg = (displayValue: number) => {
@@ -549,39 +697,76 @@ export default function IncomingStatsPage() {
           return;
         }
 
-        const displayValue = parseFloat(newValue);
-        if (isNaN(displayValue) || displayValue < 0) {
-          toast.error('Please enter a valid positive number');
-          return;
-        }
-
-        // Convert from display unit to KG for database storage
-        const weightKg = convertDisplayToKg(displayValue);
-
+        const trimmedValue = newValue.trim();
+        
         const category = categories.find(c => c.name === categoryName);
         if (!category) {
           toast.error('Category not found');
           return;
         }
 
-        if (weightKg === 0) {
-          // Delete the donation item
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/detail-donations/${donorId}/${category.id}?date=${selectedDate}`,
+        // Validate the input
+        const displayValue = parseFloat(trimmedValue);
+        if (isNaN(displayValue) || displayValue < 0) {
+          toast.error('Please enter a valid non-negative number');
+          return;
+        }
+
+        // Convert from display unit to KG for database storage
+        let weightKg = convertDisplayToKg(displayValue);
+        weightKg = parseFloat(weightKg.toFixed(2));
+
+        if (displayValue === 0) {
+          // For 0 values: First update to 0, then delete
+          // Step 1: Update to 0
+          const updateResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/detail-donations`,
             {
-              method: 'DELETE',
+              method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
-              }
+              },
+              body: JSON.stringify({
+                date: selectedDate,
+                donorId,
+                categoryId: category.id,
+                weightKg: 0
+              })
             }
           );
 
-          if (!response.ok) {
-            throw new Error('Failed to delete donation');
+          if (!updateResponse.ok) {
+            throw new Error('Failed to update donation to 0');
           }
+
+          // Refresh to show 0 in UI
+          await fetchDetailDonations();
+
+          // Step 2: Delete the item after a brief delay so user sees the 0
+          setTimeout(async () => {
+            try {
+              const deleteResponse = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/detail-donations/${donorId}/${category.id}?date=${selectedDate}`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+
+              if (deleteResponse.ok) {
+                // Refresh again to show the deletion
+                await fetchDetailDonations();
+              }
+            } catch (err) {
+              console.error('Error deleting donation:', err);
+            }
+          }, 500); // 500ms delay to show the 0 value
         } else {
-          // Create or update the donation item
+          // For non-zero values: Just update
           const response = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL}/detail-donations`,
             {
@@ -704,7 +889,7 @@ export default function IncomingStatsPage() {
           </div>
 
           <div className={styles.tableContainer} style={{ overflowX: 'auto', maxWidth: '100%' }}>
-            <table className={styles.table} style={{ minWidth: '800px' }}>
+            <table className={`${styles.table} ${styles.colScroll}`} style={{ width: `${(categories.length+2)*16.667}%`}}>
               <thead>
                 <tr>
                   <th>Donation Location</th>

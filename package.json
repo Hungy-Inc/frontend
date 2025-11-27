@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
+    "@tinymce/tinymce-react": "^6.3.0",
     "chart.js": "^4.4.0",
     "critters": "^0.0.23",
     "jwt-decode": "^4.0.0",
@@ -18,7 +20,10 @@
     "react-dom": "^18.3.1",
     "react-icons": "^5.5.0",
     "react-multi-select-component": "^4.3.4",
+    "react-qr-code": "^2.0.18",
     "react-toastify": "^11.0.5",
+    "recharts": "^3.3.0",
+    "tinymce": "^8.1.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

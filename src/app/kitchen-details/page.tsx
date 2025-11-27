@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes, FaArrowDown, FaArrowUp, FaTrash } from "react-icons/fa";
+import { FaEdit, FaUsers, FaCalendarAlt, FaBox, FaPlus, FaSave, FaTimes, FaArrowDown, FaArrowUp, FaTrash, FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from 'react-toastify';
 import TermsAndConditions from '../../components/TermsAndConditions';
 
@@ -66,6 +66,31 @@ export default function KitchenDetailsPage() {
   const [mealsValue, setMealsValue] = useState<number>(10);
   const [isEditingMealsValue, setIsEditingMealsValue] = useState(false);
   const [editingMealsValue, setEditingMealsValue] = useState<string>("");
+
+  // Food box meals count state (meals per lb)
+  const [foodBoxMealsCount, setFoodBoxMealsCount] = useState<number>(0);
+  const [isEditingFoodBoxMealsCount, setIsEditingFoodBoxMealsCount] = useState(false);
+  const [editingFoodBoxMealsCount, setEditingFoodBoxMealsCount] = useState<string>("");
+  const [foodBoxMealsCountUnit, setFoodBoxMealsCountUnit] = useState<"kg" | "lb">("lb"); // Default to lb
+
+  // Backpack meals count state (meals per backpack)
+  const [backpackMealsCount, setBackpackMealsCount] = useState<number>(0);
+  const [isEditingBackpackMealsCount, setIsEditingBackpackMealsCount] = useState(false);
+  const [editingBackpackMealsCount, setEditingBackpackMealsCount] = useState<string>("");
+
+  // Forgot password flow state
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<'otp' | 'password'>('otp');
+  const [forgotPasswordOtp, setForgotPasswordOtp] = useState('');
+  const [forgotPasswordNewPassword, setForgotPasswordNewPassword] = useState('');
+  const [forgotPasswordConfirmPassword, setForgotPasswordConfirmPassword] = useState('');
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordResetToken, setForgotPasswordResetToken] = useState('');
+  const [showForgotPasswordNew, setShowForgotPasswordNew] = useState(false);
+  const [showForgotPasswordConfirm, setShowForgotPasswordConfirm] = useState(false);
+  // Donor password state
 
   // Weighing data state
   const [weighingCategories, setWeighingCategories] = useState<WeighingCategory[]>([]);
@@ -142,13 +167,19 @@ export default function KitchenDetailsPage() {
       });
       
       // Load incoming dollar value from organization data
-      const incomingValue = userOrg.incoming_dollar_value || 0;
-      const mealsVal = userOrg.mealsvalue || 10;
+      const incomingValue = parseFloat(userOrg.incoming_dollar_value) || 0;
+      const mealsVal = parseFloat(userOrg.mealsvalue) || 10;
+      const foodBoxMealsCountVal = parseFloat(userOrg.foodboxmealscount) || 0;
+      const backpackMealsCountVal = parseFloat(userOrg.backpackmealscount) || 0;
       console.log('Organization data:', userOrg);
       console.log('Incoming dollar value loaded:', incomingValue);
       console.log('Meals value loaded:', mealsVal);
+      console.log('Food box meals count loaded:', foodBoxMealsCountVal);
+      console.log('Backpack meals count loaded:', backpackMealsCountVal);
       setIncomingDollarValue(incomingValue);
       setMealsValue(mealsVal);
+      setFoodBoxMealsCount(foodBoxMealsCountVal);
+      setBackpackMealsCount(backpackMealsCountVal);
 
       // Set addresses from already parsed data
       setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
@@ -307,9 +338,10 @@ export default function KitchenDetailsPage() {
   const handleStartEditIncomingValue = () => {
     setIsEditingIncomingValue(true);
     // Convert stored kg value to display unit
+    const numValue = typeof incomingDollarValue === 'string' ? parseFloat(incomingDollarValue) : incomingDollarValue;
     const displayValue = incomingValueUnit === "kg" 
-      ? incomingDollarValue 
-      : incomingDollarValue / 2.20462; // Convert $/kg to $/lb (divide, not multiply)
+      ? numValue 
+      : numValue / 2.20462; // Convert $/kg to $/lb (divide by 2.20462, since 1 lb = 0.45359237 kg)
     setEditingIncomingValue(displayValue.toFixed(2));
   };
 
@@ -323,7 +355,7 @@ export default function KitchenDetailsPage() {
     // Convert entered value to per kg for storage (all calculations use per kg)
     const valuePerKg = incomingValueUnit === "kg" 
       ? inputValue 
-      : inputValue / 2.20462; // Convert $/lb to $/kg
+      : inputValue * 2.20462; // Convert $/lb to $/kg (multiply by 2.20462, since 1 lb = 0.45359237 kg)
     
     try {
       const token = localStorage.getItem("token");
@@ -453,6 +485,290 @@ export default function KitchenDetailsPage() {
     setEditingMealsValue("");
   };
 
+  // Food box meals count handlers
+  const handleStartEditFoodBoxMealsCount = () => {
+    setIsEditingFoodBoxMealsCount(true);
+    // Display current value in selected unit (default lb)
+    // If stored as per lb, show as is for lb, or convert to kg for display
+    const displayValue = foodBoxMealsCountUnit === 'kg' 
+      ? (foodBoxMealsCount / 2.20462).toFixed(2)
+      : foodBoxMealsCount.toFixed(2);
+    setEditingFoodBoxMealsCount(displayValue);
+  };
+
+  const handleSaveFoodBoxMealsCount = async () => {
+    const inputValue = parseFloat(editingFoodBoxMealsCount);
+    if (isNaN(inputValue) || inputValue < 0) {
+      toast.error('Please enter a valid positive number');
+      return;
+    }
+    
+    // Convert to meals per lb (stored in database)
+    // If user entered per kg, convert to per lb: mealsPerKg * 2.20462 = mealsPerLb
+    // If user entered per lb, use as is
+    let mealsPerLb = inputValue;
+    if (foodBoxMealsCountUnit === 'kg') {
+      mealsPerLb = inputValue * 2.20462; // Convert kg to lb
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+
+      console.log('Saving food box meals count:', mealsPerLb, 'per lb (input:', inputValue, foodBoxMealsCountUnit, ')');
+      console.log('Organization ID:', organization.id);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/foodboxmealscount`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          foodboxmealscount: mealsPerLb
+        }),
+      });
+
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.error || 'Failed to update food box meals count');
+        return;
+      }
+      
+      const updatedOrg = await res.json();
+      console.log('Updated organization:', updatedOrg);
+
+      // Update both the organization state and the food box meals count display state
+      setOrganization((prev: any) => ({
+        ...prev,
+        foodboxmealscount: updatedOrg.foodboxmealscount
+      }));
+      
+      // Update the display value state (stored as per lb, display in selected unit)
+      const updatedValue = parseFloat(updatedOrg.foodboxmealscount) || 0;
+      setFoodBoxMealsCount(updatedValue);
+
+      setIsEditingFoodBoxMealsCount(false);
+      setEditingFoodBoxMealsCount("");
+      setFoodBoxMealsCountUnit("lb"); // Reset to default
+      toast.success('Food box meals count updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating food box meals count:', error);
+      toast.error('Failed to update food box meals count. Please try again.');
+    }
+  };
+
+  const handleCancelEditFoodBoxMealsCount = () => {
+    setIsEditingFoodBoxMealsCount(false);
+    setEditingFoodBoxMealsCount("");
+  };
+
+  // Backpack meals count handlers
+  const handleStartEditBackpackMealsCount = () => {
+    setIsEditingBackpackMealsCount(true);
+    setEditingBackpackMealsCount(backpackMealsCount.toFixed(2));
+  };
+
+  const handleSaveBackpackMealsCount = async () => {
+    const inputValue = parseFloat(editingBackpackMealsCount);
+    if (isNaN(inputValue) || inputValue < 0) {
+      toast.error('Please enter a valid positive number');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+
+      console.log('Saving backpack meals count:', inputValue);
+      console.log('Organization ID:', organization.id);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/backpackmealscount`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          backpackmealscount: inputValue
+        }),
+      });
+
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.error || 'Failed to update backpack meals count');
+        return;
+      }
+      
+      const updatedOrg = await res.json();
+      console.log('Updated organization:', updatedOrg);
+
+      // Update both the organization state and the backpack meals count display state
+      setOrganization((prev: any) => ({
+        ...prev,
+        backpackmealscount: updatedOrg.backpackmealscount
+      }));
+      
+      // Update the display value state
+      const updatedValue = parseFloat(updatedOrg.backpackmealscount) || 0;
+      setBackpackMealsCount(updatedValue);
+
+      setIsEditingBackpackMealsCount(false);
+      setEditingBackpackMealsCount("");
+      toast.success('Backpack meals count updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating backpack meals count:', error);
+      toast.error('Failed to update backpack meals count. Please try again.');
+    }
+  };
+
+  const handleCancelEditBackpackMealsCount = () => {
+    setIsEditingBackpackMealsCount(false);
+    setEditingBackpackMealsCount("");
+  };
+
+  // Forgot password handlers
+  const handleOpenForgotPassword = async () => {
+    setShowForgotPasswordModal(true);
+    setForgotPasswordStep('otp');
+    setForgotPasswordOtp('');
+    setForgotPasswordNewPassword('');
+    setForgotPasswordConfirmPassword('');
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+    setForgotPasswordLoading(true);
+    
+    // Automatically send OTP to hardcoded email
+    const hardcodedEmail = 'contact.hungy@gmail.com';
+    
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/forgot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: hardcodedEmail, organizationId: organization?.id })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setForgotPasswordError(data.error || 'Failed to send OTP');
+      } else {
+        setForgotPasswordSuccess(data.message);
+        if (data.otp) {
+          setForgotPasswordSuccess(`${data.message} (Test OTP: ${data.otp})`);
+        }
+      }
+    } catch (err) {
+      setForgotPasswordError('Network error. Please check your connection and try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setForgotPasswordError('');
+    setForgotPasswordLoading(true);
+    
+    const hardcodedEmail = 'contact.hungy@gmail.com';
+    
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: hardcodedEmail, otp: forgotPasswordOtp })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setForgotPasswordError(data.error || 'Invalid OTP');
+      } else {
+        setForgotPasswordResetToken(data.resetToken);
+        setForgotPasswordStep('password');
+        setForgotPasswordSuccess('');
+      }
+    } catch (err) {
+      setForgotPasswordError('Network error. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleResetDonorPassword = async () => {
+    setForgotPasswordError('');
+    setForgotPasswordLoading(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setForgotPasswordError('Authentication token not found. Please login again.');
+        setForgotPasswordLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/reset`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ resetToken: forgotPasswordResetToken, newPassword: forgotPasswordNewPassword })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setForgotPasswordError(data.error || 'Failed to reset password');
+      } else {
+        setForgotPasswordSuccess('Donor password reset successfully!');
+        setTimeout(() => {
+          setShowForgotPasswordModal(false);
+          setForgotPasswordStep('otp');
+          setForgotPasswordOtp('');
+          setForgotPasswordNewPassword('');
+          setForgotPasswordConfirmPassword('');
+          setForgotPasswordError('');
+          setForgotPasswordSuccess('');
+          setForgotPasswordResetToken('');
+        }, 2000);
+      }
+    } catch (err) {
+      setForgotPasswordError('Network error. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+
+  const handleCloseForgotPasswordModal = () => {
+    setShowForgotPasswordModal(false);
+    setForgotPasswordStep('otp');
+    setForgotPasswordOtp('');
+    setForgotPasswordNewPassword('');
+    setForgotPasswordConfirmPassword('');
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+    setForgotPasswordResetToken('');
+  };
+
+  const isForgotPasswordValid = forgotPasswordNewPassword.length >= 8;
+  const doForgotPasswordsMatch = forgotPasswordNewPassword === forgotPasswordConfirmPassword && forgotPasswordNewPassword.length > 0;
+  const canSubmitForgotPassword = isForgotPasswordValid && doForgotPasswordsMatch;
+
   // Weighing category functions
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
@@ -555,7 +871,7 @@ export default function KitchenDetailsPage() {
     setEditWeighingData({
       category: weighing.category,
       weight: weighing.kilogram_kg_.toString(),
-      unit: "kg" as "kg" | "lb"
+      unit: "lb" as "kg" | "lb"
     });
     setShowEditWeighing(true);
   };
@@ -897,6 +1213,44 @@ export default function KitchenDetailsPage() {
             </div>
           </div>
 
+          {/* Donor Data Password Card */}
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Donor Data Password</h2>
+            </div>
+
+            <div>
+              <div>
+                <div style={{ 
+                  background: '#f8f9fa',
+                  borderRadius: 8,
+                  padding: '9.5px',
+                  border: '1px solid #e9ecef',
+                  marginBottom: 12
+                }}>
+                  <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
+                    Click "Forgot Password?" to reset the donor data page password.
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenForgotPassword}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ff9800',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Incoming Stats Card */}
           <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -1052,9 +1406,10 @@ export default function KitchenDetailsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
                     ${(() => {
+                      const numValue = typeof incomingDollarValue === 'string' ? parseFloat(incomingDollarValue) : incomingDollarValue;
                       const displayValue = incomingValueUnit === "kg" 
-                        ? incomingDollarValue 
-                        : incomingDollarValue / 2.20462; // Convert $/kg to $/lb (divide, not multiply)
+                        ? numValue 
+                        : numValue / 2.20462; // Convert $/kg to $/lb (divide by 2.20462, since 1 lb = 0.45359237 kg)
                       return displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     })()}
                   </div>
@@ -1065,7 +1420,86 @@ export default function KitchenDetailsPage() {
               )}
             </div>
 
-           
+            {/* Recent Weighing Records */}
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Recent Weighing Records</h3>
+              {weighingRecords.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>No weighing records found</div>
+              ) : (
+                <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                  {weighingRecords.slice(0, 10).map((weighing) => (
+                    <div
+                      key={weighing.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        border: '1px solid #eee',
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        background: '#fff'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flex: 1, gap: 16, alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.category}</span>
+                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram_kg_.toFixed(2)} kg</span>
+                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound_lb_.toFixed(2)} lb</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => handleEditWeighing(weighing)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#2196f3',
+                            cursor: 'pointer',
+                            padding: 4
+                          }}
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteWeighing(weighing.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#f44336',
+                            cursor: 'pointer',
+                            padding: 4
+                          }}
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+              <button
+                onClick={() => setShowAddCategory(true)}
+                style={{
+                  background: '#4CAF50',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <FaPlus />
+                Add Category
+              </button>
+            </div>
           </div>
 
           {/* Outgoing Stats Card */}
@@ -1184,83 +1618,242 @@ export default function KitchenDetailsPage() {
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-              <button
-                onClick={() => setShowAddCategory(true)}
-                style={{
-                  background: '#4CAF50',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                <FaPlus />
-                Add Category
-              </button>
-            </div>
-
-            {/* Recent Weighing Records */}
-            <div style={{ marginBottom: 24 }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Recent Weighing Records</h3>
-              {weighingRecords.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#888', padding: 20 }}>No weighing records found</div>
-              ) : (
-                <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                  {weighingRecords.slice(0, 10).map((weighing) => (
-                    <div
-                      key={weighing.id}
+            {/* Food Box Meals Count Section */}
+            <div style={{ 
+              background: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 24, 
+              marginBottom: 24,
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Food Box Meals Count (per weight)</h3>
+                <button
+                  onClick={handleStartEditFoodBoxMealsCount}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #dee2e6',
+                    color: '#666',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
+                >
+                  <FaEdit />
+                  Edit
+                </button>
+              </div>
+              
+              {isEditingFoodBoxMealsCount ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      value={editingFoodBoxMealsCount}
+                      onChange={(e) => setEditingFoodBoxMealsCount(e.target.value)}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '12px 16px',
-                        border: '1px solid #eee',
-                        borderRadius: 8,
-                        marginBottom: 8,
-                        background: '#fff'
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: '#333',
+                        width: '150px',
+                        outline: 'none'
+                      }}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                    <select
+                      value={foodBoxMealsCountUnit}
+                      onChange={(e) => {
+                        const newUnit = e.target.value as "kg" | "lb";
+                        setFoodBoxMealsCountUnit(newUnit);
+                        // Convert display value when unit changes
+                        const currentValue = parseFloat(editingFoodBoxMealsCount) || 0;
+                        if (newUnit === 'kg') {
+                          // Converting from lb to kg: divide by 2.20462
+                          setEditingFoodBoxMealsCount((currentValue / 2.20462).toFixed(2));
+                        } else {
+                          // Converting from kg to lb: multiply by 2.20462
+                          setEditingFoodBoxMealsCount((currentValue * 2.20462).toFixed(2));
+                        }
+                      }}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: '#333',
+                        cursor: 'pointer',
+                        outline: 'none'
                       }}
                     >
-                      <div style={{ display: 'flex', flex: 1, gap: 16, alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, minWidth: 120 }}>{weighing.category}</span>
-                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.kilogram_kg_.toFixed(2)} kg</span>
-                        <span style={{ color: '#666', minWidth: 80 }}>{weighing.pound_lb_.toFixed(2)} lb</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          onClick={() => handleEditWeighing(weighing)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2196f3',
-                            cursor: 'pointer',
-                            padding: 4
-                          }}
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteWeighing(weighing.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#f44336',
-                            cursor: 'pointer',
-                            padding: 4
-                          }}
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
+                      <option value="lb">per lb</option>
+                      <option value="kg">per kg</option>
+                    </select>
+                    <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                      meals
                     </div>
-                  ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleSaveFoodBoxMealsCount}
+                      style={{
+                        background: '#28a745',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      onClick={handleCancelEditFoodBoxMealsCount}
+                      style={{
+                        background: '#dc3545',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                    {foodBoxMealsCount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                    meals per lb
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Backpack Meals Count Section */}
+            <div style={{ 
+              background: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 24, 
+              marginBottom: 24,
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#333' }}>Backpack Meals Count</h3>
+                <button
+                  onClick={handleStartEditBackpackMealsCount}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #dee2e6',
+                    color: '#666',
+                    borderRadius: 6,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
+                >
+                  <FaEdit />
+                  Edit
+                </button>
+              </div>
+              
+              {isEditingBackpackMealsCount ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      value={editingBackpackMealsCount}
+                      onChange={(e) => setEditingBackpackMealsCount(e.target.value)}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: '#333',
+                        width: '150px',
+                        outline: 'none'
+                      }}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                    <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                      meals per backpack
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleSaveBackpackMealsCount}
+                      style={{
+                        background: '#28a745',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      onClick={handleCancelEditBackpackMealsCount}
+                      style={{
+                        background: '#dc3545',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: '#333' }}>
+                    {backpackMealsCount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#666' }}>
+                    meals per backpack
+                  </div>
                 </div>
               )}
             </div>
@@ -1622,6 +2215,265 @@ export default function KitchenDetailsPage() {
                 Save Changes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            padding: '2rem',
+            minWidth: 400,
+            maxWidth: 500,
+            width: '100%',
+            margin: '0 1rem'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.5rem', margin: 0 }}>
+                Reset Donor Password
+              </h2>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginTop: 8 }}>
+                {forgotPasswordStep === 'otp' && 'Enter the 6-digit code sent to contact.hungy@gmail.com'}
+                {forgotPasswordStep === 'password' && 'Enter your new password'}
+              </p>
+            </div>
+
+            {forgotPasswordStep === 'otp' && (
+              <>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="otp" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>OTP Code</label>
+                  <input
+                    id="otp"
+                    type="text"
+                    value={forgotPasswordOtp}
+                    onChange={e => setForgotPasswordOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: 6,
+                      border: '1px solid #eee',
+                      fontSize: '1rem',
+                      textAlign: 'center',
+                      letterSpacing: '0.5rem'
+                    }}
+                    placeholder="000000"
+                    maxLength={6}
+                    disabled={forgotPasswordLoading}
+                  />
+                  <p style={{ fontSize: '0.8rem', color: '#666', marginTop: 4, textAlign: 'center' }}>
+                    Didn't receive the code? Check your spam folder.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleCloseForgotPasswordModal}
+                    style={{
+                      flex: 1,
+                      background: '#f5f5f5',
+                      color: '#666',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={forgotPasswordLoading || forgotPasswordOtp.length !== 6}
+                    style={{
+                      flex: 1,
+                      background: (forgotPasswordLoading || forgotPasswordOtp.length !== 6) ? '#ccc' : '#ff9800',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: (forgotPasswordLoading || forgotPasswordOtp.length !== 6) ? 'not-allowed' : 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    {forgotPasswordLoading ? 'Verifying...' : 'Verify Code'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {forgotPasswordStep === 'password' && (
+              <>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="newPassword" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>New Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id="newPassword"
+                      type={showForgotPasswordNew ? "text" : "password"}
+                      value={forgotPasswordNewPassword}
+                      onChange={e => setForgotPasswordNewPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 40px 0.75rem 0.75rem',
+                        borderRadius: 6,
+                        border: `1px solid ${isForgotPasswordValid ? '#4caf50' : '#e0e0e0'}`,
+                        fontSize: '1rem'
+                      }}
+                      placeholder="Enter new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPasswordNew(!showForgotPasswordNew)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {showForgotPasswordNew ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  {forgotPasswordNewPassword.length > 0 && !isForgotPasswordValid && (
+                    <p style={{ fontSize: '0.8rem', color: '#f44336', marginTop: 4 }}>
+                      Password must be at least 8 characters long
+                    </p>
+                  )}
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="confirmPassword" style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>Confirm Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id="confirmPassword"
+                      type={showForgotPasswordConfirm ? "text" : "password"}
+                      value={forgotPasswordConfirmPassword}
+                      onChange={e => setForgotPasswordConfirmPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 40px 0.75rem 0.75rem',
+                        borderRadius: 6,
+                        border: `1px solid ${forgotPasswordConfirmPassword.length > 0 ? (doForgotPasswordsMatch ? '#4caf50' : '#f44336') : '#e0e0e0'}`,
+                        fontSize: '1rem'
+                      }}
+                      placeholder="Confirm new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPasswordConfirm(!showForgotPasswordConfirm)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {showForgotPasswordConfirm ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  {forgotPasswordConfirmPassword.length > 0 && !doForgotPasswordsMatch && (
+                    <p style={{ fontSize: '0.8rem', color: '#f44336', marginTop: 4 }}>
+                      Passwords do not match
+                    </p>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleCloseForgotPasswordModal}
+                    style={{
+                      flex: 1,
+                      background: '#f5f5f5',
+                      color: '#666',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleResetDonorPassword}
+                    disabled={forgotPasswordLoading || !canSubmitForgotPassword}
+                    style={{
+                      flex: 1,
+                      background: (forgotPasswordLoading || !canSubmitForgotPassword) ? '#ccc' : '#ff9800',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '10px 16px',
+                      cursor: (forgotPasswordLoading || !canSubmitForgotPassword) ? 'not-allowed' : 'pointer',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    {forgotPasswordLoading ? 'Resetting...' : 'Reset Password'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {forgotPasswordError && (
+              <div style={{
+                color: '#f44336',
+                marginTop: 12,
+                fontSize: '0.9rem',
+                textAlign: 'center',
+                padding: '12px',
+                backgroundColor: '#ffebee',
+                borderRadius: '6px',
+                border: '1px solid #ffcdd2'
+              }}>
+                {forgotPasswordError}
+              </div>
+            )}
+
+            {forgotPasswordSuccess && (
+              <div style={{
+                color: '#4caf50',
+                marginTop: 12,
+                fontSize: '0.9rem',
+                textAlign: 'center',
+                padding: '12px',
+                backgroundColor: '#e8f5e8',
+                borderRadius: '6px',
+                border: '1px solid #c8e6c9'
+              }}>
+                {forgotPasswordSuccess}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -133,6 +133,19 @@ export default function ManageUsersPage() {
   // Loading state for user approval
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
 
+  // Document modal state
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [userAgreements, setUserAgreements] = useState<Array<{
+    id: number;
+    documentUrl: string;
+    signature: string;
+    acceptedAt: string;
+    termsTitle?: string;
+    termsVersion?: string;
+  }>>([]);
+  const [selectedUserName, setSelectedUserName] = useState<string>('');
+  const [loadingAgreements, setLoadingAgreements] = useState(false);
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   // Get organization ID from localStorage
@@ -413,7 +426,13 @@ export default function ManageUsersPage() {
 
   const viewUserAgreement = async (userId: string) => {
     try {
-      console.log('Fetching user agreement for userId:', userId);
+      setLoadingAgreements(true);
+      console.log('Fetching user agreements for userId:', userId);
+      
+      // Get user name for display
+      const user = users.find(u => u.id === userId);
+      setSelectedUserName(user ? user.name : 'User');
+      
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userId}/agreement`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -426,35 +445,66 @@ export default function ManageUsersPage() {
         } else {
           const errorData = await response.json().catch(() => ({}));
           console.error('Error response:', errorData);
-          toast.error(errorData.error || "Failed to fetch user agreement");
+          toast.error(errorData.error || "Failed to fetch user agreements");
         }
+        setLoadingAgreements(false);
         return;
       }
       
       const data = await response.json();
       console.log('Received agreement data:', data);
       
-      if (data.documentUrl) {
-        console.log('Opening document URL:', data.documentUrl);
-        
-        // Test if the URL is accessible before opening
-        try {
-          const testResponse = await fetch(data.documentUrl, { method: 'HEAD' });
-          if (!testResponse.ok) {
-            console.warn('Document URL might not be accessible:', testResponse.status);
-          }
-        } catch (testError) {
-          console.warn('Could not test document URL accessibility:', testError);
+      // Check if we have the new format with agreements array
+      if (data.agreements && Array.isArray(data.agreements)) {
+        if (data.agreements.length === 0) {
+          toast.error("No agreement documents available for this user");
+          setLoadingAgreements(false);
+          return;
         }
-        //toast.success("Opening user agreement document");
+        
+        // If only one document, open it directly (backward compatibility)
+        if (data.agreements.length === 1) {
+          window.open(data.agreements[0].documentUrl, '_blank');
+          setLoadingAgreements(false);
+          return;
+        }
+        
+        // Multiple documents - show modal
+        setUserAgreements(data.agreements);
+        setShowDocumentModal(true);
+      } else if (data.documentUrl) {
+        // Backward compatibility: single document format
+        console.log('Opening document URL:', data.documentUrl);
         window.open(data.documentUrl, '_blank');
       } else {
-        console.error('No documentUrl in response:', data);
+        console.error('No documentUrl or agreements in response:', data);
         toast.error("No agreement document available for this user");
       }
+      
+      setLoadingAgreements(false);
     } catch (err) {
       console.error('Error in viewUserAgreement:', err);
-      toast.error("Failed to open user agreement");
+      toast.error("Failed to fetch user agreements");
+      setLoadingAgreements(false);
+    }
+  };
+
+  const openDocument = (documentUrl: string) => {
+    window.open(documentUrl, '_blank');
+  };
+
+  const formatDateTime = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-CA', {
+        timeZone: 'America/Halifax',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid date';
     }
   };
 
@@ -1683,6 +1733,94 @@ export default function ManageUsersPage() {
                 >
                   {adding && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                   Add User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Modal */}
+      {showDocumentModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  License Agreements for {selectedUserName}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowDocumentModal(false);
+                    setUserAgreements([]);
+                    setSelectedUserName('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <FaTimes className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {loadingAgreements ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: '#EF5C11' }}></div>
+                </div>
+              ) : userAgreements.length === 0 ? (
+                <div className="text-center py-8">
+                  <FaFileAlt className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500">No agreement documents found</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {userAgreements.map((agreement, index) => (
+                    <div
+                      key={agreement.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <FaFileAlt className="text-purple-600" />
+                            <h4 className="text-sm font-medium text-gray-900">
+                              {agreement.termsTitle || `Agreement ${index + 1}`}
+                              {agreement.termsVersion && (
+                                <span className="text-gray-500 ml-2">(v{agreement.termsVersion})</span>
+                              )}
+                            </h4>
+                          </div>
+                          <div className="text-xs text-gray-500 space-y-1">
+                            <p>Signed: {formatDateTime(agreement.acceptedAt)}</p>
+                            {agreement.signature && (
+                              <p className="font-mono text-gray-400">Signature: {agreement.signature.substring(0, 20)}...</p>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => openDocument(agreement.documentUrl)}
+                          className="ml-4 px-3 py-2 text-sm text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition"
+                          style={{ backgroundColor: '#EF5C11' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                        >
+                          <FaExternalLinkAlt />
+                          Open
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => {
+                    setShowDocumentModal(false);
+                    setUserAgreements([]);
+                    setSelectedUserName('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Close
                 </button>
               </div>
             </div>

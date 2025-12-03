@@ -114,7 +114,12 @@ export default function VolunteersPage() {
           });
           if (!response.ok) throw new Error('Failed to fetch volunteers');
           const data = await response.json();
-          setVolunteers(data);
+          // Filter out staff and admin - only show volunteers
+          const filteredData = data.filter((volunteer: VolunteerDetail) => {
+            const role = (volunteer.role || '').toLowerCase().trim();
+            return role !== 'staff' && role !== 'admin';
+          });
+          setVolunteers(filteredData);
         } catch (err) {
           setVolunteers([]);
           setVolunteersError('Failed to load volunteers.');

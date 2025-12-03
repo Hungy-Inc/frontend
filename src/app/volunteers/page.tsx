@@ -309,7 +309,7 @@ export default function VolunteersPage() {
           className={`${styles.tabButton} ${activeTab === 'volunteers' ? styles.activeTab : ''}`}
           onClick={() => setActiveTab('volunteers')}
         >
-          Volunteers
+          Volunteer Profiles
         </button>
       </div>
 

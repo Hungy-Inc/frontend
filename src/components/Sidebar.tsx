@@ -1,7 +1,7 @@
 'use client';
 
 import styles from './Sidebar.module.css';
-import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog, FaEnvelope, FaQrcode, FaMobileAlt } from 'react-icons/fa';
+import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog, FaEnvelope, FaQrcode, FaMobileAlt, FaHandHoldingUsd} from 'react-icons/fa';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -22,6 +22,7 @@ const menu = [
   { icon: <FaEnvelope />, label: 'Email Management', href: '/email-management' },
   { icon: <FaQrcode />, label: 'QR Codes', href: '/qr-codes' },
   { icon: <FaMobileAlt />, label: 'Mobile Analytics', href: '/mobile-analytics' },
+  { icon: <FaHandHoldingUsd />, label: 'My Grants', href: '/my-grants' },
   { icon: <FaUtensils />, label: 'Kitchen Details', href: '/kitchen-details' },
 ];
 

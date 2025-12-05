@@ -45,6 +45,7 @@ interface User {
   permissionCount?: number;
   totalModules?: number;
   hasPermissions?: boolean;
+  isApprover?: boolean;
 }
 
 interface Module {
@@ -132,6 +133,23 @@ export default function ManageUsersPage() {
 
   // Loading state for user approval
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
+
+  // Document modal state
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [userAgreements, setUserAgreements] = useState<Array<{
+    id: number;
+    documentUrl: string;
+    signature: string;
+    acceptedAt: string;
+    termsTitle?: string;
+    termsVersion?: string;
+  }>>([]);
+  const [selectedUserName, setSelectedUserName] = useState<string>('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [loadingAgreements, setLoadingAgreements] = useState(false);
+  const [editingAgreementId, setEditingAgreementId] = useState<number | null>(null);
+  const [replacementFile, setReplacementFile] = useState<File | null>(null);
+  const [uploadingReplacement, setUploadingReplacement] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -411,9 +429,50 @@ export default function ManageUsersPage() {
     }
   };
 
+  const toggleUserApprover = async (userId: string, currentValue: boolean) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/toggle-approver`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to toggle user approver' }));
+        
+        // Check if user is not approved
+        if (response.status === 400 && errorData.status && errorData.status !== 'APPROVED') {
+          toast.error('Only approved users can receive approver email notifications');
+          return;
+        }
+        
+        throw new Error(errorData.error || "Failed to toggle user approver");
+      }
+      
+      const responseData = await response.json();
+      const newValue = responseData.isApprover ?? false;
+      
+      // Refresh both user lists to keep data in sync
+      await fetchUsers();
+      await fetchPermissionUsers();
+      
+      toast.success(`User approver email notification ${newValue ? 'enabled' : 'disabled'} successfully!`);
+    } catch (err: any) {
+      console.error('Error toggling user approver:', err);
+      toast.error(err.message || "Failed to toggle user approver. Please try again.");
+    }
+  };
+
   const viewUserAgreement = async (userId: string) => {
     try {
-      console.log('Fetching user agreement for userId:', userId);
+      setLoadingAgreements(true);
+      console.log('Fetching user agreements for userId:', userId);
+      
+      // Get user name for display
+      const user = users.find(u => u.id === userId);
+      setSelectedUserName(user ? user.name : 'User');
+      setSelectedUserId(userId);
+      
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userId}/agreement`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -426,35 +485,114 @@ export default function ManageUsersPage() {
         } else {
           const errorData = await response.json().catch(() => ({}));
           console.error('Error response:', errorData);
-          toast.error(errorData.error || "Failed to fetch user agreement");
+          toast.error(errorData.error || "Failed to fetch user agreements");
         }
+        setLoadingAgreements(false);
         return;
       }
       
       const data = await response.json();
       console.log('Received agreement data:', data);
       
-      if (data.documentUrl) {
-        console.log('Opening document URL:', data.documentUrl);
-        
-        // Test if the URL is accessible before opening
-        try {
-          const testResponse = await fetch(data.documentUrl, { method: 'HEAD' });
-          if (!testResponse.ok) {
-            console.warn('Document URL might not be accessible:', testResponse.status);
-          }
-        } catch (testError) {
-          console.warn('Could not test document URL accessibility:', testError);
+      // Check if we have the new format with agreements array
+      if (data.agreements && Array.isArray(data.agreements)) {
+        if (data.agreements.length === 0) {
+          toast.error("No agreement documents available for this user");
+          setLoadingAgreements(false);
+          return;
         }
-        //toast.success("Opening user agreement document");
+        
+        // If only one document, open it directly (backward compatibility)
+        if (data.agreements.length === 1) {
+          window.open(data.agreements[0].documentUrl, '_blank');
+          setLoadingAgreements(false);
+          return;
+        }
+        
+        // Multiple documents - show modal
+        setUserAgreements(data.agreements);
+        setShowDocumentModal(true);
+      } else if (data.documentUrl) {
+        // Backward compatibility: single document format
+        console.log('Opening document URL:', data.documentUrl);
         window.open(data.documentUrl, '_blank');
       } else {
-        console.error('No documentUrl in response:', data);
+        console.error('No documentUrl or agreements in response:', data);
         toast.error("No agreement document available for this user");
       }
+      
+      setLoadingAgreements(false);
     } catch (err) {
       console.error('Error in viewUserAgreement:', err);
-      toast.error("Failed to open user agreement");
+      toast.error("Failed to fetch user agreements");
+      setLoadingAgreements(false);
+    }
+  };
+
+  const openDocument = (documentUrl: string) => {
+    window.open(documentUrl, '_blank');
+  };
+
+  const handleReplaceDocument = async (agreementId: number) => {
+    if (!replacementFile || !selectedUserId) {
+      toast.error('Please select a file to replace the document');
+      return;
+    }
+
+    setUploadingReplacement(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append('document', replacementFile);
+
+      const response = await fetch(`${apiUrl}/api/users/${selectedUserId}/agreement/${agreementId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to replace document' }));
+        throw new Error(errorData.error || 'Failed to replace document');
+      }
+
+      const data = await response.json();
+      
+      // Update the agreement in the list
+      setUserAgreements(prev => prev.map(agreement => 
+        agreement.id === agreementId 
+          ? { ...agreement, ...data.agreement }
+          : agreement
+      ));
+
+      toast.success('Document replaced successfully!');
+      setEditingAgreementId(null);
+      setReplacementFile(null);
+    } catch (err: any) {
+      console.error('Error replacing document:', err);
+      toast.error(err.message || 'Failed to replace document. Please try again.');
+    } finally {
+      setUploadingReplacement(false);
+    }
+  };
+
+  const cancelDocumentEdit = () => {
+    setEditingAgreementId(null);
+    setReplacementFile(null);
+  };
+
+  const formatDateTime = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-CA', {
+        timeZone: 'America/Halifax',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid date';
     }
   };
 
@@ -1253,6 +1391,47 @@ export default function ManageUsersPage() {
                             </button>
                           </div>
                         </div>
+                        
+                        {/* User Approver Email Notification Toggle */}
+                        {(() => {
+                          const selectedUserData = permissionUsers.find(u => parseInt(u.id) === selectedUser);
+                          if (!selectedUserData) return null;
+                          
+                          const isApprover = selectedUserData.isApprover ?? false;
+                          const isApproved = selectedUserData.status === 'APPROVED';
+                          
+                          return (
+                            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-900">
+                                    User Approver Email Notifications
+                                  </label>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {isApproved 
+                                      ? "Receive email notifications when users need approval"
+                                      : "Only approved users can receive approver email notifications"
+                                    }
+                                  </p>
+                                </div>
+                                <label className={`relative inline-flex items-center ${isApproved ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isApprover}
+                                    disabled={!isApproved}
+                                    onChange={() => {
+                                      if (isApproved && selectedUserData) {
+                                        toggleUserApprover(selectedUserData.id, isApprover);
+                                      }
+                                    }}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 peer-disabled:opacity-50"></div>
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <div className="flex justify-end">
                           <button
                             onClick={updateUserPermissions}
@@ -1683,6 +1862,169 @@ export default function ManageUsersPage() {
                 >
                   {adding && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                   Add User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Modal */}
+      {showDocumentModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  License Agreements for {selectedUserName}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowDocumentModal(false);
+                    setUserAgreements([]);
+                    setSelectedUserName('');
+                    setSelectedUserId('');
+                    setEditingAgreementId(null);
+                    setReplacementFile(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <FaTimes className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {loadingAgreements ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: '#EF5C11' }}></div>
+                </div>
+              ) : userAgreements.length === 0 ? (
+                <div className="text-center py-8">
+                  <FaFileAlt className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500">No agreement documents found</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {userAgreements.map((agreement, index) => (
+                    <div
+                      key={agreement.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <FaFileAlt className="text-purple-600" />
+                            <h4 className="text-sm font-medium text-gray-900">
+                              {agreement.termsTitle || `Agreement ${index + 1}`}
+                              {agreement.termsVersion && (
+                                <span className="text-gray-500 ml-2">(v{agreement.termsVersion})</span>
+                              )}
+                            </h4>
+                          </div>
+                          <div className="text-xs text-gray-500 space-y-1">
+                            <p>Signed: {formatDateTime(agreement.acceptedAt)}</p>
+                            {agreement.signature && (
+                              <p className="font-mono text-gray-400">Signature: {agreement.signature.substring(0, 20)}...</p>
+                            )}
+                          </div>
+                          
+                          {/* Edit mode: File upload */}
+                          {editingAgreementId === agreement.id && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <label className="block text-xs font-medium text-gray-700 mb-2">
+                                Replace Document
+                              </label>
+                              <input
+                                type="file"
+                                accept=".pdf,application/pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file && file.type !== 'application/pdf') {
+                                    toast.error('Only PDF files are allowed. Please select a PDF file.');
+                                    e.target.value = ''; // Clear the input
+                                    setReplacementFile(null);
+                                  } else {
+                                    setReplacementFile(file);
+                                  }
+                                }}
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Only PDF files are allowed (Max 10MB)
+                              </p>
+                              <div className="flex gap-2 mt-3">
+                                <button
+                                  onClick={() => handleReplaceDocument(agreement.id)}
+                                  disabled={!replacementFile || uploadingReplacement}
+                                  className="px-3 py-1.5 text-xs text-white rounded-md disabled:opacity-50 flex items-center gap-1"
+                                  style={{ backgroundColor: '#EF5C11' }}
+                                >
+                                  {uploadingReplacement ? (
+                                    <>
+                                      <ImSpinner2 className="animate-spin" />
+                                      Uploading...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FaSave />
+                                      Replace
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={cancelDocumentEdit}
+                                  disabled={uploadingReplacement}
+                                  className="px-3 py-1.5 text-xs border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-4 flex gap-2">
+                          <button
+                            onClick={() => openDocument(agreement.documentUrl)}
+                            className="px-3 py-2 text-sm text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition"
+                            style={{ backgroundColor: '#EF5C11' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                          >
+                            <FaExternalLinkAlt />
+                            Open
+                          </button>
+                          {editingAgreementId !== agreement.id && (
+                            <button
+                              onClick={() => {
+                                setEditingAgreementId(agreement.id);
+                                setReplacementFile(null);
+                              }}
+                              className="px-3 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg flex items-center gap-2 hover:bg-blue-50 transition"
+                              title="Replace Document"
+                            >
+                              <FaEdit />
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => {
+                    setShowDocumentModal(false);
+                    setUserAgreements([]);
+                    setSelectedUserName('');
+                    setSelectedUserId('');
+                    setEditingAgreementId(null);
+                    setReplacementFile(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Close
                 </button>
               </div>
             </div>

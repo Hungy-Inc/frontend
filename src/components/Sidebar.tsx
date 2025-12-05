@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 
 const menu = [
   { icon: <FaHome />, label: 'Dashboard', href: '/dashboard' },
-  { icon: <FaUserFriends />, label: 'Volunteer Hours', href: '/volunteers' },
+  { icon: <FaUserFriends />, label: 'Volunteer Management', href: '/volunteers' },
   { icon: <FaChartBar />, label: 'Incoming Stats', href: '/incoming-stats' },
   { icon: <FaExchangeAlt />, label: 'Outgoing Stats', href: '/outgoing-stats' },
   { icon: <FaBoxOpen />, label: 'Inventory', href: '/inventory' },

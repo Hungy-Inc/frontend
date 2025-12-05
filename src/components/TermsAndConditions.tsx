@@ -38,6 +38,21 @@ export default function TermsAndConditions({ apiUrl }: TermsAndConditionsProps) 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const validatePDFFile = (file: File): boolean => {
+    if (file.type !== 'application/pdf') {
+      toast.error('Only PDF files are allowed. Please select a PDF file.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleFileChange = (file: File | null) => {
+    if (file && !validatePDFFile(file)) {
+      return;
+    }
+    setSelectedFile(file);
+  };
+
   useEffect(() => {
     fetchTermsAndConditions();
   }, []);
@@ -66,6 +81,11 @@ export default function TermsAndConditions({ apiUrl }: TermsAndConditionsProps) 
   const handleAddTerms = async () => {
     if (!selectedFile || !formData.version || !formData.title) {
       toast.error('Please fill all fields and select a file');
+      return;
+    }
+
+    // Validate file type
+    if (!validatePDFFile(selectedFile)) {
       return;
     }
 
@@ -144,6 +164,11 @@ export default function TermsAndConditions({ apiUrl }: TermsAndConditionsProps) 
   const handleReplaceFile = async () => {
     if (!editingTerms || !selectedFile) {
       toast.error('Please select a file');
+      return;
+    }
+
+    // Validate file type
+    if (!validatePDFFile(selectedFile)) {
       return;
     }
 
@@ -386,12 +411,12 @@ export default function TermsAndConditions({ apiUrl }: TermsAndConditionsProps) 
                 <label className="block text-sm font-medium text-gray-700 mb-1">File</label>
                 <input
                   type="file"
-                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                  accept=".pdf,application/pdf"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Supported: PDF, Word, Text, Images (Max 10MB)
+                  Only PDF files are allowed (Max 10MB)
                 </p>
               </div>
               
@@ -529,12 +554,12 @@ export default function TermsAndConditions({ apiUrl }: TermsAndConditionsProps) 
                 <label className="block text-sm font-medium text-gray-700 mb-1">New File</label>
                 <input
                   type="file"
-                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                  accept=".pdf,application/pdf"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Supported: PDF, Word, Text, Images (Max 10MB)
+                  Only PDF files are allowed (Max 10MB)
                 </p>
               </div>
             </div>

@@ -36,6 +36,7 @@ export default function BulkImportWizard({ isOpen, onClose, organizationId, onSu
     const [defaultStatus, setDefaultStatus] = useState('PENDING');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<ImportResult | null>(null);
+    const [rolePermissionsCount, setRolePermissionsCount] = useState<number>(0);
 
     const standardFields = [
         { id: 'firstName', label: 'First Name', required: true },
@@ -76,6 +77,30 @@ export default function BulkImportWizard({ isOpen, onClose, organizationId, onSu
             console.error('Error fetching org fields:', error);
         }
     };
+
+    const fetchRolePermissions = async (role: string) => {
+        try {
+            const token = localStorage.getItem('superAdminToken');
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${organizationId}/role-permissions/${role}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setRolePermissionsCount(data.count || 0);
+            } else {
+                setRolePermissionsCount(0);
+            }
+        } catch (error) {
+            console.error('Error fetching role permissions:', error);
+            setRolePermissionsCount(0);
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen && organizationId && defaultRole) {
+            fetchRolePermissions(defaultRole);
+        }
+    }, [defaultRole, isOpen, organizationId]);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -267,6 +292,20 @@ export default function BulkImportWizard({ isOpen, onClose, organizationId, onSu
                                 <option value="ADMIN">Organization Admin</option>
                                 <option value="SUPERADMIN">Super Admin</option>
                             </select>
+                            <div className={`text-xs mt-1 px-2 py-1.5 rounded flex items-center gap-2 ${rolePermissionsCount > 0 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                {rolePermissionsCount > 0 ? (
+                                    <>
+                                        <span className="font-bold">✓</span>
+                                        <span><strong>{rolePermissionsCount}</strong> default module permission{rolePermissionsCount !== 1 ? 's' : ''} configured for <strong>{defaultRole}</strong> role</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="font-bold">⚠</span>
+                                        <span><strong>No default permissions</strong> configured for <strong>{defaultRole}</strong> role. Users will have no module access!</span>
+                                    </>
+                                )}
+                            </div>
                             <p className="text-xs text-gray-500">This role will be assigned to all users in this import file.</p>
                         </div>
 
@@ -327,6 +366,17 @@ export default function BulkImportWizard({ isOpen, onClose, organizationId, onSu
                             <div>
                                 <strong>Tip for Multi-Select Fields:</strong> If you are importing fields that allow multiple options (e.g., "Interests"),
                                 please enter them in a single column separated by commas (e.g., "Cooking, Driving, Events").
+                            </div>
+                        </div>
+
+                        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 text-yellow-900 text-sm rounded-lg flex items-start gap-3">
+                            <div className="mt-0.5 text-lg">⚠️</div>
+                            <div>
+                                <strong className="font-bold">Important: Role-Based Permissions</strong>
+                                <p className="mt-1">
+                                    Imported users will automatically receive module permissions based on their role's default permissions configured for this organization.
+                                    Please ensure you have set up <strong>Role Default Permissions</strong> in the organization's module settings before importing.
+                                </p>
                             </div>
                         </div>
 

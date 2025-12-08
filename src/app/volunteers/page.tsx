@@ -2,7 +2,7 @@
 import styles from '../incoming-stats/IncomingStats.module.css';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import { FaChevronDown, FaChevronRight, FaSearch } from 'react-icons/fa';
 
 const months = [
   { value: 0, label: 'All Months' },
@@ -71,6 +71,7 @@ export default function VolunteersPage() {
   const [volunteersError, setVolunteersError] = useState('');
   const [expandedVolunteers, setExpandedVolunteers] = useState<Set<number>>(new Set());
   const [shiftFilters, setShiftFilters] = useState<{ [volunteerId: number]: { upcoming: number; completed: number } }>({});
+  const [volunteerSearchTerm, setVolunteerSearchTerm] = useState('');
 
   useEffect(() => {
     if (activeTab === 'hours') {
@@ -107,7 +108,7 @@ export default function VolunteersPage() {
           setVolunteersLoading(true);
           setVolunteersError('');
           const token = localStorage.getItem('token');
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/details`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/details?month=${selectedMonth}&year=${selectedYear}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -129,7 +130,7 @@ export default function VolunteersPage() {
       };
       fetchVolunteers();
     }
-  }, [activeTab]);
+  }, [activeTab, selectedMonth, selectedYear]);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -259,6 +260,16 @@ export default function VolunteersPage() {
     return shifts.slice(0, limit);
   };
 
+  // Filter volunteers based on search term
+  const filteredVolunteers = volunteers.filter(volunteer => {
+    const searchLower = volunteerSearchTerm.toLowerCase();
+    return (
+      volunteer.name.toLowerCase().includes(searchLower) ||
+      volunteer.email.toLowerCase().includes(searchLower) ||
+      volunteer.role.toLowerCase().includes(searchLower)
+    );
+  });
+
   return (
     <main className={styles.main}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -293,6 +304,30 @@ export default function VolunteersPage() {
             <button className={styles.exportBtn} onClick={handleExport} type="button">
               Export to Excel
             </button>
+          </div>
+        )}
+        {activeTab === 'volunteers' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <select
+              className={styles.select}
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(Number(e.target.value))}
+              style={{ minWidth: 130 }}
+            >
+              {months.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <select
+              className={styles.select}
+              value={selectedYear}
+              onChange={e => setSelectedYear(Number(e.target.value))}
+              style={{ minWidth: 100 }}
+            >
+              {getYearOptions().map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
           </div>
         )}
       </div>
@@ -370,8 +405,46 @@ export default function VolunteersPage() {
           ) : volunteers.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center' }}>No volunteers found.</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {volunteers.map(volunteer => {
+            <>
+              {/* Search Bar */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ position: 'relative' }}>
+                  <FaSearch style={{ 
+                    position: 'absolute', 
+                    left: 12, 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    color: '#999',
+                    fontSize: 14
+                  }} />
+                  <input
+                    type="text"
+                    placeholder="Search volunteers by name, email, or role..."
+                    value={volunteerSearchTerm}
+                    onChange={(e) => setVolunteerSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 36px',
+                      border: '1px solid #ddd',
+                      borderRadius: 8,
+                      fontSize: 14,
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#ff9800'}
+                    onBlur={(e) => e.target.style.borderColor = '#ddd'}
+                  />
+                </div>
+              </div>
+
+              {/* Volunteers List */}
+              {filteredVolunteers.length === 0 ? (
+                <div style={{ padding: 32, textAlign: 'center', color: '#999' }}>
+                  No volunteers match your search criteria.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {filteredVolunteers.map(volunteer => {
                 const isExpanded = expandedVolunteers.has(volunteer.id);
                 return (
                   <div
@@ -578,7 +651,9 @@ export default function VolunteersPage() {
                   </div>
                 );
               })}
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

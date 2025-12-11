@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
-import { FaArrowLeft, FaBuilding, FaUsers, FaPuzzlePiece, FaCog, FaCheck, FaTimes, FaToggleOn, FaToggleOff, FaMobileAlt, FaDesktop, FaUpload } from 'react-icons/fa';
+import { FaArrowLeft, FaBuilding, FaUsers, FaPuzzlePiece, FaCog, FaCheck, FaTimes, FaToggleOn, FaToggleOff, FaMobileAlt, FaDesktop, FaUpload, FaShieldAlt, FaSearch } from 'react-icons/fa';
 import Link from 'next/link';
 import StatsCard from '@/components/superadmin/StatsCard';
 import DataTable from '@/components/superadmin/DataTable';
@@ -26,6 +26,9 @@ export default function OrganizationDetailsPage() {
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
     const [selectedTemplates, setSelectedTemplates] = useState<number[]>([]);
+    const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
+    const [permissionData, setPermissionData] = useState<Record<number, string[]>>({});
+    const [permissionSearchTerm, setPermissionSearchTerm] = useState('');
 
     // Import state
     const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
@@ -192,6 +195,53 @@ export default function OrganizationDetailsPage() {
         } catch (error) {
             console.error('Error creating user:', error);
             toast.error('Failed to create user');
+        }
+    };
+
+    const openPermissionModal = () => {
+        // Initialize permission data from current modules
+        const initialData: Record<number, string[]> = {};
+        modules.forEach(m => {
+            initialData[m.id] = m.RoleDefaultPermission?.map((p: any) => p.role) || [];
+        });
+        setPermissionData(initialData);
+        setPermissionSearchTerm('');
+        setIsPermissionModalOpen(true);
+    };
+
+    const togglePermission = (moduleId: number, role: string) => {
+        setPermissionData(prev => {
+            const current = prev[moduleId] || [];
+            if (current.includes(role)) {
+                return { ...prev, [moduleId]: current.filter(r => r !== role) };
+            } else {
+                return { ...prev, [moduleId]: [...current, role] };
+            }
+        });
+    };
+
+    const handleSavePermissions = async () => {
+        try {
+            const token = localStorage.getItem('superAdminToken');
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}/permissions`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ permissions: permissionData })
+            });
+
+            if (response.ok) {
+                toast.success('Permissions updated successfully');
+                setIsPermissionModalOpen(false);
+                fetchOrganizationDetails(); // Refresh to get latest data
+            } else {
+                toast.error('Failed to update permissions');
+            }
+        } catch (error) {
+            console.error('Error updating permissions:', error);
+            toast.error('Failed to update permissions');
         }
     };
 
@@ -370,7 +420,13 @@ export default function OrganizationDetailsPage() {
 
                 {activeTab === 'modules' && (
                     <div>
-                        <div className="flex justify-end mb-4">
+                        <div className="flex justify-end mb-4 gap-3">
+                            <button
+                                onClick={openPermissionModal}
+                                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
+                            >
+                                <FaShieldAlt /> Configure Defaults
+                            </button>
                             <button
                                 onClick={() => {
                                     fetchAvailableTemplates();
@@ -576,6 +632,98 @@ export default function OrganizationDetailsPage() {
                             className="px-4 py-2 text-white bg-orange-600 rounded-lg hover:bg-orange-700 font-medium disabled:opacity-50"
                         >
                             Assign Selected
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Default Permissions Modal */}
+            <Modal
+                isOpen={isPermissionModalOpen}
+                onClose={() => setIsPermissionModalOpen(false)}
+                title="Configure Default Permissions"
+                size="lg"
+            >
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <p className="text-sm text-gray-600">
+                            Configure which roles have access to modules by default. These settings apply to this organization only.
+                        </p>
+                    </div>
+
+                    <div className="relative">
+                        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search modules..."
+                            value={permissionSearchTerm}
+                            onChange={(e) => setPermissionSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                        />
+                    </div>
+
+                    <div className="overflow-x-auto border rounded-lg max-h-[60vh]">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50 sticky top-0 z-10">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Module</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Volunteer</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Staff</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Admin</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {modules
+                                    .filter(m => m.isEnabled)
+                                    .filter(m =>
+                                        m.name.toLowerCase().includes(permissionSearchTerm.toLowerCase()) ||
+                                        (m.ModuleTemplate && m.ModuleTemplate.displayName.toLowerCase().includes(permissionSearchTerm.toLowerCase()))
+                                    )
+                                    .map(module => (
+                                        <tr key={module.id}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                {module.name}
+                                                {module.ModuleTemplate && (
+                                                    <span className="ml-2 text-xs text-gray-500 block font-normal">
+                                                        {module.ModuleTemplate.displayName}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            {['VOLUNTEER', 'STAFF', 'ADMIN'].map(role => (
+                                                <td key={role} className="px-6 py-4 whitespace-nowrap text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(permissionData[module.id] || []).includes(role)}
+                                                        onChange={() => togglePermission(module.id, role)}
+                                                        className="h-4 w-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
+                                                    />
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                {modules.filter(m => m.isEnabled).length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                            No active modules found. Enable modules first.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button
+                            onClick={() => setIsPermissionModalOpen(false)}
+                            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSavePermissions}
+                            className="px-4 py-2 text-white bg-orange-600 rounded-lg hover:bg-orange-700 font-medium"
+                        >
+                            Save Permissions
                         </button>
                     </div>
                 </div>

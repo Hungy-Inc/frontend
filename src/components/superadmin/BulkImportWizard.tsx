@@ -289,8 +289,8 @@ export default function BulkImportWizard({ isOpen, onClose, organizationId, onSu
                                 className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white"
                             >
                                 <option value="VOLUNTEER">Volunteer (Default)</option>
+                                <option value="STAFF">Staff</option>
                                 <option value="ADMIN">Organization Admin</option>
-                                <option value="SUPERADMIN">Super Admin</option>
                             </select>
                             <div className={`text-xs mt-1 px-2 py-1.5 rounded flex items-center gap-2 ${rolePermissionsCount > 0 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
                                 }`}>

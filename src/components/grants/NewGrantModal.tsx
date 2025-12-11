@@ -30,6 +30,9 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
   const [assignablePeople, setAssignablePeople] = useState<AssignablePerson[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [isManagePeopleModalOpen, setIsManagePeopleModalOpen] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
 
   // Fetch assignable people
   useEffect(() => {
@@ -63,6 +66,68 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFiles(e.target.files);
+    }
+  };
+
+  const uploadDocuments = async (grantId: number, files: FileList): Promise<boolean> => {
+    setUploadingFiles(true);
+    setUploadStatus('Uploading documents...');
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        setUploadStatus('Upload warning: Authentication required. Please log in again.');
+        return false;
+      }
+
+      const formData = new FormData();
+
+      // Add all selected files to FormData
+      Array.from(files).forEach((file) => {
+        console.log(`Adding file to FormData: ${file.name}, type: ${file.type}, size: ${file.size}`);
+        formData.append('files', file);
+      });
+
+      console.log(`Uploading ${files.length} file(s) for grant ${grantId}`);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}/documents`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Upload successful:', data);
+        setUploadStatus(`Documents uploaded successfully (${data.documents?.length || files.length} file(s))`);
+        return true;
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Upload failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        setUploadStatus(`Upload warning: ${errorData.error || 'Failed to upload some files'}`);
+        // Don't fail the whole operation if upload fails
+        return false;
+      }
+    } catch (err) {
+      console.error('Error uploading files:', err);
+      setUploadStatus('Upload warning: Network error. You can upload documents later.');
+      // Don't fail the whole operation if upload fails
+      return false;
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -73,9 +138,12 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
 
     setLoading(true);
     setError('');
+    setUploadStatus('');
 
     try {
       const token = localStorage.getItem('token');
+      
+      // Step 1: Create the grant
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants`, {
         method: 'POST',
         headers: {
@@ -90,6 +158,15 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
       });
 
       if (response.ok) {
+        const data = await response.json();
+        const grantId = data.grant.id;
+
+        // Step 2: Upload files if any were selected
+        if (selectedFiles && selectedFiles.length > 0) {
+          await uploadDocuments(grantId, selectedFiles);
+        }
+
+        // Success - grant created (and files uploaded if selected)
         onSuccess();
         resetForm();
       } else {
@@ -101,6 +178,7 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
       console.error('Error creating grant:', err);
     } finally {
       setLoading(false);
+      setUploadingFiles(false);
     }
   };
 
@@ -116,7 +194,12 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
       lastApprovalNotes: '',
     });
     setSelectedPeople([]);
+    setSelectedFiles(null);
     setError('');
+    setUploadStatus('');
+    // Reset file input
+    const fileInput = document.getElementById('grant-file-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   const togglePersonSelection = (personName: string) => {
@@ -309,6 +392,60 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
               />
             </div>
 
+            {/* Documents Upload Section */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Documents (Optional)
+              </label>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input
+                    id="grant-file-upload"
+                    type="file"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="flex-1 text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.gif,.zip"
+                    disabled={loading || uploadingFiles}
+                  />
+                </div>
+                
+                {/* File List Preview */}
+                {selectedFiles && selectedFiles.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-2">
+                      Selected Files ({selectedFiles.length}):
+                    </p>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {Array.from(selectedFiles).map((file, index) => (
+                        <div key={index} className="flex items-center justify-between text-xs text-gray-600 bg-white p-2 rounded">
+                          <span className="truncate flex-1">{file.name}</span>
+                          <span className="ml-2 text-gray-500">
+                            ({(file.size / 1024).toFixed(1)} KB)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Status */}
+                {uploadStatus && (
+                  <div className={`text-xs px-3 py-2 rounded-lg ${
+                    uploadStatus.includes('warning') || uploadStatus.includes('error')
+                      ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                      : 'bg-green-50 text-green-700 border border-green-200'
+                  }`}>
+                    {uploadStatus}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500">
+                  You can upload documents now or add them later from the grant list.
+                </p>
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
               <button
@@ -320,10 +457,22 @@ export default function NewGrantModal({ isOpen, onClose, onSuccess }: NewGrantMo
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || uploadingFiles}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {loading ? 'Creating...' : 'Create Grant'}
+                {uploadingFiles ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Uploading Documents...
+                  </>
+                ) : loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Creating Grant...
+                  </>
+                ) : (
+                  'Create Grant'
+                )}
               </button>
             </div>
           </form>

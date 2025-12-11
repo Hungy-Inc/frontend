@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import NewGrantModal from '@/components/grants/NewGrantModal';
 import EditGrantModal from '@/components/grants/EditGrantModal';
 import GrantDocumentsModal from '@/components/grants/GrantDocumentsModal';
+import ViewDocumentsModal from '@/components/grants/ViewDocumentsModal';
 import GrantReportModal from '@/components/grants/GrantReportModal';
 import ReportHistoryModal from '@/components/grants/ReportHistoryModal';
 
@@ -40,6 +41,7 @@ export default function MyGrants2Page() {
   const [error, setError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<number | null>(null);
   const [documentsGrant, setDocumentsGrant] = useState<Grant | null>(null);
+  const [viewDocumentsGrant, setViewDocumentsGrant] = useState<Grant | null>(null);
   const [reportGrant, setReportGrant] = useState<Grant | null>(null);
   const [showReportHistory, setShowReportHistory] = useState(false);
 
@@ -696,11 +698,22 @@ export default function MyGrants2Page() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => setDocumentsGrant(grant)}
-                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Documents"
+                            className="px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1.5"
+                            title="Upload Documents"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <span className="text-xs font-medium">Upload</span>
+                          </button>
+                          <button
+                            onClick={() => setViewDocumentsGrant(grant)}
+                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="View Documents"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
                           <button
@@ -808,10 +821,17 @@ export default function MyGrants2Page() {
       />
 
       <GrantDocumentsModal
-        isOpen={!!documentsGrant}
+        isOpen={!!documentsGrant && !!documentsGrant.id}
         onClose={() => setDocumentsGrant(null)}
         grantId={documentsGrant?.id || 0}
         grantTitle={documentsGrant?.title || ''}
+      />
+
+      <ViewDocumentsModal
+        isOpen={!!viewDocumentsGrant && !!viewDocumentsGrant.id}
+        onClose={() => setViewDocumentsGrant(null)}
+        grantId={viewDocumentsGrant?.id || 0}
+        grantTitle={viewDocumentsGrant?.title || ''}
       />
 
       <GrantReportModal

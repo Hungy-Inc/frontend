@@ -313,6 +313,7 @@ export default function UserDetailsPage() {
           return <p className="text-black">{field.value}</p>;
         }
       case 'MULTISELECT':
+        // Handle array values
         if (Array.isArray(field.value)) {
           return (
             <div className="flex flex-wrap gap-2">
@@ -324,7 +325,37 @@ export default function UserDetailsPage() {
             </div>
           );
         }
-        return <p className="text-black">{JSON.stringify(field.value)}</p>;
+        // Handle string values that might be JSON arrays
+        if (typeof field.value === 'string') {
+          try {
+            // Try to parse as JSON (handles cases like "[\\"Tuesday\\",\\"Wednesday\\"]")
+            const parsed = JSON.parse(field.value);
+            if (Array.isArray(parsed)) {
+              return (
+                <div className="flex flex-wrap gap-2">
+                  {parsed.map((item: string, idx: number) => (
+                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              );
+            }
+          } catch {
+            // If parsing fails, treat as single value
+            return (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                {field.value}
+              </span>
+            );
+          }
+        }
+        // Fallback for other types
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+            {String(field.value)}
+          </span>
+        );
       case 'TEXTAREA':
         return <p className="text-black whitespace-pre-wrap">{field.value}</p>;
       default:

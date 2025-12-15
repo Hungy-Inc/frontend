@@ -19,7 +19,7 @@ export default function ManageShiftsPage() {
   const [addIcon, setAddIcon] = useState("");
   const [addError, setAddError] = useState("");
   const [adding, setAdding] = useState(false);
-  const [editId, setEditId] = useState<number|null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editIcon, setEditIcon] = useState("");
   const [editError, setEditError] = useState("");
@@ -37,13 +37,13 @@ export default function ManageShiftsPage() {
     isRecurring: true,
     shiftType: 'REGULAR' // Add shift type field
   });
-  
+
   // Removed field management state - now handled in dedicated add/edit shift pages
   const [addRecurringError, setAddRecurringError] = useState('');
   const [addingRecurring, setAddingRecurring] = useState(false);
-  const [addRecurringTouched, setAddRecurringTouched] = useState<{[key: string]: boolean}>({});
+  const [addRecurringTouched, setAddRecurringTouched] = useState<{ [key: string]: boolean }>({});
 
-  const [editRecurringId, setEditRecurringId] = useState<number|null>(null);
+  const [editRecurringId, setEditRecurringId] = useState<number | null>(null);
   const [editRecurring, setEditRecurring] = useState({
     name: '',
     newDaysOfWeek: [] as number[],
@@ -55,18 +55,18 @@ export default function ManageShiftsPage() {
     isRecurring: true,
     shiftType: 'REGULAR' // Add shift type field
   });
-  
+
   // Removed edit shift field management state - now handled in dedicated edit shift page
   const [editRecurringError, setEditRecurringError] = useState('');
   const [editingRecurring, setEditingRecurring] = useState(false);
 
   // New state for enhanced features
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
-  
+
   // New state for expandable shifts
   const [expandedShifts, setExpandedShifts] = useState<Set<number>>(new Set());
-  const [shiftOccurrences, setShiftOccurrences] = useState<{[key: number]: any[]}>({});
-  const [loadingOccurrences, setLoadingOccurrences] = useState<{[key: number]: boolean}>({});
+  const [shiftOccurrences, setShiftOccurrences] = useState<{ [key: number]: any[] }>({});
+  const [loadingOccurrences, setLoadingOccurrences] = useState<{ [key: number]: boolean }>({});
   const [shifts, setShifts] = useState<any[]>([]);
 
   // Fetch shift categories for dropdown
@@ -81,13 +81,15 @@ export default function ManageShiftsPage() {
   const [showOccurrenceFilters, setShowOccurrenceFilters] = useState(false);
 
   // Individual shift occurrence filters
-  const [shiftOccurrenceFilters, setShiftOccurrenceFilters] = useState<{[key: number]: {
-    showActive: boolean;
-    showInactive: boolean;
-    searchText: string;
-    monthFilter: string;
-    activeDays: number[]; // Days that are active (selected by default, user can deselect)
-  }}>({});
+  const [shiftOccurrenceFilters, setShiftOccurrenceFilters] = useState<{
+    [key: number]: {
+      showActive: boolean;
+      showInactive: boolean;
+      searchText: string;
+      monthFilter: string;
+      activeDays: number[]; // Days that are active (selected by default, user can deselect)
+    }
+  }>({});
 
   // Default Users Management State
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
@@ -115,11 +117,11 @@ export default function ManageShiftsPage() {
   const [showNoCategoryModal, setShowNoCategoryModal] = useState(false);
 
   // Track original inactive days for each shift to detect changes
-  const [originalInactiveDays, setOriginalInactiveDays] = useState<{[key: number]: number[]}>({});
-  
+  const [originalInactiveDays, setOriginalInactiveDays] = useState<{ [key: number]: number[] }>({});
+
   // Track if there are unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+
   // Confirmation dialog state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
@@ -133,7 +135,7 @@ export default function ManageShiftsPage() {
 
   // Check for unsaved changes across all expanded shifts
   useEffect(() => {
-    const hasAnyUnsavedChanges = Array.from(expandedShifts).some(shiftId => 
+    const hasAnyUnsavedChanges = Array.from(expandedShifts).some(shiftId =>
       hasShiftUnsavedChanges(shiftId)
     );
     setHasUnsavedChanges(hasAnyUnsavedChanges);
@@ -159,17 +161,17 @@ export default function ManageShiftsPage() {
 
       const target = e.target as HTMLElement;
       const link = target.closest('a');
-      
+
       // Check if it's a navigation link (not within this page)
       if (link && link.href && !link.href.includes('#')) {
         const currentPath = window.location.pathname;
         const linkPath = new URL(link.href, window.location.origin).pathname;
-        
+
         // If navigating away from current page
         if (linkPath !== currentPath) {
           e.preventDefault();
           e.stopPropagation();
-          
+
           setPendingNavigation(() => () => {
             window.location.href = link.href;
           });
@@ -286,7 +288,7 @@ export default function ManageShiftsPage() {
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
       const data = await res.json();
-      
+
       setRecurringShifts(data);
     } catch (err) {
       setErrorRecurring("Failed to load shifts.");
@@ -391,9 +393,9 @@ export default function ManageShiftsPage() {
     setAddRecurringError('');
     try {
       const token = localStorage.getItem("token");
-      
+
       let startTime, endTime;
-      
+
       if (addRecurring.isRecurring) {
         // Recurring shift - use time inputs with current date
         if (addRecurring.startTime && addRecurring.endTime) {
@@ -424,7 +426,7 @@ export default function ManageShiftsPage() {
           endTime = addRecurring.endTime;
         }
       }
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
         method: 'POST',
         headers: {
@@ -443,7 +445,7 @@ export default function ManageShiftsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to add shift');
-      
+
       // Add default users if any are selected
       if (selectedDefaultUsers.length > 0) {
         try {
@@ -462,9 +464,9 @@ export default function ManageShiftsPage() {
           toast.warning('Shift created but failed to assign default users. You can assign them later.');
         }
       }
-      
+
       toast.success(`${addRecurring.isRecurring ? 'Recurring' : 'One-time'} shift added successfully!`);
-      
+
       setShowAddRecurring(false);
       setAddRecurring({ name: '', newDaysOfWeek: [], startTime: '', endTime: '', shiftCategoryId: '', location: '', slots: 1, isRecurring: true, shiftType: 'REGULAR' });
       setSelectedDefaultUsers([]);
@@ -482,13 +484,13 @@ export default function ManageShiftsPage() {
   const handleEditRecurring = (shift: any) => {
     console.log('Opening edit modal for shift:', shift); // Debug log
     setEditRecurringId(shift.id);
-    
+
     if (shift.isRecurring) {
       // Recurring shift - extract time from datetime
-      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
-        ? shift.newDaysOfWeek 
+      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0
+        ? shift.newDaysOfWeek
         : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
-      
+
       setEditRecurring({
         name: shift.name,
         newDaysOfWeek: daysOfWeek,
@@ -515,7 +517,7 @@ export default function ManageShiftsPage() {
       });
     }
     setEditRecurringError('');
-    
+
     // Load existing default users for this shift
     console.log('Fetching default users for shift ID:', shift.id); // Debug log
     fetchDefaultUsersForShift(shift.id);
@@ -546,9 +548,9 @@ export default function ManageShiftsPage() {
     setEditRecurringError('');
     try {
       const token = localStorage.getItem("token");
-      
+
       let startTime, endTime;
-      
+
       if (editRecurring.isRecurring) {
         // Recurring shift - use time inputs with current date
         if (editRecurring.startTime && editRecurring.endTime) {
@@ -579,7 +581,7 @@ export default function ManageShiftsPage() {
           endTime = editRecurring.endTime;
         }
       }
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
         method: 'PUT',
         headers: {
@@ -597,7 +599,7 @@ export default function ManageShiftsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update shift');
-      
+
       // Update default users if any are selected
       try {
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}/default-users`, {
@@ -614,9 +616,9 @@ export default function ManageShiftsPage() {
         console.error('Failed to update default users:', err);
         toast.warning('Shift updated but failed to update default users. You can update them later.');
       }
-      
+
       toast.success('Shift updated successfully!');
-      
+
       setShowAddRecurring(false);
       setEditRecurringId(null);
       setEditRecurring({
@@ -702,17 +704,17 @@ export default function ManageShiftsPage() {
   const calculateNextOccurrences = (shift: any, targetMonth?: number, targetYear?: number) => {
     // if (!shift || !shift.isRecurring || shift.dayOfWeek === null) return [];
     if (!shift || !shift.isRecurring) return [];
-    
+
     const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 ? shift.newDaysOfWeek : [shift.dayOfWeek];
     if (daysOfWeek.length === 0) return [];
-    
+
     const occurrences = [];
-    
+
     // If target month/year is specified, generate occurrences for that specific month only
     if (targetMonth !== undefined && targetYear !== undefined) {
       const startDate = new Date(targetYear, targetMonth, 1);
       const endDate = new Date(targetYear, targetMonth + 1, 0); // Last day of the month
-      
+
       // Generate occurrences for each day of the week in this month
       for (const dayOfWeek of daysOfWeek) {
         // Find the first occurrence of this day of week in the target month
@@ -720,29 +722,29 @@ export default function ManageShiftsPage() {
         while (currentDate.getDay() !== dayOfWeek) {
           currentDate.setDate(currentDate.getDate() + 1);
         }
-        
+
         // Generate occurrences for this day of week in this month
         while (currentDate <= endDate) {
           // Create date without time to avoid timezone issues
           const occurrenceDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-          
+
           // Set the time for this occurrence
           const startTime = new Date(shift.startTime);
           const endTime = new Date(shift.endTime);
-          
+
           const occurrenceStart = new Date(occurrenceDate);
           occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-          
+
           const occurrenceEnd = new Date(occurrenceDate);
           occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
-          
+
           occurrences.push({
             date: occurrenceDate,
             startTime: occurrenceStart,
             endTime: occurrenceEnd,
             dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][occurrenceDate.getDay()]
           });
-          
+
           // Move to next week
           currentDate.setDate(currentDate.getDate() + 7);
         }
@@ -751,31 +753,31 @@ export default function ManageShiftsPage() {
       // Default behavior: Generate 52 occurrences (one year) from current date
       const today = new Date();
       let startDate = new Date();
-      
+
       // Generate occurrences for each day of the week
       for (const dayOfWeek of daysOfWeek) {
         const startDateDay = startDate.getDay();
         let dayDiff = dayOfWeek - startDateDay;
-        
+
         // If start date is the recurring day, start from next week
         if (dayDiff < 0) dayDiff += 7;
-        
+
         // Generate 52 occurrences (one year of weekly shifts) for this day
         for (let i = 0; i < 52; i++) {
           // Create date without time to avoid timezone issues - use proper setDate method
           const occurrenceDate = new Date(startDate);
           occurrenceDate.setDate(startDate.getDate() + dayDiff + (i * 7));
-          
+
           // Set the time for this occurrence
           const startTime = new Date(shift.startTime);
           const endTime = new Date(shift.endTime);
-          
+
           const occurrenceStart = new Date(occurrenceDate);
           occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-          
+
           const occurrenceEnd = new Date(occurrenceDate);
           occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
-          
+
           // Debug first few occurrences
           if (i < 3) {
             console.log(`🔍 MANAGE-SHIFTS OCCURRENCE ${i}:`, {
@@ -798,7 +800,7 @@ export default function ManageShiftsPage() {
               }
             });
           }
-          
+
           occurrences.push({
             date: occurrenceDate,
             startTime: occurrenceStart,
@@ -808,14 +810,14 @@ export default function ManageShiftsPage() {
         }
       }
     }
-    
+
     return occurrences;
   };
 
   // Handle expand/collapse of shift occurrences
   const handleToggleExpand = async (shiftId: number) => {
     const newExpandedShifts = new Set(expandedShifts);
-    
+
     if (newExpandedShifts.has(shiftId)) {
       // Collapse
       newExpandedShifts.delete(shiftId);
@@ -824,13 +826,13 @@ export default function ManageShiftsPage() {
       // Expand - load occurrences
       newExpandedShifts.add(shiftId);
       setExpandedShifts(newExpandedShifts);
-      
+
       // Initialize filters for this shift
       initializeShiftFilters(shiftId);
-      
+
       // Set loading state
       setLoadingOccurrences(prev => ({ ...prev, [shiftId]: true }));
-      
+
       try {
         // Calculate next 52 occurrences (default behavior - no month filtering)
         const shift = recurringShifts.find(s => s.id === shiftId);
@@ -851,7 +853,7 @@ export default function ManageShiftsPage() {
   const getOccurrenceStatus = (shiftId: number, occurrenceDate: Date) => {
     const filters = shiftOccurrenceFilters[shiftId];
     const dayOfWeek = occurrenceDate.getDay();
-    
+
     // Check if there's a shift for this occurrence in the shifts data
     const existingShift = shifts.find((s: any) => {
       if (s.recurringShiftId !== shiftId) return false;
@@ -859,7 +861,7 @@ export default function ManageShiftsPage() {
       // Compare dates using toDateString() for consistent comparison
       return shiftDate.toDateString() === occurrenceDate.toDateString();
     });
-    
+
     console.log('🔍 GET OCCURRENCE STATUS:', {
       shiftId,
       occurrenceDate: occurrenceDate.toDateString(),
@@ -870,18 +872,18 @@ export default function ManageShiftsPage() {
       totalShifts: shifts.length,
       shiftsForRecurring: shifts.filter(s => s.recurringShiftId === shiftId).length
     });
-    
+
     // If a shift exists, return its isActive status (this takes priority)
     if (existingShift) {
       return existingShift.isActive;
     }
-    
+
     // If no shift exists, check if this day is in the activeDays filter
     // If activeDays filter exists and this day is not in it, the occurrence is inactive
     if (filters && filters.activeDays && !filters.activeDays.includes(dayOfWeek)) {
       return false;
     }
-    
+
     // Default: no shift exists and day is active, so it's considered active
     return true;
   };
@@ -890,16 +892,16 @@ export default function ManageShiftsPage() {
   const toggleOccurrenceStatus = async (shiftId: number, occurrenceDate: Date) => {
     try {
       const token = localStorage.getItem("token");
-      
+
       // First, check if a shift exists for this occurrence
       const shift = recurringShifts.find(s => s.id === shiftId);
       if (!shift) throw new Error('Shift not found');
-      
+
       // Check if shift exists for this date
       const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (checkRes.ok) {
         const existingShifts = await checkRes.json();
         const existingShift = existingShifts.find((s: any) => {
@@ -907,7 +909,7 @@ export default function ManageShiftsPage() {
           // Use consistent date comparison
           return shiftDate.toDateString() === occurrenceDate.toDateString() && s.recurringShiftId === shiftId;
         });
-        
+
         if (existingShift) {
           // Update existing shift using the toggle-active endpoint
           const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${existingShift.id}/toggle-active`, {
@@ -915,18 +917,18 @@ export default function ManageShiftsPage() {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({ isActive: !existingShift.isActive })
           });
-          
+
           if (!updateRes.ok) {
             const errorData = await updateRes.json();
             throw new Error(errorData.error || 'Failed to update shift status');
           }
-          
+
           toast.success(`Occurrence ${existingShift.isActive ? 'deactivated' : 'activated'} successfully`);
         } else {
           // No shift exists yet. Determine the desired status based on current display status
           const currentStatus = getOccurrenceStatus(shiftId, occurrenceDate);
           const desiredStatus = !currentStatus; // Toggle the current status
-          
+
           // Create new shift for this occurrence using proper endpoint
           const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shiftId}`, {
             method: 'POST',
@@ -936,30 +938,30 @@ export default function ManageShiftsPage() {
               customSlots: shift.slots
             })
           });
-          
+
           if (!createRes.ok) {
             const errorData = await createRes.json();
             throw new Error(errorData.error || 'Failed to create shift');
           }
-          
+
           const result = await createRes.json();
           const createdShift = result.shift;
-          
+
           // Set the shift to the desired status
           const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${createdShift.id}/toggle-active`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({ isActive: desiredStatus })
           });
-          
+
           if (!updateRes.ok) {
             const errorData = await updateRes.json();
             throw new Error(errorData.error || `Failed to ${desiredStatus ? 'activate' : 'deactivate'} shift`);
           }
-          
+
           toast.success(`Occurrence created and ${desiredStatus ? 'activated' : 'deactivated'} successfully`);
         }
-        
+
         // Refresh the shifts data and occurrences
         console.log('🔍 REFRESHING DATA AFTER TOGGLE...');
         await fetchShifts();
@@ -1010,7 +1012,7 @@ export default function ManageShiftsPage() {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
-    
+
     // Start from current month and go forward 12 months
     for (let i = 0; i < 12; i++) {
       const monthIndex = (currentMonth + i) % 12;
@@ -1022,7 +1024,7 @@ export default function ManageShiftsPage() {
         year: year
       });
     }
-    
+
     return months;
   };
 
@@ -1036,7 +1038,7 @@ export default function ManageShiftsPage() {
   // Group occurrences by month for better organization
   const groupOccurrencesByMonth = (occurrences: any[]) => {
     const grouped: { [key: string]: any[] } = {};
-    
+
     occurrences.forEach(occurrence => {
       const monthKey = `${occurrence.date.getFullYear()}-${occurrence.date.getMonth()}`;
       if (!grouped[monthKey]) {
@@ -1044,7 +1046,7 @@ export default function ManageShiftsPage() {
       }
       grouped[monthKey].push(occurrence);
     });
-    
+
     return grouped;
   };
 
@@ -1084,20 +1086,20 @@ export default function ManageShiftsPage() {
   const initializeShiftFilters = (shiftId: number) => {
     if (!shiftOccurrenceFilters[shiftId]) {
       const shift = recurringShifts.find(s => s.id === shiftId);
-      const daysOfWeek = shift?.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
-        ? shift.newDaysOfWeek 
+      const daysOfWeek = shift?.newDaysOfWeek && shift.newDaysOfWeek.length > 0
+        ? shift.newDaysOfWeek
         : (shift?.dayOfWeek !== null ? [shift?.dayOfWeek] : []);
-      
+
       // Initialize activeDays with all days from newDaysOfWeek, excluding inactiveDays
       const inactiveDays = shift?.inactiveDays || [];
       const activeDays = daysOfWeek.filter((day: number) => !inactiveDays.includes(day));
-      
+
       // Store original inactive days for this shift
       setOriginalInactiveDays(prev => ({
         ...prev,
         [shiftId]: [...inactiveDays]
       }));
-      
+
       setShiftOccurrenceFilters(prev => ({
         ...prev,
         [shiftId]: {
@@ -1121,7 +1123,7 @@ export default function ManageShiftsPage() {
       const [year, month] = filters.monthFilter.split('-').map(Number);
       if (isNaN(year) || isNaN(month)) return occurrences; // Safety check for invalid month/year
       const monthOccurrences = calculateNextOccurrences(shift, month, year);
-      
+
       // Apply other filters to the month-specific occurrences
       return monthOccurrences.filter(occurrence => {
         // Don't show past occurrences (completed)
@@ -1144,13 +1146,13 @@ export default function ManageShiftsPage() {
         if (filters.searchText) {
           const searchLower = filters.searchText.toLowerCase();
           const dayName = occurrence.dayName.toLowerCase();
-          const dateStr = occurrence.date.toLocaleDateString('en-CA', { 
-            month: 'short', 
-            day: 'numeric', 
+          const dateStr = occurrence.date.toLocaleDateString('en-CA', {
+            month: 'short',
+            day: 'numeric',
             year: 'numeric',
             timeZone: 'America/Halifax'
           }).toLowerCase();
-          
+
           if (!dayName.includes(searchLower) && !dateStr.includes(searchLower)) {
             return false;
           }
@@ -1166,7 +1168,7 @@ export default function ManageShiftsPage() {
     if (occurrences.length === 0 || occurrences.length < 52) {
       defaultOccurrences = calculateNextOccurrences(shift); // Generate default 52 occurrences
     }
-    
+
     // Apply filters to the default occurrences
     return defaultOccurrences.filter(occurrence => {
       // Don't show past occurrences (completed)
@@ -1189,13 +1191,13 @@ export default function ManageShiftsPage() {
       if (filters.searchText) {
         const searchLower = filters.searchText.toLowerCase();
         const dayName = occurrence.dayName.toLowerCase();
-        const dateStr = occurrence.date.toLocaleDateString('en-CA', { 
-          month: 'short', 
-          day: 'numeric', 
+        const dateStr = occurrence.date.toLocaleDateString('en-CA', {
+          month: 'short',
+          day: 'numeric',
           year: 'numeric',
           timeZone: 'America/Halifax'
         }).toLowerCase();
-        
+
         if (!dayName.includes(searchLower) && !dateStr.includes(searchLower)) {
           return false;
         }
@@ -1221,10 +1223,10 @@ export default function ManageShiftsPage() {
     const shift = recurringShifts.find(s => s.id === shiftId);
     if (!shift) return false;
 
-    const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
-      ? shift.newDaysOfWeek 
+    const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0
+      ? shift.newDaysOfWeek
       : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
-    
+
     const activeDays = shiftOccurrenceFilters[shiftId]?.activeDays || [];
     const currentInactiveDays = daysOfWeek.filter((day: number) => !activeDays.includes(day));
     const originalInactive = originalInactiveDays[shiftId] || [];
@@ -1285,19 +1287,19 @@ export default function ManageShiftsPage() {
         return;
       }
 
-      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
-        ? shift.newDaysOfWeek 
+      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0
+        ? shift.newDaysOfWeek
         : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
-      
+
       const activeDays = shiftOccurrenceFilters[shiftId]?.activeDays || [];
       const inactiveDays = daysOfWeek.filter((day: number) => !activeDays.includes(day));
 
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ inactiveDays })
       });
@@ -1308,17 +1310,17 @@ export default function ManageShiftsPage() {
       }
 
       toast.success('Inactive days saved successfully');
-      
+
       // Update original inactive days to reflect the saved state
       setOriginalInactiveDays(prev => ({
         ...prev,
         [shiftId]: [...inactiveDays]
       }));
-      
+
       // Refresh recurring shifts to get updated data
       await fetchRecurringShifts();
       await fetchShifts();
-      
+
       // Refresh occurrences for this shift to reflect the changes
       const occurrences = calculateNextOccurrences(shift);
       setShiftOccurrences(prev => ({ ...prev, [shiftId]: occurrences }));
@@ -1351,8 +1353,8 @@ export default function ManageShiftsPage() {
         }
       }
     });
-    
-    
+
+
     setSelectedShift(shift);
     setSelectedRecurringShift(shift); // Keep track of the recurring shift
     setSelectedOccurrence(occurrence);
@@ -1361,7 +1363,7 @@ export default function ManageShiftsPage() {
     setUserSearchTerm('');
     setAbsenceReason('');
     setAbsenceType('UNAVAILABLE');
-    
+
     // Fetch default users and absences for this occurrence
     await fetchDefaultUsersAndAbsencesForOccurrence(shift, occurrence);
   };
@@ -1370,7 +1372,7 @@ export default function ManageShiftsPage() {
     setLoadingAbsences(true);
     try {
       const token = localStorage.getItem("token");
-      
+
       console.log('🔍 FETCH DEFAULT USERS CALLED:', {
         '=== FUNCTION CALL ===': {
           shiftId: shift.id,
@@ -1384,19 +1386,19 @@ export default function ManageShiftsPage() {
           stack: new Error().stack
         }
       });
-      
+
       // Fetch default users for the recurring shift
       console.log('Fetching default users for recurring shift:', shift.id);
       const defaultUsersRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shift.id}/default-users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       console.log('Default users response:', {
         status: defaultUsersRes.status,
         ok: defaultUsersRes.ok,
         statusText: defaultUsersRes.statusText
       });
-      
+
       // Find or create the actual shift instance for this occurrence
       console.log('Date conversion debugging:', {
         originalDate: occurrence.date,
@@ -1406,21 +1408,21 @@ export default function ManageShiftsPage() {
         isoDateOnly: occurrence.date.toISOString().split('T')[0],
         timezoneOffset: occurrence.date.getTimezoneOffset()
       });
-      
+
       // Create timezone-safe date string by using the original date components
       // This avoids any timezone conversion issues
       const year = occurrence.date.getFullYear();
       const month = occurrence.date.getMonth() + 1;
       const day = occurrence.date.getDate();
-      
+
       // Also try alternative methods to see what's different
       const utcYear = occurrence.date.getUTCFullYear();
       const utcMonth = occurrence.date.getUTCMonth() + 1;
       const utcDay = occurrence.date.getUTCDate();
-      
+
       const occurrenceDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const utcOccurrenceDate = `${utcYear}-${String(utcMonth).padStart(2, '0')}-${String(utcDay).padStart(2, '0')}`;
-      
+
       console.log('🔍 MANAGE-SHIFTS DATE DEBUGGING:', {
         '=== OCCURRENCE OBJECT ===': {
           occurrence: occurrence,
@@ -1442,14 +1444,14 @@ export default function ManageShiftsPage() {
           finalUtcDate: utcOccurrenceDate
         }
       });
-      
+
       console.log('🎯 FINAL OCCURRENCE DATE (using local):', occurrenceDate);
-      
+
       // First, check if shift exists for this occurrence using the same logic as backend
       const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shift.id}/check/${occurrenceDate}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       let actualShift = null;
       if (checkRes.ok) {
         const checkData = await checkRes.json();
@@ -1459,7 +1461,7 @@ export default function ManageShiftsPage() {
           occurrenceDate,
           recurringShiftId: shift.id
         });
-        
+
         if (checkData.exists && checkData.shift) {
           actualShift = checkData.shift;
           console.log('Found existing shift:', { id: actualShift.id, name: actualShift.name });
@@ -1469,7 +1471,7 @@ export default function ManageShiftsPage() {
       } else {
         console.error('Failed to check for existing shift:', checkRes.status, checkRes.statusText);
       }
-      
+
       // If no shift exists, create one
       if (!actualShift) {
         console.log('🔍 CREATING SHIFT FOR OCCURRENCE:', {
@@ -1487,7 +1489,7 @@ export default function ManageShiftsPage() {
             token: token ? 'Present' : 'Missing'
           }
         });
-        
+
         const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shift.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -1495,17 +1497,17 @@ export default function ManageShiftsPage() {
             date: occurrenceDate
           })
         });
-        
+
         console.log('Shift creation response:', {
           status: createRes.status,
           ok: createRes.ok,
           statusText: createRes.statusText
         });
-        
+
         if (createRes.ok) {
           const result = await createRes.json();
           actualShift = result.shift;
-          
+
           if (result.message === 'Using existing shift for this occurrence') {
             toast.info('Using existing shift for this occurrence');
           } else {
@@ -1517,10 +1519,10 @@ export default function ManageShiftsPage() {
           throw new Error(`Failed to create shift for this occurrence: ${errorData.error || 'Unknown error'}`);
         }
       }
-      
+
       // Update selectedShift to the actual shift instance
       setSelectedShift(actualShift);
-      
+
       // Fetch absences for this specific shift instance
       const absencesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${actualShift.id}/absences`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -1544,8 +1546,8 @@ export default function ManageShiftsPage() {
   };
 
   const handleUserSelection = (userId: number) => {
-    setSelectedUsersForAbsence(prev => 
-      prev.includes(userId) 
+    setSelectedUsersForAbsence(prev =>
+      prev.includes(userId)
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     );
@@ -1556,8 +1558,8 @@ export default function ManageShiftsPage() {
       toast.error("Please select at least one user");
       return;
     }
-    
-    
+
+
     console.log('🔍 HANDLE MAKE ABSENCE CALLED:', {
       '=== SELECTED SHIFT ===': {
         selectedShiftId: selectedShift.id,
@@ -1571,12 +1573,12 @@ export default function ManageShiftsPage() {
         absenceType
       }
     });
-    
+
     try {
       const token = localStorage.getItem("token");
-      
+
       // Create absence requests for all selected users
-      const promises = selectedUsersForAbsence.map(userId => 
+      const promises = selectedUsersForAbsence.map(userId =>
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${selectedShift.id}/absences`, {
           method: 'POST',
           headers: {
@@ -1595,16 +1597,16 @@ export default function ManageShiftsPage() {
 
       const responses = await Promise.all(promises);
       const failedRequests = responses.filter(res => !res.ok);
-      
+
       if (failedRequests.length > 0) {
         throw new Error(`Failed to request absence for ${failedRequests.length} user(s)`);
       }
-      
+
       toast.success(`Absence requested successfully for ${selectedUsersForAbsence.length} user(s)`);
       setSelectedUsersForAbsence([]);
       setAbsenceReason('');
       setAbsenceType('UNAVAILABLE');
-      
+
       // Refresh data
       await fetchDefaultUsersAndAbsencesForOccurrence(selectedRecurringShift, selectedOccurrence);
     } catch (err) {
@@ -1614,7 +1616,7 @@ export default function ManageShiftsPage() {
 
   const handleAbsenceAction = async (absenceId: number, isApproved: boolean) => {
     if (!selectedShift) return;
-    
+
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${selectedShift.id}/absences/${absenceId}`, {
@@ -1629,9 +1631,9 @@ export default function ManageShiftsPage() {
       });
 
       if (!res.ok) throw new Error(`Failed to ${isApproved ? 'approve' : 'reject'} absence`);
-      
+
       toast.success(`Absence ${isApproved ? 'approved' : 'rejected'} successfully`);
-      
+
       // Refresh data
       await fetchDefaultUsersAndAbsencesForOccurrence(selectedRecurringShift, selectedOccurrence);
     } catch (err) {
@@ -1641,7 +1643,7 @@ export default function ManageShiftsPage() {
 
   const handleRemoveAbsence = async (absenceId: number) => {
     if (!selectedShift) return;
-    
+
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${selectedShift.id}/absences/${absenceId}`, {
@@ -1652,9 +1654,9 @@ export default function ManageShiftsPage() {
       });
 
       if (!res.ok) throw new Error("Failed to remove absence");
-      
+
       toast.success("Absence removed successfully - user is now present");
-      
+
       // Refresh data
       await fetchDefaultUsersAndAbsencesForOccurrence(selectedRecurringShift, selectedOccurrence);
     } catch (err) {
@@ -1698,7 +1700,7 @@ export default function ManageShiftsPage() {
         >
           Shift Categories
         </button>
-       </div>
+      </div>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, minHeight: 200, position: 'relative' }}>
         {tab === 'shiftcategory' && (
           <>
@@ -1755,10 +1757,10 @@ export default function ManageShiftsPage() {
                       {addName.trim() && categories.find(
                         cat => cat.name.toLowerCase() === addName.trim().toLowerCase()
                       ) && (
-                        <div style={{ color: '#f44336', fontSize: 12, marginTop: 4 }}>
-                          Category "{addName.trim()}" already exists
-                        </div>
-                      )}
+                          <div style={{ color: '#f44336', fontSize: 12, marginTop: 4 }}>
+                            Category "{addName.trim()}" already exists
+                          </div>
+                        )}
                     </div>
                     <input placeholder="Icon (optional)" value={addIcon} onChange={e => setAddIcon(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                     {addError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{addError}</div>}
@@ -1805,7 +1807,7 @@ export default function ManageShiftsPage() {
                 </select>
                 <select value={filterDay} onChange={e => setFilterDay(e.target.value)} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee', minWidth: 180 }}>
                   <option value="">All Days</option>
-                  {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                  {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, i) => (
                     <option key={i} value={i}>{day}</option>
                   ))}
                 </select>
@@ -1833,7 +1835,7 @@ export default function ManageShiftsPage() {
                   setShowNoCategoryModal(true);
                   return;
                 }
-                
+
                 // Redirect to full Add Shift page
                 safeNavigate('/add-shift');
               }} style={{ background: 'none', border: 'none', color: '#ff9800', fontSize: 28, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Add Shift">
@@ -1908,9 +1910,9 @@ export default function ManageShiftsPage() {
                           </td>
                           <td style={{ padding: '12px 0' }}>{shift.name}</td>
                           <td style={{ padding: 12 }}>
-                            <span style={{ 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
                               gap: 4,
                               padding: '2px 8px',
                               borderRadius: 12,
@@ -1924,58 +1926,58 @@ export default function ManageShiftsPage() {
                             </span>
                           </td>
                           <td style={{ padding: 12 }}>
-                            {shift.isRecurring ? 
-                            // ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek || 0] :
+                            {shift.isRecurring ?
+                              // ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][shift.dayOfWeek || 0] :
                               (() => {
                                 const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 ? shift.newDaysOfWeek : [shift.dayOfWeek];
-                                const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                                 return daysOfWeek.map((day: number) => dayNames[day]).join(', ');
                               })() :
-                              new Date(shift.startTime).toLocaleDateString('en-CA', { 
-                                month: 'short', 
-                                day: 'numeric', 
+                              new Date(shift.startTime).toLocaleDateString('en-CA', {
+                                month: 'short',
+                                day: 'numeric',
                                 year: 'numeric',
                                 timeZone: 'America/Halifax'
                               })
                             }
                           </td>
                           <td style={{ padding: 12 }}>
-                            {shift.startTime ? new Date(shift.startTime).toLocaleTimeString('en-CA', { 
-                              hour: '2-digit', 
-                              minute: '2-digit', 
-                              hour12: false, 
-                              timeZone: 'America/Halifax' 
+                            {shift.startTime ? new Date(shift.startTime).toLocaleTimeString('en-CA', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                              timeZone: 'America/Halifax'
                             }) : ''}
                           </td>
                           <td style={{ padding: 12 }}>
-                            {shift.endTime ? new Date(shift.endTime).toLocaleTimeString('en-CA', { 
-                              hour: '2-digit', 
-                              minute: '2-digit', 
-                              hour12: false, 
-                              timeZone: 'America/Halifax' 
+                            {shift.endTime ? new Date(shift.endTime).toLocaleTimeString('en-CA', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                              timeZone: 'America/Halifax'
                             }) : ''}
                           </td>
                           <td style={{ padding: 12 }}>{shift.location}</td>
                           <td style={{ padding: 12 }}>{shift.slots}</td>
                           <td style={{ padding: 12, textAlign: 'center' }}>
-                            <button 
+                            <button
                               onClick={() => toggleActive(shift.id, shift.isActive)}
-                              style={{ 
-                                background: 'none', 
-                                border: 'none', 
-                                color: shift.isActive ? '#4caf50' : '#9e9e9e', 
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: shift.isActive ? '#4caf50' : '#9e9e9e',
                                 cursor: 'pointer',
                                 fontSize: 16
-                              }} 
+                              }}
                               title={shift.isActive ? 'Deactivate' : 'Activate'}
                             >
                               {shift.isActive ? <FaToggleOn /> : <FaToggleOff />}
                             </button>
                           </td>
                           <td style={{ padding: 12, textAlign: 'center' }}>
-                            <button 
-                              style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }} 
-                              title="Edit" 
+                            <button
+                              style={{ background: 'none', border: 'none', color: '#ff9800', cursor: 'pointer', marginRight: 12 }}
+                              title="Edit"
                               onClick={() => safeNavigate(`/edit-shift/${shift.id}`)}
                             >
                               <FaEdit />
@@ -1989,17 +1991,17 @@ export default function ManageShiftsPage() {
                         {expandedShifts.has(shift.id) && shift.isRecurring && (
                           <tr>
                             <td colSpan={10} style={{ padding: 0, borderBottom: '1px solid #f0f0f0' }}>
-                              <div style={{ 
-                                background: '#f8f9fa', 
+                              <div style={{
+                                background: '#f8f9fa',
                                 padding: '16px 24px',
                                 borderLeft: '4px solid #ff9800'
                               }}>
 
-                                
+
                                 {/* Occurrences Summary */}
-                                <div style={{ 
-                                  display: 'flex', 
-                                  gap: '16px', 
+                                <div style={{
+                                  display: 'flex',
+                                  gap: '16px',
                                   marginBottom: '16px',
                                   padding: '12px',
                                   background: '#fff',
@@ -2028,17 +2030,17 @@ export default function ManageShiftsPage() {
                                 </div>
 
                                 {/* Occurrence Filters - Inside each expanded section */}
-                                <div style={{ 
+                                <div style={{
                                   marginBottom: '16px',
                                   padding: '16px',
                                   background: '#fff',
                                   borderRadius: '8px',
                                   border: '1px solid #e0e0e0'
-                              }}>
-                                <div style={{ 
-                                  fontWeight: 600, 
-                                    fontSize: '13px', 
-                                  color: '#333', 
+                                }}>
+                                  <div style={{
+                                    fontWeight: 600,
+                                    fontSize: '13px',
+                                    color: '#333',
                                     marginBottom: '12px',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -2046,11 +2048,11 @@ export default function ManageShiftsPage() {
                                   }}>
                                     🔍 Filter Occurrences
                                   </div>
-                                  
+
                                   {/* Simple Month Filter */}
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: '12px',
                                     marginBottom: '16px',
                                     padding: '12px',
@@ -2059,7 +2061,7 @@ export default function ManageShiftsPage() {
                                     border: '1px solid #e9ecef'
                                   }}>
                                     <span style={{ fontWeight: 600, color: '#666', fontSize: '12px' }}>Month Filter:</span>
-                                    
+
                                     <select
                                       value={shiftOccurrenceFilters[shift.id]?.monthFilter ?? ''}
                                       onChange={(e) => updateShiftFilter(shift.id, 'monthFilter', e.target.value)}
@@ -2082,9 +2084,9 @@ export default function ManageShiftsPage() {
                                   </div>
 
                                   {/* Day Filter - Show/Hide Days of Week */}
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: '12px',
                                     marginBottom: '16px',
                                     padding: '12px',
@@ -2094,20 +2096,20 @@ export default function ManageShiftsPage() {
                                     flexWrap: 'wrap'
                                   }}>
                                     <span style={{ fontWeight: 600, color: '#666', fontSize: '12px' }}>Active Days:</span>
-                                    
+
                                     {(() => {
-                                      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
-                                        ? shift.newDaysOfWeek 
+                                      const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0
+                                        ? shift.newDaysOfWeek
                                         : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
                                       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                                      
+
                                       return daysOfWeek.map((day: number) => {
                                         const isActive = shiftOccurrenceFilters[shift.id]?.activeDays?.includes(day) ?? true;
                                         return (
-                                          <label 
+                                          <label
                                             key={day}
-                                            style={{ 
-                                              fontSize: '12px', 
+                                            style={{
+                                              fontSize: '12px',
                                               color: isActive ? '#333' : '#999',
                                               display: 'flex',
                                               alignItems: 'center',
@@ -2128,13 +2130,13 @@ export default function ManageShiftsPage() {
                                                 const newActiveDays = e.target.checked
                                                   ? [...currentActiveDays, day]
                                                   : currentActiveDays.filter(d => d !== day);
-                                                
+
                                                 updateShiftFilter(shift.id, 'activeDays', newActiveDays);
-                                                
+
                                                 // Immediately update local shifts state to reflect UI changes
                                                 // When a day is re-selected (checked), mark all existing shifts for that day as active
                                                 // When a day is deselected (unchecked), mark all existing shifts for that day as inactive
-                                                setShifts(prevShifts => 
+                                                setShifts(prevShifts =>
                                                   prevShifts.map(s => {
                                                     if (s.recurringShiftId === shift.id) {
                                                       const shiftDate = new Date(s.startTime);
@@ -2154,7 +2156,7 @@ export default function ManageShiftsPage() {
                                         );
                                       });
                                     })()}
-                                    
+
                                     {/* Save Inactive Days Button */}
                                     {(() => {
                                       const hasChanges = hasShiftUnsavedChanges(shift.id);
@@ -2187,10 +2189,10 @@ export default function ManageShiftsPage() {
                                       );
                                     })()}
                                   </div>
-                                  
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    gap: '12px', 
+
+                                  <div style={{
+                                    display: 'flex',
+                                    gap: '12px',
                                     alignItems: 'center',
                                     flexWrap: 'wrap'
                                   }}>
@@ -2234,12 +2236,12 @@ export default function ManageShiftsPage() {
                                     {/* Clear Filters */}
                                     <button
                                       onClick={() => {
-                                        const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0 
-                                          ? shift.newDaysOfWeek 
+                                        const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0
+                                          ? shift.newDaysOfWeek
                                           : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
                                         const inactiveDays = shift.inactiveDays || [];
                                         const activeDays = daysOfWeek.filter((day: number) => !inactiveDays.includes(day));
-                                        
+
                                         setShiftOccurrenceFilters(prev => ({
                                           ...prev,
                                           [shift.id]: {
@@ -2266,7 +2268,7 @@ export default function ManageShiftsPage() {
                                   </div>
 
                                   {/* Filter Results Summary */}
-                                  <div style={{ 
+                                  <div style={{
                                     marginTop: '12px',
                                     padding: '8px 12px',
                                     background: '#f0f8ff',
@@ -2291,10 +2293,10 @@ export default function ManageShiftsPage() {
                                       const groupedOccurrences = groupOccurrencesByMonth(filteredOccurrences);
                                       return Object.entries(groupedOccurrences).map(([monthKey, monthOccurrences]) => (
                                         <div key={monthKey} style={{ marginBottom: '20px' }}>
-                                          <div style={{ 
-                                            fontWeight: 600, 
-                                            fontSize: 13, 
-                                            color: '#666', 
+                                          <div style={{
+                                            fontWeight: 600,
+                                            fontSize: 13,
+                                            color: '#666',
                                             marginBottom: '12px',
                                             padding: '8px 12px',
                                             background: '#fff',
@@ -2303,114 +2305,114 @@ export default function ManageShiftsPage() {
                                           }}>
                                             {getMonthNameFromKey(monthKey)} ({monthOccurrences.length} occurrences)
                                           </div>
-                                          <div style={{ 
-                                            display: 'grid', 
-                                            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-                                            gap: '12px' 
+                                          <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                            gap: '12px'
                                           }}>
                                             {monthOccurrences.map((occurrence, index) => (
-                                      <div key={index} style={{
-                                        background: '#fff', 
-                                        border: `1px solid ${getOccurrenceStatus(shift.id, occurrence.date) ? '#e0e0e0' : '#dee2e6'}`,
-                                        borderRadius: '8px',
-                                        padding: '12px',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        // opacity: getOccurrenceStatus(shift.id, occurrence.date) ? 1 : 0.7
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor = '#ff9800';
-                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(255, 152, 0, 0.1)';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = '#e0e0e0';
-                                        e.currentTarget.style.boxShadow = 'none';
-                                      }}>
-                                        <div style={{ flex: 1 }}>
-                                          <div style={{ 
-                                            fontWeight: 600, 
-                                            fontSize: 14, 
-                                            color: '#333',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px'
-                                          }}>
-                                            {occurrence.dayName}, {occurrence.date.toLocaleDateString('en-CA', { 
-                                              month: 'short', 
-                                              day: 'numeric', 
-                                              year: 'numeric',
-                                              timeZone: 'America/Halifax'
-                                            })}
-                                            {!getOccurrenceStatus(shift.id, occurrence.date) && (
-                                              <span style={{
-                                                background: '#dc3545',
-                                                color: 'white',
-                                                fontSize: '10px',
-                                                padding: '2px 6px',
-                                                borderRadius: '12px',
-                                                fontWeight: 500
-                                              }}>
-                                                INACTIVE
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div style={{ fontSize: 12, color: '#666', marginTop: '4px' }}>
-                                            {occurrence.startTime.toLocaleTimeString('en-CA', { 
-                                              hour: '2-digit', 
-                                              minute: '2-digit', 
-                                              hour12: false, 
-                                              timeZone: 'America/Halifax' 
-                                            })} - {occurrence.endTime.toLocaleTimeString('en-CA', { 
-                                              hour: '2-digit', 
-                                              minute: '2-digit', 
-                                              hour12: false, 
-                                              timeZone: 'America/Halifax' 
-                                            })}
-                                          </div>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleOccurrenceClick(shift, occurrence);
-                                            }}
-                                            style={{
-                                              background: '#ff9800',
-                                              color: '#fff',
-                                              border: 'none',
-                                              borderRadius: 4,
-                                              padding: '4px 8px',
-                                              fontSize: 11,
-                                              cursor: 'pointer',
-                                              marginTop: '4px',
-                                              fontWeight: 500
-                                            }}
-                                          >
-                                            Manage Absences
-                                          </button>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              toggleOccurrenceStatus(shift.id, occurrence.date);
-                                            }}
-                                            style={{
-                                              background: 'none',
-                                              border: 'none',
-                                              color: getOccurrenceStatus(shift.id, occurrence.date) ? '#4caf50' : '#9e9e9e',
-                                              cursor: 'pointer',
-                                              fontSize: 16,
-                                              padding: '4px'
-                                            }}
-                                            title={getOccurrenceStatus(shift.id, occurrence.date) ? 'Deactivate' : 'Activate'}
-                                          >
-                                            {getOccurrenceStatus(shift.id, occurrence.date) ? <FaToggleOn /> : <FaToggleOff />}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))}
+                                              <div key={index} style={{
+                                                background: '#fff',
+                                                border: `1px solid ${getOccurrenceStatus(shift.id, occurrence.date) ? '#e0e0e0' : '#dee2e6'}`,
+                                                borderRadius: '8px',
+                                                padding: '12px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                // opacity: getOccurrenceStatus(shift.id, occurrence.date) ? 1 : 0.7
+                                              }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.borderColor = '#ff9800';
+                                                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(255, 152, 0, 0.1)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.borderColor = '#e0e0e0';
+                                                  e.currentTarget.style.boxShadow = 'none';
+                                                }}>
+                                                <div style={{ flex: 1 }}>
+                                                  <div style={{
+                                                    fontWeight: 600,
+                                                    fontSize: 14,
+                                                    color: '#333',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px'
+                                                  }}>
+                                                    {occurrence.dayName}, {occurrence.date.toLocaleDateString('en-CA', {
+                                                      month: 'short',
+                                                      day: 'numeric',
+                                                      year: 'numeric',
+                                                      timeZone: 'America/Halifax'
+                                                    })}
+                                                    {!getOccurrenceStatus(shift.id, occurrence.date) && (
+                                                      <span style={{
+                                                        background: '#dc3545',
+                                                        color: 'white',
+                                                        fontSize: '10px',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '12px',
+                                                        fontWeight: 500
+                                                      }}>
+                                                        INACTIVE
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  <div style={{ fontSize: 12, color: '#666', marginTop: '4px' }}>
+                                                    {occurrence.startTime.toLocaleTimeString('en-CA', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: false,
+                                                      timeZone: 'America/Halifax'
+                                                    })} - {occurrence.endTime.toLocaleTimeString('en-CA', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: false,
+                                                      timeZone: 'America/Halifax'
+                                                    })}
+                                                  </div>
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleOccurrenceClick(shift, occurrence);
+                                                    }}
+                                                    style={{
+                                                      background: '#ff9800',
+                                                      color: '#fff',
+                                                      border: 'none',
+                                                      borderRadius: 4,
+                                                      padding: '4px 8px',
+                                                      fontSize: 11,
+                                                      cursor: 'pointer',
+                                                      marginTop: '4px',
+                                                      fontWeight: 500
+                                                    }}
+                                                  >
+                                                    Manage Absences
+                                                  </button>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      toggleOccurrenceStatus(shift.id, occurrence.date);
+                                                    }}
+                                                    style={{
+                                                      background: 'none',
+                                                      border: 'none',
+                                                      color: getOccurrenceStatus(shift.id, occurrence.date) ? '#4caf50' : '#9e9e9e',
+                                                      cursor: 'pointer',
+                                                      fontSize: 16,
+                                                      padding: '4px'
+                                                    }}
+                                                    title={getOccurrenceStatus(shift.id, occurrence.date) ? 'Deactivate' : 'Activate'}
+                                                  >
+                                                    {getOccurrenceStatus(shift.id, occurrence.date) ? <FaToggleOn /> : <FaToggleOff />}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            ))}
                                           </div>
                                         </div>
                                       ));
@@ -2444,7 +2446,7 @@ export default function ManageShiftsPage() {
                         <input placeholder="Enter shift name" value={addRecurring.name} onChange={e => setAddRecurring(r => ({ ...r, name: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, name: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, name: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                       </div>
                       {addRecurringTouched.name && !isRecurringNameValid && <div style={{ color: 'red', fontSize: 13 }}>Name is required.</div>}
-                      
+
                       {/* Shift Type Selection */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type *</label>
@@ -2471,13 +2473,13 @@ export default function ManageShiftsPage() {
                           </label>
                         </div>
                       </div>
-                      
+
                       {/* Days of Week - Only show for recurring shifts */}
                       {addRecurring.isRecurring && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Days of Week *</label>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, i) => (
                               <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                                 <input
                                   type="checkbox"
@@ -2497,7 +2499,7 @@ export default function ManageShiftsPage() {
                           </div>
                         </div>
                       )}
-                      
+
                       {/* Date/Time inputs based on shift type */}
                       {addRecurring.isRecurring ? (
                         <>
@@ -2538,13 +2540,13 @@ export default function ManageShiftsPage() {
                         </select>
                       </div>
                       {addRecurringTouched.shiftCategoryId && !isRecurringCategoryValid && <div style={{ color: 'red', fontSize: 13 }}>Category is required.</div>}
-                      
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Location *</label>
                         <input placeholder="Enter shift location" value={addRecurring.location} onChange={e => setAddRecurring(r => ({ ...r, location: e.target.value }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, location: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, location: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                       </div>
                       {addRecurringTouched.location && !isRecurringLocationValid && <div style={{ color: 'red', fontSize: 13 }}>Location is required.</div>}
-                      
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Number of Volunteer Slots</label>
                         <input type="number" min={1} placeholder="Enter number of volunteers needed" value={addRecurring.slots} onChange={e => setAddRecurring(r => ({ ...r, slots: Number(e.target.value) }))} onBlur={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} onFocus={() => setAddRecurringTouched(t => ({ ...t, slots: true }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
@@ -2559,11 +2561,11 @@ export default function ManageShiftsPage() {
                       <span style={{ fontSize: 16, fontWeight: 600, color: '#333' }}>Default Users</span>
                       <span style={{ fontSize: 12, color: '#666' }}>(Optional - Users automatically assigned to every occurrence)</span>
                     </div>
-                    
+
                     {defaultUsersError && (
                       <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{defaultUsersError}</div>
                     )}
-                    
+
                     {loadingUsers ? (
                       <div style={{ color: '#666', fontSize: 14 }}>Loading users...</div>
                     ) : (
@@ -2571,7 +2573,7 @@ export default function ManageShiftsPage() {
                         <div style={{ fontSize: 14, color: '#666', marginBottom: 4 }}>
                           Select users to automatically assign to this shift:
                         </div>
-                        
+
                         {/* Search Bar */}
                         <div style={{ marginBottom: 8 }}>
                           <input
@@ -2589,7 +2591,7 @@ export default function ManageShiftsPage() {
                             }}
                           />
                         </div>
-                        
+
                         <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #ddd', borderRadius: 4, padding: 8 }}>
                           {availableUsers.length === 0 ? (
                             <div style={{ color: '#666', fontSize: 14, textAlign: 'center', padding: 20 }}>
@@ -2629,7 +2631,7 @@ export default function ManageShiftsPage() {
                               ))
                           )}
                         </div>
-                        
+
                         {/* Search Results Count */}
                         {addShiftUserSearchTerm && (
                           <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
@@ -2641,18 +2643,18 @@ export default function ManageShiftsPage() {
                             }).length} of {availableUsers.length} users
                           </div>
                         )}
-                        
+
                         <div style={{ fontSize: 12, color: '#666' }}>
                           Selected: {selectedDefaultUsers.length} / {addRecurring.slots} slots
                         </div>
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Error Messages and Submit Button */}
                   <div style={{ marginTop: 16 }}>
                     {addRecurringError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center', marginBottom: 12 }}>{addRecurringError}</div>}
-                    <button onClick={handleAddRecurringShift} style={{ background: isRecurringFormValid ? '#EF5C11' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, width: '100%', cursor: isRecurringFormValid ? 'pointer' : 'not-allowed', opacity: addingRecurring ? 0.7 : 1 }} disabled={addingRecurring || !isRecurringFormValid}>
+                    <button onClick={handleAddRecurringShift} style={{ background: isRecurringFormValid ? 'hsl(var(--primary))' : '#ccc', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 16, width: '100%', cursor: isRecurringFormValid ? 'pointer' : 'not-allowed', opacity: addingRecurring ? 0.7 : 1 }} disabled={addingRecurring || !isRecurringFormValid}>
                       {addingRecurring ? 'Adding...' : 'Add'}
                     </button>
                   </div>
@@ -2673,13 +2675,13 @@ export default function ManageShiftsPage() {
                         <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Shift Name *</label>
                         <input placeholder="Enter shift name" value={editRecurring.name} onChange={e => setEditRecurring(r => ({ ...r, name: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                       </div>
-                      
+
                       {/* Shift Type Display (Read-only) */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Shift Type</label>
-                        <div style={{ 
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
                           gap: 4,
                           padding: '6px 12px',
                           borderRadius: 6,
@@ -2692,13 +2694,13 @@ export default function ManageShiftsPage() {
                           {editRecurring.isRecurring ? '🔄 Recurring' : '📅 One-time'}
                         </div>
                       </div>
-                      
+
                       {/* Days of Week - Only show for recurring shifts */}
                       {editRecurring.isRecurring && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Days of Week *</label>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, i) => (
                               <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                                 <input
                                   type="checkbox"
@@ -2718,7 +2720,7 @@ export default function ManageShiftsPage() {
                           </div>
                         </div>
                       )}
-                      
+
                       {/* Date/Time inputs based on shift type */}
                       {editRecurring.isRecurring ? (
                         <>
@@ -2754,12 +2756,12 @@ export default function ManageShiftsPage() {
                           {categoryOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.icon ? `${opt.icon} ` : ''}{opt.name}</option>)}
                         </select>
                       </div>
-                      
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Location *</label>
                         <input placeholder="Enter shift location" value={editRecurring.location} onChange={e => setEditRecurring(r => ({ ...r, location: e.target.value }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
                       </div>
-                      
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Number of Volunteer Slots</label>
                         <input type="number" min={1} placeholder="Enter number of volunteers needed" value={editRecurring.slots} onChange={e => setEditRecurring(r => ({ ...r, slots: Number(e.target.value) }))} style={{ padding: 8, borderRadius: 5, border: '1px solid #eee' }} />
@@ -2773,11 +2775,11 @@ export default function ManageShiftsPage() {
                       <span style={{ fontSize: 18, fontWeight: 700, color: '#ff0000' }}>🔴 DEFAULT USERS SECTION 🔴</span>
                       <span style={{ fontSize: 12, color: '#666' }}>(Optional - Users automatically assigned to every occurrence)</span>
                     </div>
-                    
+
                     {defaultUsersError && (
                       <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{defaultUsersError}</div>
                     )}
-                    
+
                     {loadingUsers ? (
                       <div style={{ color: '#666', fontSize: 14 }}>Loading users...</div>
                     ) : (
@@ -2833,7 +2835,7 @@ export default function ManageShiftsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Error Messages and Submit Button */}
                   <div style={{ marginTop: 16 }}>
                     {editRecurringError && <div style={{ color: 'red', fontSize: 13, textAlign: 'center', marginBottom: 12 }}>{editRecurringError}</div>}
@@ -2853,7 +2855,7 @@ export default function ManageShiftsPage() {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.15)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#fff', borderRadius: 10, padding: 32, minWidth: 400, maxWidth: '90vw', boxShadow: '0 2px 16px #ddd', position: 'relative', textAlign: 'center' }}>
             <button onClick={() => setShowNoCategoryModal(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}>×</button>
-            
+
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
             <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 16, color: '#333' }}>No Categories Available</div>
             <div style={{ fontSize: 16, color: '#666', marginBottom: 24, lineHeight: 1.5 }}>
@@ -2861,16 +2863,16 @@ export default function ManageShiftsPage() {
               <br />
               Please create a category first.
             </div>
-            
+
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button 
-                onClick={() => setShowNoCategoryModal(false)} 
-                style={{ 
-                  padding: '10px 20px', 
-                  borderRadius: 6, 
-                  border: '1px solid #ddd', 
-                  background: '#fff', 
-                  color: '#666', 
+              <button
+                onClick={() => setShowNoCategoryModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  background: '#fff',
+                  color: '#666',
                   cursor: 'pointer',
                   fontSize: 14,
                   fontWeight: 500
@@ -2878,19 +2880,19 @@ export default function ManageShiftsPage() {
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setShowNoCategoryModal(false);
                   setTab('shiftcategory');
                   // Show a toast message to guide the user
                   toast.info('Please create a category first, then try adding shifts again.');
-                }} 
-                style={{ 
-                  padding: '10px 20px', 
-                  borderRadius: 6, 
-                  border: 'none', 
-                  background: '#ff9800', 
-                  color: '#fff', 
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#ff9800',
+                  color: '#fff',
                   cursor: 'pointer',
                   fontSize: 14,
                   fontWeight: 500
@@ -2908,29 +2910,29 @@ export default function ManageShiftsPage() {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.15)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#fff', borderRadius: 10, padding: 32, minWidth: 600, maxWidth: '90vw', boxShadow: '0 2px 16px #ddd', position: 'relative' }}>
             <button onClick={() => setShowAbsenceModal(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer' }}>×</button>
-            
+
             <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Manage Absences</div>
-            
+
             <div style={{ marginBottom: 16, padding: 12, background: '#f8f9fa', borderRadius: 6, border: '1px solid #e0e0e0' }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
-                {selectedOccurrence.dayName}, {selectedOccurrence.date.toLocaleDateString('en-CA', { 
-                  month: 'short', 
-                  day: 'numeric', 
+                {selectedOccurrence.dayName}, {selectedOccurrence.date.toLocaleDateString('en-CA', {
+                  month: 'short',
+                  day: 'numeric',
                   year: 'numeric',
                   timeZone: 'America/Halifax'
                 })}
               </div>
               <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                {selectedOccurrence.startTime.toLocaleTimeString('en-CA', { 
-                  hour: '2-digit', 
-                  minute: '2-digit', 
-                  hour12: false, 
-                  timeZone: 'America/Halifax' 
-                })} - {selectedOccurrence.endTime.toLocaleTimeString('en-CA', { 
-                  hour: '2-digit', 
-                  minute: '2-digit', 
-                  hour12: false, 
-                  timeZone: 'America/Halifax' 
+                {selectedOccurrence.startTime.toLocaleTimeString('en-CA', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                  timeZone: 'America/Halifax'
+                })} - {selectedOccurrence.endTime.toLocaleTimeString('en-CA', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                  timeZone: 'America/Halifax'
                 })}
               </div>
             </div>
@@ -2944,7 +2946,7 @@ export default function ManageShiftsPage() {
                   <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12, color: '#333' }}>
                     Select Users for Absence
                   </div>
-                  
+
                   {/* Search Bar */}
                   <div style={{ marginBottom: 16 }}>
                     <input
@@ -2962,17 +2964,17 @@ export default function ManageShiftsPage() {
                       }}
                     />
                   </div>
-                  
+
                   {/* User List with Checkboxes */}
                   {defaultUsersForOccurrence.length === 0 ? (
                     <div style={{ color: '#666', fontSize: 14, textAlign: 'center', padding: 20, background: '#f8f9fa', borderRadius: 6 }}>
                       No default users assigned to this shift
                     </div>
                   ) : (
-                    <div style={{ 
-                      maxHeight: 200, 
-                      overflowY: 'auto', 
-                      border: '1px solid #e0e0e0', 
+                    <div style={{
+                      maxHeight: 200,
+                      overflowY: 'auto',
+                      border: '1px solid #e0e0e0',
                       borderRadius: 6,
                       background: '#fff'
                     }}>
@@ -2985,14 +2987,14 @@ export default function ManageShiftsPage() {
                           return fullName.includes(searchLower) || email.includes(searchLower);
                         })
                         .map((defaultUser: any) => {
-                          const isAbsent = shiftAbsences.some((absence: any) => 
+                          const isAbsent = shiftAbsences.some((absence: any) =>
                             absence.userId === defaultUser.userId && absence.isApproved
                           );
-                          const pendingAbsence = shiftAbsences.find((absence: any) => 
+                          const pendingAbsence = shiftAbsences.find((absence: any) =>
                             absence.userId === defaultUser.userId && !absence.isApproved
                           );
                           const isSelected = selectedUsersForAbsence.includes(defaultUser.userId);
-                          
+
                           return (
                             <div key={defaultUser.userId} style={{
                               display: 'flex',
@@ -3002,7 +3004,7 @@ export default function ManageShiftsPage() {
                               background: isSelected ? '#e3f2fd' : 'transparent',
                               cursor: 'pointer'
                             }}
-                            onClick={() => handleUserSelection(defaultUser.userId)}>
+                              onClick={() => handleUserSelection(defaultUser.userId)}>
                               <input
                                 type="checkbox"
                                 checked={isSelected}
@@ -3024,9 +3026,9 @@ export default function ManageShiftsPage() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 {isAbsent && (
                                   <>
-                                    <span style={{ 
-                                      fontSize: 10, 
-                                      color: '#d32f2f', 
+                                    <span style={{
+                                      fontSize: 10,
+                                      color: '#d32f2f',
                                       backgroundColor: '#ffcdd2',
                                       padding: '2px 6px',
                                       borderRadius: 4
@@ -3059,9 +3061,9 @@ export default function ManageShiftsPage() {
                                 )}
                                 {pendingAbsence && (
                                   <>
-                                    <span style={{ 
-                                      fontSize: 10, 
-                                      color: '#f57c00', 
+                                    <span style={{
+                                      fontSize: 10,
+                                      color: '#f57c00',
                                       backgroundColor: '#fff3e0',
                                       padding: '2px 6px',
                                       borderRadius: 4
@@ -3114,13 +3116,13 @@ export default function ManageShiftsPage() {
                         })}
                     </div>
                   )}
-                  
+
                   {/* Selected Count */}
                   {selectedUsersForAbsence.length > 0 && (
-                    <div style={{ 
-                      marginTop: 12, 
-                      padding: 8, 
-                      background: '#e3f2fd', 
+                    <div style={{
+                      marginTop: 12,
+                      padding: 8,
+                      background: '#e3f2fd',
                       borderRadius: 6,
                       fontSize: 14,
                       color: '#1976d2',
@@ -3136,7 +3138,7 @@ export default function ManageShiftsPage() {
                   <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12, color: '#333' }}>
                     Absence Details
                   </div>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div>
                       <label style={{ fontSize: 14, fontWeight: 600, color: '#333', marginBottom: 4, display: 'block' }}>
@@ -3153,7 +3155,7 @@ export default function ManageShiftsPage() {
                         <option value="VACATION">Vacation</option>
                       </select>
                     </div>
-                    
+
                     <div>
                       <label style={{ fontSize: 14, fontWeight: 600, color: '#333', marginBottom: 4, display: 'block' }}>
                         Reason (Optional)
@@ -3162,11 +3164,11 @@ export default function ManageShiftsPage() {
                         value={absenceReason}
                         onChange={(e) => setAbsenceReason(e.target.value)}
                         placeholder="Enter reason for absence..."
-                        style={{ 
-                          padding: 8, 
-                          borderRadius: 5, 
-                          border: '1px solid #eee', 
-                          width: '100%', 
+                        style={{
+                          padding: 8,
+                          borderRadius: 5,
+                          border: '1px solid #eee',
+                          width: '100%',
                           minHeight: 80,
                           resize: 'vertical'
                         }}

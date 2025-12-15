@@ -127,21 +127,21 @@ export default function MealCountPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-[#EF5C11] mx-auto mb-4" />
-          <p className="text-[#666666]">Loading...</p>
+          <FaSpinner className="animate-spin text-4xl text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center p-3 sm:p-4" style={{ margin: 0 }}>
+    <div className="min-h-screen bg-background flex items-center justify-center p-3 sm:p-4" style={{ margin: 0 }}>
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
         {/* Organization Name */}
         <div className="text-center mb-3 sm:mb-4">
-          <h2 className="text-base sm:text-lg font-semibold text-[#666666] px-2 break-words">
+          <h2 className="text-base sm:text-lg font-semibold text-muted-foreground px-2 break-words">
             {organizationName}
           </h2>
         </div>
@@ -149,12 +149,12 @@ export default function MealCountPage() {
         {/* Header - Icon and Title */}
         <div className="text-center mb-4 sm:mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-[#fff5ed] rounded-full mb-3 sm:mb-4">
-            <FaUtensils className="text-2xl sm:text-3xl text-[#EF5C11]" />
+            <FaUtensils className="text-2xl sm:text-3xl text-primary" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#000000] mb-2">
             {shiftName} Meal Count
           </h1>
-          <p className="text-sm sm:text-base text-[#666666] mb-3 sm:mb-4 px-2">
+          <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4 px-2">
             {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
               weekday: 'long',
               year: 'numeric',
@@ -165,18 +165,18 @@ export default function MealCountPage() {
         </div>
 
         {/* Category and Shift Name */}
-        <div className="bg-[#F5F4F2] p-3 sm:p-4 rounded-lg mb-3 sm:mb-4">
-          <p className="text-xs sm:text-sm text-[#666666] mb-1">
+        <div className="bg-background p-3 sm:p-4 rounded-lg mb-3 sm:mb-4">
+          <p className="text-xs sm:text-sm text-muted-foreground mb-1">
             <strong>Category:</strong> Daily Meal Program
           </p>
-          <p className="text-xs sm:text-sm text-[#666666]">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             <strong>Shift:</strong> {shiftName}
           </p>
         </div>
 
         {/* Date Picker */}
         <div className="mb-4 sm:mb-6">
-          <label htmlFor="datePicker" className="block text-sm font-medium text-[#666666] mb-2">
+          <label htmlFor="datePicker" className="block text-sm font-medium text-muted-foreground mb-2">
             Select Date
           </label>
           <input
@@ -187,15 +187,15 @@ export default function MealCountPage() {
               setSelectedDate(e.target.value);
               // The useEffect will automatically fetch meal count for the new date
             }}
-            className="w-full px-3 sm:px-4 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#EF5C11] focus:border-[#EF5C11] touch-manipulation"
+            className="w-full px-3 sm:px-4 py-2.5 sm:py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary touch-manipulation"
           />
           {existingMealCount !== null && (
-            <p className="text-center text-[#EF5C11] font-semibold mt-2 text-sm sm:text-base">
+            <p className="text-center text-primary font-semibold mt-2 text-sm sm:text-base">
               Submitted
             </p>
           )}
           {selectedDate !== currentDate && existingMealCount === null && (
-            <p className="text-xs text-[#666666] mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {new Date(selectedDate + 'T00:00:00') > new Date(currentDate + 'T00:00:00') 
                 ? 'Future date selected' 
                 : 'Past date selected'}
@@ -207,7 +207,7 @@ export default function MealCountPage() {
         {existingMealCount === null && (
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div>
-            <label htmlFor="mealsServed" className="block text-sm font-medium text-[#666666] mb-2">
+            <label htmlFor="mealsServed" className="block text-sm font-medium text-muted-foreground mb-2">
               Number of Meals Served
             </label>
             <input
@@ -216,7 +216,7 @@ export default function MealCountPage() {
               min="0"
               value={mealsServed}
               onChange={(e) => setMealsServed(e.target.value)}
-              className="w-full px-3 sm:px-4 py-3 sm:py-3.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#EF5C11] focus:border-[#EF5C11] text-base sm:text-lg touch-manipulation"
+              className="w-full px-3 sm:px-4 py-3 sm:py-3.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-base sm:text-lg touch-manipulation"
               placeholder="Enter number of meals"
               required
               autoFocus
@@ -226,7 +226,7 @@ export default function MealCountPage() {
           <button
             type="submit"
             disabled={submitting || !mealsServed}
-            className="w-full bg-[#EF5C11] text-white py-3.5 sm:py-3 px-4 rounded-lg font-semibold hover:bg-[#ff9800] focus:outline-none focus:ring-2 focus:ring-[#EF5C11] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-base sm:text-lg min-h-[48px] touch-manipulation"
+            className="w-full bg-primary text-white py-3.5 sm:py-3 px-4 rounded-lg font-semibold hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-base sm:text-lg min-h-[48px] touch-manipulation"
           >
             {submitting ? (
               <>

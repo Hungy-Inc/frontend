@@ -439,26 +439,26 @@ export default function ManageUsersPage() {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Failed to toggle user approver' }));
-        
+
         // Check if user is not approved
         if (response.status === 400 && errorData.status && errorData.status !== 'APPROVED') {
           toast.error('Only approved users can receive approver email notifications');
           return;
         }
-        
+
         throw new Error(errorData.error || "Failed to toggle user approver");
       }
-      
+
       const responseData = await response.json();
       const newValue = responseData.isApprover ?? false;
-      
+
       // Refresh both user lists to keep data in sync
       await fetchUsers();
       await fetchPermissionUsers();
-      
+
       toast.success(`User approver email notification ${newValue ? 'enabled' : 'disabled'} successfully!`);
     } catch (err: any) {
       console.error('Error toggling user approver:', err);
@@ -470,12 +470,12 @@ export default function ManageUsersPage() {
     try {
       setLoadingAgreements(true);
       console.log('Fetching user agreements for userId:', userId);
-      
+
       // Get user name for display
       const user = users.find(u => u.id === userId);
       setSelectedUserName(user ? user.name : 'User');
       setSelectedUserId(userId);
-      
+
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userId}/agreement`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -496,7 +496,7 @@ export default function ManageUsersPage() {
 
       const data = await response.json();
       console.log('Received agreement data:', data);
-      
+
       // Check if we have the new format with agreements array
       if (data.agreements && Array.isArray(data.agreements)) {
         if (data.agreements.length === 0) {
@@ -504,14 +504,14 @@ export default function ManageUsersPage() {
           setLoadingAgreements(false);
           return;
         }
-        
+
         // If only one document, open it directly (backward compatibility)
         if (data.agreements.length === 1) {
           window.open(data.agreements[0].documentUrl, '_blank');
           setLoadingAgreements(false);
           return;
         }
-        
+
         // Multiple documents - show modal
         setUserAgreements(data.agreements);
         setShowDocumentModal(true);
@@ -523,7 +523,7 @@ export default function ManageUsersPage() {
         console.error('No documentUrl or agreements in response:', data);
         toast.error("No agreement document available for this user");
       }
-      
+
       setLoadingAgreements(false);
     } catch (err) {
       console.error('Error in viewUserAgreement:', err);
@@ -560,10 +560,10 @@ export default function ManageUsersPage() {
       }
 
       const data = await response.json();
-      
+
       // Update the agreement in the list
-      setUserAgreements(prev => prev.map(agreement => 
-        agreement.id === agreementId 
+      setUserAgreements(prev => prev.map(agreement =>
+        agreement.id === agreementId
           ? { ...agreement, ...data.agreement }
           : agreement
       ));
@@ -981,8 +981,8 @@ export default function ManageUsersPage() {
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             style={{
-              borderBottomColor: activeTab === 'users' ? '#EF5C11' : 'transparent',
-              color: activeTab === 'users' ? '#EF5C11' : undefined
+              borderBottomColor: activeTab === 'users' ? 'hsl(var(--primary))' : 'transparent',
+              color: activeTab === 'users' ? 'hsl(var(--primary))' : undefined
             }}
           >
             <FaUsers className="inline mr-2" />
@@ -995,8 +995,8 @@ export default function ManageUsersPage() {
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             style={{
-              borderBottomColor: activeTab === 'permissions' ? '#EF5C11' : 'transparent',
-              color: activeTab === 'permissions' ? '#EF5C11' : undefined
+              borderBottomColor: activeTab === 'permissions' ? 'hsl(var(--primary))' : 'transparent',
+              color: activeTab === 'permissions' ? 'hsl(var(--primary))' : undefined
             }}
           >
             <FaShieldAlt className="inline mr-2" />
@@ -1009,8 +1009,8 @@ export default function ManageUsersPage() {
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             style={{
-              borderBottomColor: activeTab === 'defaultPermissions' ? '#EF5C11' : 'transparent',
-              color: activeTab === 'defaultPermissions' ? '#EF5C11' : undefined
+              borderBottomColor: activeTab === 'defaultPermissions' ? 'hsl(var(--primary))' : 'transparent',
+              color: activeTab === 'defaultPermissions' ? 'hsl(var(--primary))' : undefined
             }}
           >
             <FaUserCog className="inline mr-2" />
@@ -1032,7 +1032,7 @@ export default function ManageUsersPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
               />
             </div>
             <div className="flex gap-2">
@@ -1040,7 +1040,7 @@ export default function ManageUsersPage() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
               >
                 <option value="all">All Status</option>
                 <option value="PENDING">Pending</option>
@@ -1051,7 +1051,7 @@ export default function ManageUsersPage() {
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
               >
                 <option value="all">All Roles</option>
                 {roles.map(role => (
@@ -1070,11 +1070,11 @@ export default function ManageUsersPage() {
                 onClick={() => setShowAdd(true)}
                 className="px-4 py-2 text-white rounded-lg flex items-center gap-2"
                 style={{
-                  backgroundColor: '#EF5C11',
+                  backgroundColor: 'hsl(var(--primary))',
                   '&:hover': { backgroundColor: '#666666' }
                 } as React.CSSProperties}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--primary))'}
               >
                 <FaUserPlus />
                 Add User
@@ -1139,7 +1139,7 @@ export default function ManageUsersPage() {
                                 value={editData.role || ''}
                                 onChange={(e) => handleEditChange('role', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                                style={{ '--tw-ring-color': '#EF5C11', '--tw-border-opacity': '1' } as React.CSSProperties}
+                                style={{ '--tw-ring-color': 'hsl(var(--primary))', '--tw-border-opacity': '1' } as React.CSSProperties}
                               >
                                 {roles.map(role => (
                                   <option key={role} value={role}>{role}</option>
@@ -1246,9 +1246,9 @@ export default function ManageUsersPage() {
                             <button
                               onClick={() => navigateToUserDetails(user.id)}
                               className="p-2"
-                              style={{ color: '#EF5C11' }}
+                              style={{ color: 'hsl(var(--primary))' }}
                               onMouseEnter={(e) => e.currentTarget.style.color = '#666666'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = '#EF5C11'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'hsl(var(--primary))'}
                             >
                               <FaEdit />
                             </button>
@@ -1290,7 +1290,7 @@ export default function ManageUsersPage() {
                         value={permissionSearchTerm}
                         onChange={(e) => setPermissionSearchTerm(e.target.value)}
                         className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                        style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                        style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                       />
                     </div>
                   </div>
@@ -1321,7 +1321,7 @@ export default function ManageUsersPage() {
                             : 'border-gray-200 hover:border-gray-300'
                             }`}
                           style={selectedUser === parseInt(user.id) ? {
-                            borderColor: '#EF5C11',
+                            borderColor: 'hsl(var(--primary))',
                             backgroundColor: '#F5F4F2'
                           } : undefined}
                         >
@@ -1356,7 +1356,7 @@ export default function ManageUsersPage() {
                     </div>
                   ) : permissionLoading ? (
                     <div className="flex items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: '#EF5C11' }}></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: 'hsl(var(--primary))' }}></div>
                     </div>
                   ) : !userPermissions ? (
                     <div className="text-center py-12">
@@ -1389,15 +1389,15 @@ export default function ManageUsersPage() {
                             </button>
                           </div>
                         </div>
-                        
+
                         {/* User Approver Email Notification Toggle */}
                         {(() => {
                           const selectedUserData = permissionUsers.find(u => parseInt(u.id) === selectedUser);
                           if (!selectedUserData) return null;
-                          
+
                           const isApprover = selectedUserData.isApprover ?? false;
                           const isApproved = selectedUserData.status === 'APPROVED';
-                          
+
                           return (
                             <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                               <div className="flex items-center justify-between">
@@ -1406,7 +1406,7 @@ export default function ManageUsersPage() {
                                     User Approver Email Notifications
                                   </label>
                                   <p className="text-xs text-gray-500 mt-1">
-                                    {isApproved 
+                                    {isApproved
                                       ? "Receive email notifications when users need approval"
                                       : "Only approved users can receive approver email notifications"
                                     }
@@ -1436,10 +1436,10 @@ export default function ManageUsersPage() {
                             disabled={savingPermissions}
                             className="px-4 py-2 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
                             style={{
-                              backgroundColor: '#EF5C11'
+                              backgroundColor: 'hsl(var(--primary))'
                             } as React.CSSProperties}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--primary))'}
                           >
                             {savingPermissions && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                             Save Permissions
@@ -1457,7 +1457,7 @@ export default function ManageUsersPage() {
                             value={permissionFilterTerm}
                             onChange={(e) => setPermissionFilterTerm(e.target.value)}
                             className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                            style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                            style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                           />
                         </div>
                       </div>
@@ -1504,7 +1504,7 @@ export default function ManageUsersPage() {
                                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
                                   style={{
                                     '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
-                                    backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
+                                    backgroundColor: permission.canAccess ? 'hsl(var(--primary))' : '#E5E7EB'
                                   } as React.CSSProperties}></div>
                               </label>
                             </div>
@@ -1548,7 +1548,7 @@ export default function ManageUsersPage() {
 
           {defaultPermissionsLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: '#EF5C11' }}></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: 'hsl(var(--primary))' }}></div>
             </div>
           ) : (
             <div className="space-y-6">
@@ -1562,7 +1562,7 @@ export default function ManageUsersPage() {
                       ? 'bg-orange-500 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
-                    style={selectedRole === role ? { backgroundColor: '#EF5C11' } : undefined}
+                    style={selectedRole === role ? { backgroundColor: 'hsl(var(--primary))' } : undefined}
                   >
                     {role}
                   </button>
@@ -1600,7 +1600,7 @@ export default function ManageUsersPage() {
                         value={defaultPermissionFilterTerm}
                         onChange={(e) => setDefaultPermissionFilterTerm(e.target.value)}
                         className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                        style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                        style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                       />
                     </div>
                   </div>
@@ -1629,7 +1629,7 @@ export default function ManageUsersPage() {
                                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
                                   style={{
                                     '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
-                                    backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
+                                    backgroundColor: permission.canAccess ? 'hsl(var(--primary))' : '#E5E7EB'
                                   } as React.CSSProperties}></div>
                               </label>
                             </div>
@@ -1662,7 +1662,7 @@ export default function ManageUsersPage() {
                                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
                                   style={{
                                     '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
-                                    backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
+                                    backgroundColor: permission.canAccess ? 'hsl(var(--primary))' : '#E5E7EB'
                                   } as React.CSSProperties}></div>
                               </label>
                             </div>
@@ -1684,10 +1684,10 @@ export default function ManageUsersPage() {
                           disabled={savingDefaultPermissions}
                           className="px-4 py-2 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
                           style={{
-                            backgroundColor: '#EF5C11'
+                            backgroundColor: 'hsl(var(--primary))'
                           } as React.CSSProperties}
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--primary))'}
                         >
                           {savingDefaultPermissions && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                           Save Changes
@@ -1727,7 +1727,7 @@ export default function ManageUsersPage() {
                     value={addData.firstName}
                     onChange={(e) => setAddData({ ...addData, firstName: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                    style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                     required
                   />
                 </div>
@@ -1738,7 +1738,7 @@ export default function ManageUsersPage() {
                     value={addData.lastName}
                     onChange={(e) => setAddData({ ...addData, lastName: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                    style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                     required
                   />
                 </div>
@@ -1749,7 +1749,7 @@ export default function ManageUsersPage() {
                     value={addData.email}
                     onChange={(e) => setAddData({ ...addData, email: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                    style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                     required
                   />
                   {addData.email && !isEmail(addData.email) && (
@@ -1767,7 +1767,7 @@ export default function ManageUsersPage() {
                       setAddData({ ...addData, phone: val });
                     }}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                    style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                     maxLength={10}
                     pattern="[0-9]{10}"
                     required
@@ -1782,7 +1782,7 @@ export default function ManageUsersPage() {
                     value={addData.role}
                     onChange={(e) => setAddData({ ...addData, role: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                    style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                    style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                   >
                     {roles.map(role => (
                       <option key={role} value={role}>{role}</option>
@@ -1797,7 +1797,7 @@ export default function ManageUsersPage() {
                       value={addData.password}
                       onChange={(e) => setAddData({ ...addData, password: e.target.value })}
                       className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                      style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                      style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                       required
                     />
                     <button
@@ -1820,7 +1820,7 @@ export default function ManageUsersPage() {
                       value={addData.confirmPassword}
                       onChange={(e) => setAddData({ ...addData, confirmPassword: e.target.value })}
                       className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                      style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                      style={{ '--tw-ring-color': 'hsl(var(--primary))' } as React.CSSProperties}
                       required
                     />
                     <button
@@ -1896,10 +1896,10 @@ export default function ManageUsersPage() {
                   disabled={adding || !isAddFormValid()}
                   className="px-4 py-2 text-white rounded-md disabled:opacity-50 flex items-center gap-2"
                   style={{
-                    backgroundColor: '#EF5C11'
+                    backgroundColor: 'hsl(var(--primary))'
                   } as React.CSSProperties}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--primary))'}
                 >
                   {adding && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                   Add User
@@ -1933,10 +1933,10 @@ export default function ManageUsersPage() {
                   <FaTimes className="w-5 h-5" />
                 </button>
               </div>
-              
+
               {loadingAgreements ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: '#EF5C11' }}></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderBottomColor: 'hsl(var(--primary))' }}></div>
                 </div>
               ) : userAgreements.length === 0 ? (
                 <div className="text-center py-8">
@@ -1967,7 +1967,7 @@ export default function ManageUsersPage() {
                               <p className="font-mono text-gray-400">Signature: {agreement.signature.substring(0, 20)}...</p>
                             )}
                           </div>
-                          
+
                           {/* Edit mode: File upload */}
                           {editingAgreementId === agreement.id && (
                             <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -1997,7 +1997,7 @@ export default function ManageUsersPage() {
                                   onClick={() => handleReplaceDocument(agreement.id)}
                                   disabled={!replacementFile || uploadingReplacement}
                                   className="px-3 py-1.5 text-xs text-white rounded-md disabled:opacity-50 flex items-center gap-1"
-                                  style={{ backgroundColor: '#EF5C11' }}
+                                  style={{ backgroundColor: 'hsl(var(--primary))' }}
                                 >
                                   {uploadingReplacement ? (
                                     <>
@@ -2026,9 +2026,9 @@ export default function ManageUsersPage() {
                           <button
                             onClick={() => openDocument(agreement.documentUrl)}
                             className="px-3 py-2 text-sm text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition"
-                            style={{ backgroundColor: '#EF5C11' }}
+                            style={{ backgroundColor: 'hsl(var(--primary))' }}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EF5C11'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'hsl(var(--primary))'}
                           >
                             <FaExternalLinkAlt />
                             Open
@@ -2052,7 +2052,7 @@ export default function ManageUsersPage() {
                   ))}
                 </div>
               )}
-              
+
               <div className="flex justify-end mt-6">
                 <button
                   onClick={() => {

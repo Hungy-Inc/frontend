@@ -1,0 +1,211 @@
+src/app/waitlist/page.tsx:      const response = await fetch(`${apiBaseUrl}/api/public/waitlist-signup`, {
+src/app/donor-data/page.tsx:      const response = await fetch(`${apiUrl}/api/donor-data?${params}`, {
+src/app/donor-data/page.tsx:      const response = await fetch(`${apiUrl}/api/donor-data/export?${params}`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/organizations/${organizationId}`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/modules`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/roles/default-permissions`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/roles/${role}/default-permissions`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}/approve`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}/deny`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}/reset`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}/toggle-approver`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}/agreement`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${selectedUserId}/agreement/${agreementId}`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}/permissions`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userPermissions.userId}/permissions`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${id}`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${id}`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users/upload-agreement`, {
+src/app/manage-users/page.tsx:      const response = await fetch(`${apiUrl}/api/users`, {
+src/app/contact/page.tsx:      const response = await fetch('/api/contact', {
+src/app/qr-codes/page.tsx:        const orgRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations`, {
+src/app/schedule-shifts/page.tsx:        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/last-updated`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
+src/app/schedule-shifts/page.tsx:            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${shift.id}/absences`, {
+src/app/schedule-shifts/page.tsx:      const signupRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signupId}`, {
+src/app/schedule-shifts/page.tsx:      const signupRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signupId}`, {
+src/app/schedule-shifts/page.tsx:      const shiftRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${shift.id}`, {
+src/app/schedule-shifts/page.tsx:          const shiftRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+src/app/schedule-shifts/page.tsx:          const signupRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups`, {
+src/app/schedule-shifts/page.tsx:          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signupId}`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups?shiftId=${shiftId}`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups?shiftId=${shift.id}`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups?shiftId=${selectedShiftForPopup.id}`, {
+src/app/schedule-shifts/page.tsx:          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signup.id}`, {
+src/app/schedule-shifts/page.tsx:        const shiftRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+src/app/schedule-shifts/page.tsx:        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups`, {
+src/app/schedule-shifts/page.tsx:          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${rec.id}`, {
+src/app/schedule-shifts/page.tsx:                const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+src/app/schedule-shifts/page.tsx:                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${rec.id}`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups?shiftId=${shift.id}`, {
+src/app/schedule-shifts/page.tsx:          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signup.id}`, {
+src/app/schedule-shifts/page.tsx:        const shiftRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+src/app/schedule-shifts/page.tsx:        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-employees?shiftId=${shift.id}`, {
+src/app/schedule-shifts/page.tsx:      const defaultUsersRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shift.recurringShiftId}/default-users`, {
+src/app/schedule-shifts/page.tsx:      const absencesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${shift.id}/absences`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signupId}`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences`, {
+src/app/schedule-shifts/page.tsx:        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences/${absenceId}`, {
+src/app/schedule-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences/${absenceId}`, {
+src/app/superadmin/organizations/[id]/page.tsx:import { superadminApi } from '@/services/api/superadmin';
+src/app/superadmin/organizations/[id]/page.tsx:                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}/users`, {
+src/app/superadmin/organizations/page.tsx:import { superadminApi } from '@/services/api/superadmin';
+src/app/superadmin/audit-logs/page.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/audit-logs${query}`, {
+src/app/superadmin/audit-logs/page.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/audit-logs/export${query}`, {
+src/app/superadmin/dashboard/page.tsx:                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/dashboard/stats`, {
+src/app/superadmin/profile/page.tsx:                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/auth/profile`, {
+src/app/superadmin/profile/page.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/auth/profile`, {
+src/app/superadmin/profile/page.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/auth/change-password`, {
+src/app/superadmin/users/page.tsx:import { superadminApi } from '@/services/api/superadmin';
+src/app/superadmin/modules/page.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/module-templates`, {
+src/app/superadmin/modules/page.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/module-templates/${id}`, {
+src/app/superadmin/modules/page.tsx:                ? `${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/module-templates/${selectedTemplate.id}`
+src/app/superadmin/modules/page.tsx:                : `${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/module-templates`;
+src/app/superadmin/login/page.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/auth/login`, {
+src/app/user-details/[userId]/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}`, {
+src/app/user-details/[userId]/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}`, {
+src/app/user-details/[userId]/page.tsx:        const emailCheckResponse = await fetch(`${apiUrl}/api/users`, {
+src/app/user-details/[userId]/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${userId}`, {
+src/app/user-details/[userId]/page.tsx:              await fetch(`${apiUrl}/api/user-field-values`, {
+src/app/meal-count/[organizationName]/[shiftName]/page.tsx:        `${process.env.NEXT_PUBLIC_API_URL}/api/public/meal-count/${encodedOrgName}/${shiftNameParam}?date=${date}`
+src/app/meal-count/[organizationName]/[shiftName]/page.tsx:        `${process.env.NEXT_PUBLIC_API_URL}/api/public/meal-count/${encodedOrgName}/${shiftNameParam}`,
+src/app/add-shift/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories`, {
+src/app/add-shift/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
+src/app/add-shift/page.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/fields/definitions`, {
+src/app/add-shift/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
+src/app/add-shift/page.tsx:            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${data.id}/default-users`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/fields/definitions`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/organizations/${organizationId}/registration-fields`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/organizations/${organizationId}/available-fields`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/fields/definitions`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/fields/definitions/${editModalField.id}`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/fields/definitions/${id}`, {
+src/app/field-management/page.tsx:        const response = await fetch(`${apiUrl}/api/organizations/${organizationId}/registration-fields`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/organizations/${organizationId}/registration-fields/${id}`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/organizations/${organizationId}/registration-fields/${id}`, {
+src/app/field-management/page.tsx:      const response = await fetch(`${apiUrl}/api/organizations/${organizationId}`, {
+src/app/field-management/page.tsx:        const response = await fetch(`${apiUrl}/api/organizations/${organizationId}/registration-fields/${update.id}`, {
+src/app/my-grants/page.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants`, {
+src/app/my-grants/page.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}`, {
+src/app/dashboard/page.tsx:                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/export-consolidated?month=${monthNumber}&year=${year}&incomingUnit=${incomingUnit}&inventoryUnit=${inventoryUnit}`;
+src/app/dashboard/page.tsx:                    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/incoming-stats/export-dashboard?month=${monthNumber}&year=${year}&unit=${incomingUnit}`;
+src/app/dashboard/page.tsx:                  const url = `${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/summary/export-dashboard?month=${monthNumber}&year=${year}`;
+src/app/dashboard/page.tsx:                const url = `${process.env.NEXT_PUBLIC_API_URL}/api/outgoing-stats/export-dashboard?month=${monthNumber}&year=${year}&unit=kg`;
+src/app/dashboard/page.tsx:                  const url = `${process.env.NEXT_PUBLIC_API_URL}/api/inventory-categories/export-dashboard?month=${monthNumber}&year=${year}&unit=${inventoryUnit}`;
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts?isActive=${filterActive === 'all' ? '' : filterActive === 'active' ? 'true' : 'false'}`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories/${editId}`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories/${cat.id}`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts`, {
+src/app/manage-shifts/page.tsx:          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${data.id}/default-users`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/default-users`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}`, {
+src/app/manage-shifts/page.tsx:        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${editRecurringId}/default-users`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shift.id}`, {
+src/app/manage-shifts/page.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/toggle-active`, {
+src/app/manage-shifts/page.tsx:      const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts`, {
+src/app/manage-shifts/page.tsx:          const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${existingShift.id}/toggle-active`, {
+src/app/manage-shifts/page.tsx:          const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shiftId}`, {
+src/app/manage-shifts/page.tsx:          const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${createdShift.id}/toggle-active`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}`, {
+src/app/manage-shifts/page.tsx:      const defaultUsersRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shift.id}/default-users`, {
+src/app/manage-shifts/page.tsx:      const checkRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shift.id}/check/${occurrenceDate}`, {
+src/app/manage-shifts/page.tsx:            url: `${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shift.id}`,
+src/app/manage-shifts/page.tsx:        const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/from-recurring/${shift.id}`, {
+src/app/manage-shifts/page.tsx:      const absencesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${actualShift.id}/absences`, {
+src/app/manage-shifts/page.tsx:        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${selectedShift.id}/absences`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${selectedShift.id}/absences/${absenceId}`, {
+src/app/manage-shifts/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${selectedShift.id}/absences/${absenceId}`, {
+src/app/profile/page.tsx:        const userResponse = await fetch(`${apiUrl}/api/users/${user.userId}`, {
+src/app/profile/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${profile.id}`, {
+src/app/profile/page.tsx:      const response = await fetch(`${apiUrl}/api/users/${profile.id}/password`, {
+src/app/shift-signup/[categoryName]/[shiftName]/page.tsx:        const response = await fetch(`${apiUrl}/api/public/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(shiftName)}`);
+src/app/shift-signup/[categoryName]/[shiftName]/page.tsx:      const response = await fetch(`${apiUrl}/api/public/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(shiftName)}`, {
+src/app/forgot-password/page.tsx:      const res = await fetch(`${apiUrl}/api/forgot-password`, {
+src/app/forgot-password/page.tsx:      const res = await fetch(`${apiUrl}/api/verify-otp`, {
+src/app/forgot-password/page.tsx:      const res = await fetch(`${apiUrl}/api/reset-password`, {
+src/app/api/contact/route.ts:    const response = await fetch('http://localhost:3001/api/contact', {
+src/app/api/report-issue/route.ts:    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contact`, {
+src/app/kitchen-details/page.tsx:      const orgRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations`, {
+src/app/kitchen-details/page.tsx:      const statsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${userOrg.id}/stats`, {
+src/app/kitchen-details/page.tsx:      const categoriesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+src/app/kitchen-details/page.tsx:      const recordsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing`, {
+src/app/kitchen-details/page.tsx:      const statsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing/stats`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/incoming-value`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/meals-value`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/foodboxmealscount`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/backpackmealscount`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/approver-email-list`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/forgot`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/verify-otp`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/donor-password/reset`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing-categories`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing/${editingWeighingId}`, {
+src/app/kitchen-details/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/weighing/${weighingId}`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const shiftRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/edit`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-categories`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/default-users`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/default-users`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/fields/definitions`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/field-requirements`, {
+src/app/edit-shift/[shiftId]/page.tsx:      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/field-requirements/bulk`, {
+src/app/[organizationName]/volunteer-registration/page.tsx:      const orgResponse = await fetch(`${apiUrl}/api/public/organizations/${organizationName}`);
+src/app/[organizationName]/volunteer-registration/page.tsx:      const fieldsResponse = await fetch(`${apiUrl}/api/public/organizations/${organizationName}/registration-fields`);
+src/app/[organizationName]/volunteer-registration/page.tsx:      const response = await fetch(`${apiUrl}/api/public/organizations/${organizationName}/volunteer-registration`, {
+src/app/mobile-analytics/page.tsx:        fetch(`${baseUrl}/api/analytics/activity-timeline?${params}`, { headers }),
+src/app/mobile-analytics/page.tsx:        fetch(`${baseUrl}/api/analytics/user-summary?${params}`, { headers }),
+src/app/mobile-analytics/page.tsx:        fetch(`${baseUrl}/api/analytics/feature-usage?${params}`, { headers }),
+src/app/mobile-analytics/page.tsx:        fetch(`${baseUrl}/api/analytics/peak-hours?${params}`, { headers }),
+src/app/mobile-analytics/page.tsx:        fetch(`${baseUrl}/api/analytics/daily-patterns?${params}`, { headers })
+src/app/mobile-analytics/page.tsx:        const userRes = await fetch(`${baseUrl}/api/analytics/user/${selectedUser}?${params}`, { headers });
+src/stores/authStore.ts:import { auth } from '@/services/api/auth';
+src/stores/superAdminStore.ts:import { superadminApi } from '@/services/api/superadmin';
+src/stores/superAdminStore.ts:            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/auth/logout`, {
+src/components/features/grants/GrantCard.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grant.id}`, {
+src/components/features/grants/ReportHistoryModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants`, {
+src/components/features/grants/ViewDocumentsModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}/documents`, {
+src/components/features/grants/ViewDocumentsModal.tsx:        `${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}/documents/${documentId}`,
+src/components/features/grants/GrantReportModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grant.id}`, {
+src/components/features/grants/GrantDocumentsModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}/documents`, {
+src/components/features/grants/GrantDocumentsModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}/documents`, {
+src/components/features/grants/GrantDocumentsModal.tsx:        `${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}/documents/${documentId}`,
+src/components/features/grants/NewGrantModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assignable-people`, {
+src/components/features/grants/NewGrantModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grantId}/documents`, {
+src/components/features/grants/NewGrantModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants`, {
+src/components/features/grants/EditGrantModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assignable-people`, {
+src/components/features/grants/EditGrantModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/custom-grants/${grant.id}`, {
+src/components/features/grants/ManageAssignablePeopleModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assignable-people`, {
+src/components/features/grants/ManageAssignablePeopleModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assignable-people`, {
+src/components/features/grants/ManageAssignablePeopleModal.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assignable-people/${personId}`, {
+src/components/features/auth/PasswordProtection.tsx:      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/verify-donor-password`, {
+src/components/features/superadmin/SuperAdminHeader.tsx:                await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/auth/logout`, {
+src/components/features/superadmin/ImportHistoryTable.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${organizationId}/import-history`, {
+src/components/features/superadmin/BulkImportWizard.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${organizationId}/registration-fields`, {
+src/components/features/superadmin/BulkImportWizard.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${organizationId}/role-permissions/${role}`, {
+src/components/features/superadmin/BulkImportWizard.tsx:            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${organizationId}/users/import`, {
+src/components/features/superadmin/CreateOrganizationWizard.tsx:import { superadminApi } from '@/services/api/superadmin';
+src/components/features/superadmin/CreateOrganizationWizard.tsx:                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/module-templates`);
+src/components/features/superadmin/CreateOrganizationWizard.tsx:                // Let's fix `frontend/src/services/api/core.ts` later to ensure credentials are sent.
+src/components/features/legal/TermsAndConditions.tsx:      const response = await fetch(`${apiUrl}/api/terms-and-conditions`, {
+src/components/features/legal/TermsAndConditions.tsx:      const response = await fetch(`${apiUrl}/api/terms-and-conditions`, {
+src/components/features/legal/TermsAndConditions.tsx:      const response = await fetch(`${apiUrl}/api/terms-and-conditions/${editingTerms.id}`, {
+src/components/features/legal/TermsAndConditions.tsx:      const response = await fetch(`${apiUrl}/api/terms-and-conditions/${editingTerms.id}/file`, {
+src/components/features/legal/TermsAndConditions.tsx:      const response = await fetch(`${apiUrl}/api/terms-and-conditions/${terms.id}`, {
+src/components/features/reports/ReportIssueModal.tsx:          const userResponse = await fetch(`${apiUrl}/api/users/${user.userId}`, {
+src/components/features/reports/ReportIssueModal.tsx:      const response = await fetch('/api/report-issue', {

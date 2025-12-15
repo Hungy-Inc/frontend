@@ -4,40 +4,19 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import { FaPlus } from 'react-icons/fa';
+import { useQuery } from '@tanstack/react-query';
+import { superadminApi } from '@/services/api/superadmin';
 import DataTable from '@/components/superadmin/DataTable';
 
 
 export default function OrganizationsPage() {
     const router = useRouter();
-    const [organizations, setOrganizations] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
-    const fetchOrganizations = async () => {
-        try {
-            setLoading(true);
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations?search=${search}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setOrganizations(data);
-            }
-        } catch (error) {
-            console.error('Error fetching organizations:', error);
-            toast.error('Failed to load organizations');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchOrganizations();
-    }, [search]);
+    const { data: organizations = [], isLoading: loading } = useQuery({
+        queryKey: ['organizations', search],
+        queryFn: () => superadminApi.getOrganizations(search)
+    });
 
 
 

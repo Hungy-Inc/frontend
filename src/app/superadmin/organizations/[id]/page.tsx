@@ -12,6 +12,7 @@ import OrganizationForm from '@/components/superadmin/OrganizationForm';
 import UserForm from '@/components/superadmin/UserForm';
 import BulkImportWizard from '@/components/superadmin/BulkImportWizard';
 import ImportHistoryTable from '@/components/superadmin/ImportHistoryTable';
+import { superadminApi } from '@/services/api/superadmin';
 
 export default function OrganizationDetailsPage() {
     const params = useParams();
@@ -37,41 +38,18 @@ export default function OrganizationDetailsPage() {
     const fetchOrganizationDetails = async () => {
         try {
             setLoading(true);
-            const token = localStorage.getItem('superAdminToken');
+            const data = await superadminApi.getOrganization(Number(params.id));
+            setOrganization(data);
 
-            // Fetch Org Details
-            const orgResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const modulesData = await superadminApi.getOrganizationModules(Number(params.id));
+            setModules(modulesData);
 
-            if (orgResponse.ok) {
-                const data = await orgResponse.json();
-                setOrganization(data);
-            } else {
-                toast.error('Failed to load organization');
-                router.push('/superadmin/organizations');
-                return;
-            }
-
-            // Fetch Modules
-            const modulesResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}/modules`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (modulesResponse.ok) {
-                setModules(await modulesResponse.json());
-            }
-
-            // Fetch Users
-            const usersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}/users`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (usersResponse.ok) {
-                setUsers(await usersResponse.json());
-            }
-
+            const usersData = await superadminApi.getOrganizationUsers(Number(params.id));
+            setUsers(usersData);
         } catch (error) {
             console.error('Error fetching details:', error);
             toast.error('Failed to load details');
+            router.push('/superadmin/organizations');
         } finally {
             setLoading(false);
         }
@@ -85,16 +63,10 @@ export default function OrganizationDetailsPage() {
 
     const fetchAvailableTemplates = async () => {
         try {
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/module-templates`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const templates = await response.json();
-                // Filter out already assigned modules
-                const assignedTemplateIds = modules.map(m => m.moduleTemplateId);
-                setAvailableTemplates(templates.filter((t: any) => !assignedTemplateIds.includes(t.id)));
-            }
+            const templates = await superadminApi.getModuleTemplates();
+            // Filter out already assigned modules
+            const assignedTemplateIds = modules.map(m => m.moduleTemplateId);
+            setAvailableTemplates(templates.filter((t: any) => !assignedTemplateIds.includes(t.id)));
         } catch (error) {
             console.error('Error fetching templates:', error);
         }
@@ -102,23 +74,10 @@ export default function OrganizationDetailsPage() {
 
     const handleUpdateOrg = async (formData: any) => {
         try {
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                toast.success('Organization updated successfully');
-                setIsEditModalOpen(false);
-                fetchOrganizationDetails();
-            } else {
-                toast.error('Failed to update organization');
-            }
+            await superadminApi.updateOrganization(Number(params.id), formData);
+            toast.success('Organization updated successfully');
+            setIsEditModalOpen(false);
+            fetchOrganizationDetails();
         } catch (error) {
             console.error('Error updating org:', error);
             toast.error('Failed to update organization');
@@ -127,16 +86,9 @@ export default function OrganizationDetailsPage() {
 
     const handleToggleModule = async (moduleId: number) => {
         try {
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}/modules/${moduleId}/toggle`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                toast.success('Module status updated');
-                fetchOrganizationDetails();
-            }
+            await superadminApi.toggleOrganizationModule(Number(params.id), moduleId);
+            toast.success('Module status updated');
+            fetchOrganizationDetails();
         } catch (error) {
             console.error('Error toggling module:', error);
             toast.error('Failed to update module');
@@ -145,24 +97,11 @@ export default function OrganizationDetailsPage() {
 
     const handleAssignModules = async () => {
         try {
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}/modules`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ moduleTemplateIds: selectedTemplates })
-            });
-
-            if (response.ok) {
-                toast.success('Modules assigned successfully');
-                setIsModuleModalOpen(false);
-                setSelectedTemplates([]);
-                fetchOrganizationDetails();
-            } else {
-                toast.error('Failed to assign modules');
-            }
+            await superadminApi.assignOrganizationModules(Number(params.id), selectedTemplates);
+            toast.success('Modules assigned successfully');
+            setIsModuleModalOpen(false);
+            setSelectedTemplates([]);
+            fetchOrganizationDetails();
         } catch (error) {
             console.error('Error assigning modules:', error);
             toast.error('Failed to assign modules');
@@ -171,30 +110,16 @@ export default function OrganizationDetailsPage() {
 
     const handleCreateUser = async (formData: any) => {
         try {
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/users`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    ...formData,
-                    organizationId: parseInt(formData.organizationId)
-                })
+            await superadminApi.createUser({
+                ...formData,
+                organizationId: parseInt(formData.organizationId)
             });
-
-            if (response.ok) {
-                toast.success('User created successfully');
-                setIsUserModalOpen(false);
-                fetchOrganizationDetails(); // Refresh users list
-            } else {
-                const data = await response.json();
-                toast.error(data.error || 'Failed to create user');
-            }
-        } catch (error) {
+            toast.success('User created successfully');
+            setIsUserModalOpen(false);
+            fetchOrganizationDetails(); // Refresh users list
+        } catch (error: any) {
             console.error('Error creating user:', error);
-            toast.error('Failed to create user');
+            toast.error(error.message || 'Failed to create user');
         }
     };
 
@@ -222,23 +147,10 @@ export default function OrganizationDetailsPage() {
 
     const handleSavePermissions = async () => {
         try {
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${params.id}/permissions`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ permissions: permissionData })
-            });
-
-            if (response.ok) {
-                toast.success('Permissions updated successfully');
-                setIsPermissionModalOpen(false);
-                fetchOrganizationDetails(); // Refresh to get latest data
-            } else {
-                toast.error('Failed to update permissions');
-            }
+            await superadminApi.updateOrganizationPermissions(Number(params.id), permissionData);
+            toast.success('Permissions updated successfully');
+            setIsPermissionModalOpen(false);
+            fetchOrganizationDetails(); // Refresh to get latest data
         } catch (error) {
             console.error('Error updating permissions:', error);
             toast.error('Failed to update permissions');

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { FaPlus, FaEdit, FaTrash, FaKey, FaFilter } from 'react-icons/fa';
+import { useQuery } from '@tanstack/react-query';
+import { superadminApi } from '@/services/api/superadmin';
 import DataTable from '@/components/superadmin/DataTable';
 import Modal from '@/components/superadmin/Modal';
 import UserForm from '@/components/superadmin/UserForm';
@@ -12,7 +14,7 @@ export default function UsersPage() {
     const searchParams = useSearchParams();
     const [users, setUsers] = useState<any[]>([]);
     const [organizations, setOrganizations] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    // search and filters are needed for query key and UI
     const [search, setSearch] = useState('');
     const [filters, setFilters] = useState({
         organizationId: searchParams.get('orgId') || '',
@@ -25,54 +27,34 @@ export default function UsersPage() {
     const [formLoading, setFormLoading] = useState(false);
     const [newPassword, setNewPassword] = useState('');
 
-    // Fetch organizations for dropdown
+    const { data: usersData, isLoading: loading, refetch: refetchUsers } = useQuery({
+        queryKey: ['users', search, filters],
+        queryFn: () => superadminApi.getUsers(search) // Note: API might need update to support filters if not already handling query string in getUsers
+    });
+
+    // Derived state from query result
     useEffect(() => {
-        const fetchOrgs = async () => {
-            try {
-                const token = localStorage.getItem('superAdminToken');
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations?isActive=true`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    setOrganizations(await response.json());
-                }
-            } catch (error) {
-                console.error('Error fetching orgs:', error);
-            }
-        };
-        fetchOrgs();
-    }, []);
-
-    // Fetch users
-    const fetchUsers = async () => {
-        try {
-            setLoading(true);
-            const token = localStorage.getItem('superAdminToken');
-
-            let query = `?search=${search}`;
-            if (filters.organizationId) query += `&organizationId=${filters.organizationId}`;
-            if (filters.role) query += `&role=${filters.role}`;
-            if (filters.status) query += `&status=${filters.status}`;
-
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/users${query}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setUsers(data.users);
-            }
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            toast.error('Failed to load users');
-        } finally {
-            setLoading(false);
+        if (usersData?.users) {
+            setUsers(usersData.users);
+        } else if (Array.isArray(usersData)) {
+            setUsers(usersData);
         }
-    };
+    }, [usersData]);
+
+    const { data: organizationsList = [] } = useQuery({
+        queryKey: ['organizations', 'active'],
+        queryFn: async () => {
+            const data = await superadminApi.getOrganizations();
+            return data.filter((org: any) => org.isActive);
+        }
+    });
 
     useEffect(() => {
-        fetchUsers();
-    }, [search, filters]);
+        if (organizationsList) {
+            setOrganizations(organizationsList);
+        }
+    }, [organizationsList]);
+
 
     // Open modal if action=create is in URL
     useEffect(() => {
@@ -95,18 +77,9 @@ export default function UsersPage() {
         if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
 
         try {
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/users/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                toast.success('User deleted successfully');
-                fetchUsers();
-            } else {
-                toast.error('Failed to delete user');
-            }
+            await superadminApi.deleteUser(id);
+            toast.success('User deleted successfully');
+            refetchUsers();
         } catch (error) {
             console.error('Error deleting user:', error);
             toast.error('Failed to delete user');
@@ -119,24 +92,11 @@ export default function UsersPage() {
 
         try {
             setFormLoading(true);
-            const token = localStorage.getItem('superAdminToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/users/${selectedUser.id}/reset-password`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ newPassword })
-            });
-
-            if (response.ok) {
-                toast.success('Password reset successfully');
-                setIsResetPasswordOpen(false);
-                setNewPassword('');
-                setSelectedUser(null);
-            } else {
-                toast.error('Failed to reset password');
-            }
+            await superadminApi.resetUserPassword(selectedUser.id, newPassword);
+            toast.success('Password reset successfully');
+            setIsResetPasswordOpen(false);
+            setNewPassword('');
+            setSelectedUser(null);
         } catch (error) {
             console.error('Error resetting password:', error);
             toast.error('Failed to reset password');
@@ -148,37 +108,22 @@ export default function UsersPage() {
     const handleSubmit = async (formData: any) => {
         try {
             setFormLoading(true);
-            const token = localStorage.getItem('superAdminToken');
 
-            let url, method;
             if (selectedUser) {
-                url = `${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/users/${selectedUser.id}`;
-                method = 'PUT';
+                await superadminApi.updateUser(selectedUser.id, formData);
             } else {
-                url = `${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/organizations/${formData.organizationId}/users`;
-                method = 'POST';
+                await superadminApi.createUser({
+                    ...formData,
+                    organizationId: Number(formData.organizationId)
+                });
             }
 
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                toast.success(`User ${selectedUser ? 'updated' : 'created'} successfully`);
-                setIsModalOpen(false);
-                fetchUsers();
-            } else {
-                const data = await response.json();
-                toast.error(data.error || 'Operation failed');
-            }
-        } catch (error) {
+            toast.success(`User ${selectedUser ? 'updated' : 'created'} successfully`);
+            setIsModalOpen(false);
+            refetchUsers();
+        } catch (error: any) {
             console.error('Error saving user:', error);
-            toast.error('Operation failed');
+            toast.error(error.message || 'Operation failed');
         } finally {
             setFormLoading(false);
         }
@@ -214,7 +159,7 @@ export default function UsersPage() {
             header: 'Status',
             accessor: (u: any) => (
                 <span className={`px-2 py-1 text-xs rounded-full ${u.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
-                        u.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                    u.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
                     }`}>
                     {u.status}
                 </span>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { useSuperAdminStore } from '@/stores/superAdminStore';
 import { FaLock, FaEnvelope, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 export default function SuperAdminLogin() {
@@ -30,11 +31,8 @@ export default function SuperAdminLogin() {
                 throw new Error(data.error || 'Login failed');
             }
 
-            // Store token
-            localStorage.setItem('superAdminToken', data.token);
-
-            // Store super admin info
-            localStorage.setItem('superAdminInfo', JSON.stringify(data.superAdmin));
+            // Update store
+            useSuperAdminStore.getState().login(data.superAdmin);
 
             toast.success('Login successful!');
             router.push('/superadmin/dashboard');

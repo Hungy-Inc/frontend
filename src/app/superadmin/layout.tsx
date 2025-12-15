@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useSuperAdminStore } from '@/stores/superAdminStore';
 import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
 import SuperAdminSidebar from '@/components/superadmin/SuperAdminSidebar';
 
@@ -12,50 +13,41 @@ export default function SuperAdminLayout({
 }) {
     const router = useRouter();
     const pathname = usePathname();
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const checkSession = useSuperAdminStore((state) => state.checkSession);
+    const isAuthenticated = useSuperAdminStore((state) => state.isAuthenticated);
+    const [isChecking, setIsChecking] = useState(true);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            // Skip auth check for login page
+        const initSession = async () => {
+            // Skip auth check for public pages
             if (pathname === '/superadmin/login' || pathname.startsWith('/superadmin/forgot-password') || pathname.startsWith('/superadmin/reset-password')) {
-                setLoading(false);
-                return;
-            }
-
-            const token = localStorage.getItem('superAdminToken');
-
-            if (!token) {
-                router.push('/superadmin/login');
+                setIsChecking(false);
                 return;
             }
 
             try {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/superadmin/auth/profile`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    setIsAuthenticated(true);
-                } else {
-                    localStorage.removeItem('superAdminToken');
-                    localStorage.removeItem('superAdminInfo');
-                    router.push('/superadmin/login');
-                }
+                await checkSession();
             } catch (error) {
-                console.error('Auth check failed:', error);
+                // If checkSession fails, redirect to login
                 router.push('/superadmin/login');
             } finally {
-                setLoading(false);
+                setIsChecking(false);
             }
         };
 
-        checkAuth();
-    }, [pathname, router]);
+        initSession();
+    }, [pathname, router, checkSession]);
 
-    if (loading) {
+    // Redirect if not authenticated and not on public page
+    useEffect(() => {
+        if (!isChecking && !isAuthenticated) {
+            if (pathname !== '/superadmin/login' && !pathname.startsWith('/superadmin/forgot-password') && !pathname.startsWith('/superadmin/reset-password')) {
+                router.push('/superadmin/login');
+            }
+        }
+    }, [isChecking, isAuthenticated, pathname, router]);
+
+    if (isChecking) {
         return (
             <div className="flex items-center justify-center h-screen bg-gray-50">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>

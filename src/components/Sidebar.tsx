@@ -1,7 +1,7 @@
 'use client';
 
 import styles from './Sidebar.module.css';
-import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog, FaEnvelope, FaQrcode, FaMobileAlt, FaHandHoldingUsd} from 'react-icons/fa';
+import { FaHome, FaUserFriends, FaChartBar, FaExchangeAlt, FaBoxOpen, FaClock, FaCalendarAlt, FaUtensils, FaUsers, FaCog, FaEnvelope, FaQrcode, FaMobileAlt, FaHandHoldingUsd } from 'react-icons/fa';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 
 const menu = [
   { icon: <FaHome />, label: 'Dashboard', href: '/dashboard', key: 'website_dashboard' },
-  { icon: <FaUserFriends />, label: 'Volunteer Hours', href: '/volunteers', key: 'website_volunteer_hours' },
+  { icon: <FaUserFriends />, label: 'Volunteer Management', href: '/volunteers', key: 'website_volunteer_hours' },
   { icon: <FaChartBar />, label: 'Incoming Stats', href: '/incoming-stats', key: 'website_incoming_stats' },
   { icon: <FaExchangeAlt />, label: 'Outgoing Stats', href: '/outgoing-stats', key: 'website_outgoing_stats' },
   { icon: <FaBoxOpen />, label: 'Inventory', href: '/inventory', key: 'website_inventory' },
@@ -22,7 +22,7 @@ const menu = [
   { icon: <FaEnvelope />, label: 'Email Management', href: '/email-management', key: 'website_email_management' },
   { icon: <FaQrcode />, label: 'QR Codes', href: '/qr-codes', key: 'website_qr_codes' },
   { icon: <FaMobileAlt />, label: 'Mobile Analytics', href: '/mobile-analytics', key: 'website_mobile_analytics' },
-  { icon: <FaHandHoldingUsd />, label: 'My Grants', href: '/my-grants', key: 'website_my_grants'},
+  { icon: <FaHandHoldingUsd />, label: 'My Grants', href: '/my-grants', key: 'website_my_grants' },
   { icon: <FaUtensils />, label: 'Kitchen Details', href: '/kitchen-details', key: 'website_kitchen_details' },
 ];
 

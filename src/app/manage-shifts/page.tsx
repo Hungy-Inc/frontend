@@ -728,9 +728,22 @@ export default function ManageShiftsPage() {
           // Create date without time to avoid timezone issues
           const occurrenceDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
 
-          // Set the time for this occurrence
-          const startTime = new Date(shift.startTime);
-          const endTime = new Date(shift.endTime);
+          // Check for day-specific configuration
+          const dayConfig = shift.RecurringShiftDayConfig?.find((config: any) => config.dayOfWeek === dayOfWeek);
+          
+          // Set the time for this occurrence - use day config if available, otherwise global
+          let startTime: Date;
+          let endTime: Date;
+          
+          if (dayConfig && dayConfig.startTime && dayConfig.endTime) {
+            // Use day-specific times
+            startTime = new Date(dayConfig.startTime);
+            endTime = new Date(dayConfig.endTime);
+          } else {
+            // Use global times
+            startTime = new Date(shift.startTime);
+            endTime = new Date(shift.endTime);
+          }
 
           const occurrenceStart = new Date(occurrenceDate);
           occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
@@ -768,9 +781,22 @@ export default function ManageShiftsPage() {
           const occurrenceDate = new Date(startDate);
           occurrenceDate.setDate(startDate.getDate() + dayDiff + (i * 7));
 
-          // Set the time for this occurrence
-          const startTime = new Date(shift.startTime);
-          const endTime = new Date(shift.endTime);
+          // Check for day-specific configuration
+          const dayConfig = shift.RecurringShiftDayConfig?.find((config: any) => config.dayOfWeek === dayOfWeek);
+          
+          // Set the time for this occurrence - use day config if available, otherwise global
+          let startTime: Date;
+          let endTime: Date;
+          
+          if (dayConfig && dayConfig.startTime && dayConfig.endTime) {
+            // Use day-specific times
+            startTime = new Date(dayConfig.startTime);
+            endTime = new Date(dayConfig.endTime);
+          } else {
+            // Use global times
+            startTime = new Date(shift.startTime);
+            endTime = new Date(shift.endTime);
+          }
 
           const occurrenceStart = new Date(occurrenceDate);
           occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);

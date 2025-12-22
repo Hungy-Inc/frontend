@@ -46,6 +46,15 @@ export default function EditShiftPage() {
   const router = useRouter();
   const shiftId = parseInt(params.shiftId as string);
 
+  // Day specific configuration interface
+  interface DayConfig {
+    isActive: boolean;
+    slots: number | null;
+    startTime: string | null;
+    endTime: string | null;
+    defaultUserIds: number[];
+  }
+
   const [shift, setShift] = useState<ShiftDetails | null>(null);
   // Dynamic field management state
   const [shiftFields, setShiftFields] = useState<any[]>([]);
@@ -55,12 +64,18 @@ export default function EditShiftPage() {
   const [fieldPage, setFieldPage] = useState(1);
   const [fieldsPerPage] = useState(10);
   const [savingFields, setSavingFields] = useState(false);
+
+  // Day specific configuration state
+  const [showDayConfigs, setShowDayConfigs] = useState(false);
+  const [dayConfigs, setDayConfigs] = useState<{ [key: number]: DayConfig }>({});
+  const [daySearchTerms, setDaySearchTerms] = useState<{ [key: number]: string }>({});
+
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Unsaved changes tracking
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -105,11 +120,11 @@ export default function EditShiftPage() {
   // Utility function for deep comparison
   const deepEqual = (obj1: any, obj2: any): boolean => {
     if (obj1 === obj2) return true;
-    
+
     if (obj1 == null || obj2 == null) return obj1 === obj2;
-    
+
     if (typeof obj1 !== typeof obj2) return false;
-    
+
     if (Array.isArray(obj1) && Array.isArray(obj2)) {
       if (obj1.length !== obj2.length) return false;
       // Sort arrays before comparison for consistent results
@@ -117,26 +132,26 @@ export default function EditShiftPage() {
       const sorted2 = [...obj2].sort();
       return sorted1.every((item, index) => deepEqual(item, sorted2[index]));
     }
-    
+
     if (typeof obj1 === 'object') {
       const keys1 = Object.keys(obj1);
       const keys2 = Object.keys(obj2);
-      
+
       if (keys1.length !== keys2.length) return false;
-      
+
       return keys1.every(key => deepEqual(obj1[key], obj2[key]));
     }
-    
+
     return obj1 === obj2;
   };
 
   // Detect changes in form data
   useEffect(() => {
     if (!originalShiftForm) return;
-    
+
     const shiftChanged = !deepEqual(shiftForm, originalShiftForm);
     const usersChanged = !deepEqual(selectedDefaultUsers, originalDefaultUsers);
-    
+
     const hasChanges = shiftChanged || usersChanged;
     setHasUnsavedChanges(hasChanges);
   }, [shiftForm, selectedDefaultUsers, originalShiftForm, originalDefaultUsers]);
@@ -159,7 +174,7 @@ export default function EditShiftPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       // Fetch shift details
       const shiftRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/edit`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -173,17 +188,17 @@ export default function EditShiftPage() {
       setShift(shiftData);
 
       // Set form data with Halifax timezone conversion
-      const daysOfWeek = shiftData.newDaysOfWeek && shiftData.newDaysOfWeek.length > 0 
-        ? shiftData.newDaysOfWeek 
+      const daysOfWeek = shiftData.newDaysOfWeek && shiftData.newDaysOfWeek.length > 0
+        ? shiftData.newDaysOfWeek
         : (shiftData.dayOfWeek !== null ? [shiftData.dayOfWeek] : []);
-      
+
       const formData = {
         name: shiftData.name,
         newDaysOfWeek: daysOfWeek,
-        startTime: shiftData.isRecurring 
+        startTime: shiftData.isRecurring
           ? convertUTCTimeToHalifaxTime(shiftData.startTime) // Convert UTC to Halifax time for recurring shifts
           : convertUTCToHalifax(shiftData.startTime), // Full datetime for one-time shifts
-        endTime: shiftData.isRecurring 
+        endTime: shiftData.isRecurring
           ? convertUTCTimeToHalifaxTime(shiftData.endTime) // Convert UTC to Halifax time for recurring shifts
           : convertUTCToHalifax(shiftData.endTime), // Full datetime for one-time shifts
         shiftCategoryId: shiftData.shiftCategoryId.toString(),
@@ -191,8 +206,56 @@ export default function EditShiftPage() {
         slots: shiftData.slots,
         isActive: shiftData.isActive
       };
-      
+
       setShiftForm(formData);
+
+      // Populate day configs if available
+      // Populate day configs if available
+      if (shiftData.RecurringShiftDayConfig && shiftData.RecurringShiftDayConfig.length > 0) {
+        setShowDayConfigs(true);
+        const configs: { [key: number]: DayConfig } = {};
+
+        // Initialize ALL days (0-6)
+        [0, 1, 2, 3, 4, 5, 6].forEach((day) => {
+          configs[day] = {
+            isActive: daysOfWeek.includes(day), // Active only if part of global days
+            slots: null,
+            startTime: null,
+            endTime: null,
+            defaultUserIds: []
+          };
+        });
+
+        // Override with loaded configs
+        shiftData.RecurringShiftDayConfig.forEach((config: any) => {
+          // If valid config exists, update the specific day
+          if (configs[config.dayOfWeek]) {
+            configs[config.dayOfWeek] = {
+              ...configs[config.dayOfWeek],
+              isActive: config.isActive,
+              slots: config.slots,
+              // Convert UTC DateTime to Halifax time (HH:MM format)
+              startTime: config.startTime ? convertUTCTimeToHalifaxTime(config.startTime) : null,
+              endTime: config.endTime ? convertUTCTimeToHalifaxTime(config.endTime) : null,
+              defaultUserIds: [] // Default users fetched separately
+            };
+          }
+        });
+        setDayConfigs(configs);
+      } else if (shiftData.isRecurring) {
+        // Initialize empty configs for recurring shift for ALL days
+        const configs: { [key: number]: DayConfig } = {};
+        [0, 1, 2, 3, 4, 5, 6].forEach((day) => {
+          configs[day] = {
+            isActive: daysOfWeek.includes(day), // Active only if part of global days
+            slots: null,
+            startTime: null,
+            endTime: null,
+            defaultUserIds: []
+          };
+        });
+        setDayConfigs(configs);
+      }
       // Create proper deep copy for comparison
       setOriginalShiftForm({
         name: formData.name,
@@ -259,13 +322,57 @@ export default function EditShiftPage() {
       if (res.ok) {
         const data = await res.json();
         console.log('Fetched default users:', data); // Debug log
-        // Ensure all user IDs are numbers and filter out invalid ones
-        const defaultUserIds = data.defaultUsers
+
+        // Handle global default users (dayOfWeek is null)
+        const globalDefaultUsers = data.defaultUsers
+          .filter((du: any) => du.dayOfWeek === null)
           .map((du: any) => du.userId)
           .filter((id: any): id is number => id != null && !isNaN(Number(id)))
           .map((id: any) => Number(id));
-        setSelectedDefaultUsers(defaultUserIds);
-        setOriginalDefaultUsers([...defaultUserIds]); // Store original for comparison
+
+        setSelectedDefaultUsers(globalDefaultUsers);
+        setOriginalDefaultUsers([...globalDefaultUsers]); // Store original for comparison
+
+        // Handle day-specific default users
+        setDayConfigs(prev => {
+          const newConfigs = { ...prev };
+          
+          // First, collect all day-specific user IDs by day
+          const dayUserMap: { [key: number]: number[] } = {};
+          data.defaultUsers
+            .filter((du: any) => du.dayOfWeek !== null)
+            .forEach((du: any) => {
+              const day = du.dayOfWeek;
+              if (!dayUserMap[day]) {
+                dayUserMap[day] = [];
+              }
+              dayUserMap[day].push(du.userId);
+            });
+          
+          // Then update day configs with the collected user IDs
+          Object.keys(dayUserMap).forEach(dayStr => {
+            const day = Number(dayStr);
+            if (newConfigs[day]) {
+              // Preserve all existing config, only update defaultUserIds
+              newConfigs[day] = {
+                ...newConfigs[day],
+                defaultUserIds: dayUserMap[day]
+              };
+            } else {
+              // If day config doesn't exist yet, create it
+              newConfigs[day] = {
+                isActive: true,
+                slots: null,
+                startTime: null,
+                endTime: null,
+                defaultUserIds: dayUserMap[day]
+              };
+            }
+          });
+          
+          return newConfigs;
+        });
+
       } else {
         console.error('Failed to fetch default users:', res.status, res.statusText);
         setSelectedDefaultUsers([]);
@@ -280,16 +387,16 @@ export default function EditShiftPage() {
     setSavingDefaultUsers(true);
     try {
       const token = localStorage.getItem("token");
-      
+
       // Filter out invalid user IDs and ensure they are numbers
       const validUserIds = selectedDefaultUsers
         .filter((id): id is number => id != null && !isNaN(Number(id)))
         .map(id => Number(id));
-      
+
       if (validUserIds.length === 0 && selectedDefaultUsers.length > 0) {
         throw new Error('No valid user IDs found. Please check your selection.');
       }
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/default-users`, {
         method: 'PUT', // Changed from POST to PUT for bulk update
         headers: {
@@ -305,10 +412,10 @@ export default function EditShiftPage() {
       }
 
       toast.success('Default users saved successfully!');
-      
+
       // Update original values to reflect saved state
       setOriginalDefaultUsers([...validUserIds]);
-      
+
       // Refresh the default users to confirm they're saved
       await fetchDefaultUsersForShift(shiftId);
     } catch (err) {
@@ -320,17 +427,17 @@ export default function EditShiftPage() {
 
   const handleShiftSave = async () => {
     if (!shift) return;
-    
+
     // Validation
     if (shift.isRecurring && shiftForm.newDaysOfWeek.length === 0) {
       toast.error("Please select at least one day of the week for recurring shifts");
       return;
     }
-    
+
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      
+
       // Prepare update data based on shift type
       let updateData: any = {
         name: shiftForm.name,
@@ -367,7 +474,20 @@ export default function EditShiftPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(updateData)
+        body: JSON.stringify({
+          ...updateData,
+          dayConfigs: Object.entries(dayConfigs).map(([day, config]) => ({
+            dayOfWeek: Number(day),
+            isActive: config.isActive,
+            slots: config.slots,
+            // Convert Halifax time strings (HH:MM) to UTC DateTime format
+            // Use fixed reference date (true) for consistent storage, same as global times
+            startTime: config.startTime ? convertHalifaxToUTC(config.startTime, true) : null,
+            endTime: config.endTime ? convertHalifaxToUTC(config.endTime, true) : null,
+            defaultUserIds: config.defaultUserIds
+          }))
+        })
+
       });
 
       if (!res.ok) {
@@ -375,10 +495,51 @@ export default function EditShiftPage() {
         throw new Error(errorData.error || 'Failed to update shift');
       }
 
-      // Note: Default users are saved separately using the "Save Default Users" button
+      // Get the updated shift data from response
+      const updatedShiftData = await res.json();
+
+      // Update day configs from the response
+      if (updatedShiftData.RecurringShiftDayConfig && Array.isArray(updatedShiftData.RecurringShiftDayConfig)) {
+        const updatedConfigs: { [key: number]: DayConfig } = {};
+        
+        // Initialize ALL days (0-6) with defaults
+        [0, 1, 2, 3, 4, 5, 6].forEach((day) => {
+          updatedConfigs[day] = {
+            isActive: shiftForm.newDaysOfWeek.includes(day), // Active only if part of global days
+            slots: null,
+            startTime: null,
+            endTime: null,
+            defaultUserIds: []
+          };
+        });
+
+        // Override with loaded configs from response
+        updatedShiftData.RecurringShiftDayConfig.forEach((config: any) => {
+          if (updatedConfigs[config.dayOfWeek] !== undefined) {
+            updatedConfigs[config.dayOfWeek] = {
+              ...updatedConfigs[config.dayOfWeek],
+              isActive: config.isActive,
+              slots: config.slots,
+              startTime: config.startTime ? convertUTCTimeToHalifaxTime(config.startTime) : null, // Convert UTC to Halifax time
+              endTime: config.endTime ? convertUTCTimeToHalifaxTime(config.endTime) : null,
+              defaultUserIds: [] // Will be reloaded separately
+            };
+          }
+        });
+
+        setDayConfigs(updatedConfigs);
+        
+        // Enable day configs UI if there are any day configs
+        if (updatedShiftData.RecurringShiftDayConfig.length > 0) {
+          setShowDayConfigs(true);
+        }
+      }
+
+      // Reload default users for each day to get the updated day-specific users
+      await fetchDefaultUsersForShift(shiftId);
 
       toast.success('Shift details updated successfully!');
-      
+
       // Update original values to reflect saved state (deep copy)
       setOriginalShiftForm({
         name: shiftForm.name,
@@ -390,9 +551,6 @@ export default function EditShiftPage() {
         slots: shiftForm.slots,
         isActive: shiftForm.isActive
       });
-      
-      // Don't refresh data immediately to avoid overwriting the updated original values
-      // The form state is already up to date
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update shift');
     } finally {
@@ -452,7 +610,7 @@ export default function EditShiftPage() {
   };
 
   const updateFieldInForm = (fieldId: number, updates: any) => {
-    setShiftFields(shiftFields.map(field => 
+    setShiftFields(shiftFields.map(field =>
       field.fieldDefinitionId === fieldId ? { ...field, ...updates } : field
     ));
   };
@@ -461,7 +619,7 @@ export default function EditShiftPage() {
     setSavingFields(true);
     try {
       const token = localStorage.getItem("token");
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/recurring-shifts/${shiftId}/field-requirements/bulk`, {
         method: 'POST',
         headers: {
@@ -483,7 +641,7 @@ export default function EditShiftPage() {
       }
 
       toast.success('Field requirements saved successfully!');
-      
+
       // Refresh the field data to confirm they're saved
       await loadShiftFields();
     } catch (err) {
@@ -653,37 +811,53 @@ export default function EditShiftPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   > */}
                   <div className="flex flex-wrap gap-4">
-                    {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day, i) => (
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, i) => (
                       // <option key={i} value={i}>{day}</option>
                       <label key={i} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={shiftForm.newDaysOfWeek.includes(i)}
                           onChange={(e) => {
-                            if (e.target.checked) {
-                              setShiftForm(prev => {
-                                const newDaysOfWeek = [...prev.newDaysOfWeek, i];
-                                return {
-                                  ...prev,
-                                  newDaysOfWeek
-                                };
-                              });
+                            const isChecked = e.target.checked;
+
+                            // 1. Update Global State
+                            if (isChecked) {
+                              setShiftForm(prev => ({
+                                ...prev,
+                                newDaysOfWeek: [...prev.newDaysOfWeek, i].sort()
+                              }));
                             } else {
-                              setShiftForm(prev => {
-                                const newDaysOfWeek = prev.newDaysOfWeek.filter(d => d !== i);
-                                return {
-                                  ...prev,
-                                  newDaysOfWeek
-                                };
-                              });
+                              setShiftForm(prev => ({
+                                ...prev,
+                                newDaysOfWeek: prev.newDaysOfWeek.filter(d => d !== i).sort()
+                              }));
                             }
+
+                            // 2. Sync Day Config State
+                            setDayConfigs(prev => {
+                              const existingConfig = prev[i] || {
+                                isActive: isChecked,
+                                slots: null,
+                                startTime: null,
+                                endTime: null,
+                                defaultUserIds: []
+                              };
+
+                              return {
+                                ...prev,
+                                [i]: {
+                                  ...existingConfig,
+                                  isActive: isChecked
+                                }
+                              };
+                            });
                           }}
                           className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                         />
                         <span className="text-sm text-gray-700">{day}</span>
                       </label>
                     ))}
-                  {/* </select> */}
+                    {/* </select> */}
                   </div>
                   {shiftForm.newDaysOfWeek.length === 0 && (
                     <p className="text-red-500 text-sm mt-1">Please select at least one day</p>
@@ -717,6 +891,8 @@ export default function EditShiftPage() {
                   />
                 </div>
               </div>
+
+
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -777,7 +953,213 @@ export default function EditShiftPage() {
             </div>
 
             {/* Save Button for Shift Details */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
+
+
+
+            {shift.isRecurring && shiftForm.newDaysOfWeek.length > 0 && (
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                    <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
+                      Section A.1
+                    </span>
+                    Day Configuration
+                  </h2>
+                  <label className="flex items-center cursor-pointer select-none">
+                    <span className="text-sm mr-3 font-medium text-gray-600">Enable Individual Config</span>
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={showDayConfigs}
+                        onChange={() => setShowDayConfigs(!showDayConfigs)}
+                      />
+                      <div className={`block w-12 h-7 rounded-full transition-colors ${showDayConfigs ? 'bg-orange-500' : 'bg-gray-300'}`}></div>
+                      <div className={`absolute left-1 top-1 bg-white w-5 h-5 rounded-full transition-transform ${showDayConfigs ? 'transform translate-x-5' : ''}`}></div>
+                    </div>
+                  </label>
+                </div>
+
+                {showDayConfigs && (
+                  <>
+                    <div className="space-y-8 mt-8">
+
+                      {[0, 1, 2, 3, 4, 5, 6].map((day, index) => {
+
+                        const config = dayConfigs[day] || { isActive: true, slots: null, startTime: null, endTime: null, defaultUserIds: [] };
+                        const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day];
+
+                        return (
+                          <div key={day} className={`bg-gray-50 rounded-lg border p-6 transition-all ${!config.isActive ? 'opacity-70 bg-gray-100' : ''}`}>
+                            <div className="flex items-center justify-between mb-6 border-b pb-4">
+                              <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                                <span className="bg-white border text-gray-600 px-2 py-1 rounded text-xs font-semibold mr-2 uppercase tracking-wide shadow-sm">
+                                  Day {index + 1}
+                                </span>
+                                {dayName}
+                              </h3>
+                              <label className="flex items-center cursor-pointer select-none">
+                                <span className="text-sm mr-2 font-medium text-gray-600">{config.isActive ? 'Active' : 'Skipped'}</span>
+                                <div className="relative">
+                                  <input
+                                    type="checkbox"
+                                    checked={config.isActive}
+                                    onChange={(e) => {
+                                      const isChecked = e.target.checked;
+
+                                      // Update dayConfigs state
+                                      setDayConfigs(prev => ({
+                                        ...prev,
+                                        [day]: { ...prev[day], isActive: isChecked }
+                                      }));
+
+                                      // Update main form newDaysOfWeek state
+                                      setShiftForm(prev => {
+                                        const currentDays = prev.newDaysOfWeek || [];
+                                        if (isChecked) {
+                                          return { ...prev, newDaysOfWeek: [...new Set([...currentDays, day])].sort() };
+                                        } else {
+                                          return { ...prev, newDaysOfWeek: currentDays.filter(d => d !== day).sort() };
+                                        }
+                                      });
+                                    }}
+                                    className="sr-only"
+                                  />
+                                  <div className={`block w-10 h-6 rounded-full transition-colors ${config.isActive ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                  <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${config.isActive ? 'transform translate-x-4' : ''}`}></div>
+                                </div>
+                              </label>
+                            </div>
+
+                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 ${!config.isActive ? 'pointer-events-none grayscale opacity-50' : ''}`}>
+                              {/* Left Column: Times & Slots */}
+                              <div className="space-y-6">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">Slots Override</label>
+                                  <div className="relative">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder={`Default: ${shiftForm.slots || 'Not set'}`}
+                                      value={config.slots === null ? '' : config.slots}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? null : Number(e.target.value);
+                                        setDayConfigs(prev => ({
+                                          ...prev,
+                                          [day]: { ...prev[day], slots: val }
+                                        }));
+                                      }}
+                                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                      disabled={!config.isActive}
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Leave empty to use the global setting.</p>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Time</label>
+                                    <input
+                                      type="time"
+                                      value={config.startTime || ''}
+                                      onChange={(e) => setDayConfigs(prev => ({
+                                        ...prev,
+                                        [day]: { ...prev[day], startTime: e.target.value || null }
+                                      }))}
+                                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                      disabled={!config.isActive}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">End Time</label>
+                                    <input
+                                      type="time"
+                                      value={config.endTime || ''}
+                                      onChange={(e) => setDayConfigs(prev => ({
+                                        ...prev,
+                                        [day]: { ...prev[day], endTime: e.target.value || null }
+                                      }))}
+                                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                      disabled={!config.isActive}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right Column: Default Users */}
+                              <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                                <label className="block text-sm font-semibold text-gray-800 mb-3">Default Users for {dayName}</label>
+
+                                {/* Search */}
+                                <div className="mb-3 relative">
+                                  <input
+                                    type="text"
+                                    placeholder="Search users..."
+                                    value={daySearchTerms[day] || ''}
+                                    onChange={(e) => setDaySearchTerms(prev => ({ ...prev, [day]: e.target.value }))}
+                                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                    disabled={!config.isActive}
+                                  />
+                                  <svg className="w-4 h-4 text-gray-400 absolute left-2.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                </div>
+
+                                {/* List */}
+                                <div className="flex-1 overflow-y-auto max-h-48 space-y-2 pr-1 custom-scrollbar">
+                                  {availableUsers
+                                    .filter(u => u.status === 'APPROVED')
+                                    .filter(u => {
+                                      const term = (daySearchTerms[day] || '').toLowerCase();
+                                      if (!term) return true;
+                                      const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+                                      return fullName.includes(term) || u.email.toLowerCase().includes(term);
+                                    })
+                                    .map(user => (
+                                      <label key={`${day}-${user.id}`} className="flex items-center p-2 rounded hover:bg-indigo-50 cursor-pointer transition-colors border border-transparent hover:border-indigo-100">
+                                        <input
+                                          type="checkbox"
+                                          checked={config.defaultUserIds?.includes(Number(user.id))}
+                                          onChange={(e) => {
+                                            setDayConfigs(prev => {
+                                              const currentIds = prev[day]?.defaultUserIds || [];
+                                              const newIds = e.target.checked
+                                                ? [...currentIds, Number(user.id)]
+                                                : currentIds.filter(id => id !== Number(user.id));
+                                              return {
+                                                ...prev,
+                                                [day]: { ...prev[day], defaultUserIds: newIds }
+                                              };
+                                            });
+                                          }}
+                                          disabled={!config.isActive}
+                                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 mr-3"
+                                        />
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-medium text-gray-700">{user.firstName} {user.lastName}</span>
+                                          <span className="text-xs text-gray-500">{user.email}</span>
+                                        </div>
+                                      </label>
+                                    ))
+                                  }
+                                  {availableUsers.filter(u => u.status === 'APPROVED' && (`${u.firstName} ${u.lastName}`.toLowerCase().includes((daySearchTerms[day] || '').toLowerCase()))).length === 0 && (
+                                    <div className="text-center py-6 text-xs text-gray-400">No users found</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    </div>
+
+
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Unified Save Button for Section A + A.1 */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
               <button
                 onClick={handleShiftSave}
                 disabled={saving}
@@ -830,7 +1212,7 @@ export default function EditShiftPage() {
                 ) : (
                   <div className="divide-y divide-gray-200">
                     {availableUsers
-                      .filter(user => 
+                      .filter(user =>
                         user.firstName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
                         user.lastName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
                         user.email?.toLowerCase().includes(userSearchTerm.toLowerCase())
@@ -839,33 +1221,33 @@ export default function EditShiftPage() {
                       .map((user) => {
                         const userId = Number(user.id); // Ensure ID is a number
                         return (
-                        <div key={userId} className="p-3 hover:bg-gray-50">
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedDefaultUsers.includes(userId)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  // Only add if user ID is valid
-                                  if (userId != null && !isNaN(userId)) {
-                                    setSelectedDefaultUsers([...selectedDefaultUsers, userId]);
+                          <div key={userId} className="p-3 hover:bg-gray-50">
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedDefaultUsers.includes(userId)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    // Only add if user ID is valid
+                                    if (userId != null && !isNaN(userId)) {
+                                      setSelectedDefaultUsers([...selectedDefaultUsers, userId]);
+                                    } else {
+                                      toast.error(`Invalid user ID for user: ${user.firstName} ${user.lastName}`);
+                                    }
                                   } else {
-                                    toast.error(`Invalid user ID for user: ${user.firstName} ${user.lastName}`);
+                                    setSelectedDefaultUsers(selectedDefaultUsers.filter(id => id !== userId));
                                   }
-                                } else {
-                                  setSelectedDefaultUsers(selectedDefaultUsers.filter(id => id !== userId));
-                                }
-                              }}
-                              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                            />
-                            <div className="ml-3">
-                              <div className="text-sm font-medium text-gray-900">
-                                {user.firstName} {user.lastName}
+                                }}
+                                className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                              />
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {user.firstName} {user.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">{user.email}</div>
                               </div>
-                              <div className="text-sm text-gray-500">{user.email}</div>
-                            </div>
-                          </label>
-                        </div>
+                            </label>
+                          </div>
                         );
                       })}
                   </div>
@@ -905,7 +1287,7 @@ export default function EditShiftPage() {
               {/* Current Fields */}
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Current Fields</h3>
-                
+
                 {/* Information Note */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                   <div className="flex items-start">
@@ -999,57 +1381,57 @@ export default function EditShiftPage() {
                         {shiftFields
                           .filter(field => !field.fieldDefinition?.isSystemField)
                           .map((field, index) => (
-                      <div key={field.fieldDefinitionId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center">
-                            <span className="text-sm font-medium text-gray-900">
-                              {field.fieldDefinition?.name}
-                            </span>
-                            {field.isRequired && <span className="text-red-500 ml-1">*</span>}
-                            <span className="ml-2 text-xs text-gray-500">
-                              ({field.fieldDefinition?.fieldType})
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1">
-                            {field.fieldDefinition?.description}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={field.isRequired}
-                              onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isRequired: e.target.checked })}
-                              className="mr-1"
-                              disabled={field.fieldDefinition?.isSystemField}
-                            />
-                            <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
-                              Required
-                            </span>
-                          </label>
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={field.isActive}
-                              onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isActive: e.target.checked })}
-                              className="mr-1"
-                              disabled={field.fieldDefinition?.isSystemField}
-                            />
-                            <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
-                              Active
-                            </span>
-                          </label>
-                          {!field.fieldDefinition?.isSystemField && (
-                            <button
-                              onClick={() => removeFieldFromForm(field.fieldDefinitionId)}
-                              className="text-red-500 hover:text-red-700 p-1"
-                              title="Remove field"
-                            >
-                              <FaTrash className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                            <div key={field.fieldDefinitionId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                              <div className="flex-1">
+                                <div className="flex items-center">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {field.fieldDefinition?.name}
+                                  </span>
+                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    ({field.fieldDefinition?.fieldType})
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {field.fieldDefinition?.description}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={field.isRequired}
+                                    onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isRequired: e.target.checked })}
+                                    className="mr-1"
+                                    disabled={field.fieldDefinition?.isSystemField}
+                                  />
+                                  <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    Required
+                                  </span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={field.isActive}
+                                    onChange={(e) => updateFieldInForm(field.fieldDefinitionId, { isActive: e.target.checked })}
+                                    className="mr-1"
+                                    disabled={field.fieldDefinition?.isSystemField}
+                                  />
+                                  <span className={`text-xs ${field.fieldDefinition?.isSystemField ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    Active
+                                  </span>
+                                </label>
+                                {!field.fieldDefinition?.isSystemField && (
+                                  <button
+                                    onClick={() => removeFieldFromForm(field.fieldDefinitionId)}
+                                    className="text-red-500 hover:text-red-700 p-1"
+                                    title="Remove field"
+                                  >
+                                    <FaTrash className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           ))}
                       </>
                     )}
@@ -1111,17 +1493,17 @@ export default function EditShiftPage() {
                         const filteredFields = availableFieldDefs
                           .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
                           .filter(fieldDef => !fieldDef.isSystemField) // Hide system fields from available list
-                          .filter(fieldDef => 
+                          .filter(fieldDef =>
                             fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                             fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                             fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                             fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
                           );
-                        
+
                         const startIndex = (fieldPage - 1) * fieldsPerPage;
                         const endIndex = startIndex + fieldsPerPage;
                         const paginatedFields = filteredFields.slice(startIndex, endIndex);
-                        
+
                         return paginatedFields.map((fieldDef) => (
                           <div key={fieldDef.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
                             <div className="flex-1">
@@ -1146,17 +1528,17 @@ export default function EditShiftPage() {
                           </div>
                         ));
                       })()}
-                      
+
                       {(() => {
                         const filteredFields = availableFieldDefs
                           .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
-                          .filter(fieldDef => 
+                          .filter(fieldDef =>
                             fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                             fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                             fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                             fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
                           );
-                        
+
                         if (filteredFields.length === 0 && !fieldSearchTerm) {
                           return (
                             <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -1164,7 +1546,7 @@ export default function EditShiftPage() {
                             </div>
                           );
                         }
-                        
+
                         if (filteredFields.length === 0 && fieldSearchTerm) {
                           return (
                             <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -1172,25 +1554,25 @@ export default function EditShiftPage() {
                             </div>
                           );
                         }
-                        
+
                         return null;
                       })()}
                     </div>
-                    
+
                     {/* Pagination */}
                     {(() => {
                       const filteredFields = availableFieldDefs
                         .filter(fieldDef => !shiftFields.some(field => field.fieldDefinitionId === fieldDef.id))
                         .filter(fieldDef => !fieldDef.isSystemField) // Hide system fields from available list
-                        .filter(fieldDef => 
+                        .filter(fieldDef =>
                           fieldDef.name.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                           fieldDef.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                           fieldDef.description.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
                           fieldDef.fieldType.toLowerCase().includes(fieldSearchTerm.toLowerCase())
                         );
-                      
+
                       const totalPages = Math.ceil(filteredFields.length / fieldsPerPage);
-                      
+
                       if (totalPages > 1) {
                         return (
                           <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
@@ -1224,7 +1606,7 @@ export default function EditShiftPage() {
                   </>
                 )}
               </div>
-              
+
               {/* Save Button for Field Management */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <button
@@ -1249,6 +1631,6 @@ export default function EditShiftPage() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

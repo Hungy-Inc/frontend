@@ -1353,7 +1353,19 @@ export default function ScheduleShiftsPage() {
       
       return categoryMatch && locationMatch && dateMatch && recurringMatch;
     });
-    const shiftForModal = matchingShifts[0];
+    
+    // CRITICAL: Validate that matched shift belongs to this recurring shift
+    // This prevents using wrong shift if matching somehow fails or data is inconsistent
+    let shiftForModal = matchingShifts.find(shift => 
+      shift.recurringShiftId === rec.id
+    ) || matchingShifts[0];
+    
+    // Additional safety check: if shift exists but recurringShiftId doesn't match, don't use it
+    // This handles edge cases where shifts might not have recurringShiftId set correctly
+    if (shiftForModal && shiftForModal.recurringShiftId && shiftForModal.recurringShiftId !== rec.id) {
+      console.warn(`[Shift Matching] Shift ${shiftForModal.id} has recurringShiftId ${shiftForModal.recurringShiftId} but expected ${rec.id}. Ignoring this shift.`);
+      shiftForModal = null; // Don't use wrong shift
+    }
 
     // CHECK FOR DAY SPECIFIC CONFIGURATION
     // Priority: Use day config if it exists, otherwise use global config
@@ -1416,7 +1428,14 @@ export default function ScheduleShiftsPage() {
 
     // Helper to create a shift for this occurrence if it doesn't exist
     const handleManageEmployeesClick = async () => {
+      // CRITICAL: Double-check that shiftForModal belongs to this recurring shift
+      // This prevents wrong shift from being passed to manage modal
       let shiftToUse = shiftForModal;
+      if (shiftToUse && shiftToUse.recurringShiftId && shiftToUse.recurringShiftId !== rec.id) {
+        console.error(`[BUG DETECTED] Shift ${shiftToUse.id} has recurringShiftId ${shiftToUse.recurringShiftId} but expected ${rec.id}. Creating new shift instead.`);
+        shiftToUse = null; // Don't use wrong shift, create new one instead
+      }
+      
       if (!shiftToUse) {
         // Create the shift for this occurrence using the proper endpoint
         try {

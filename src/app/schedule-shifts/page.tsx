@@ -1337,14 +1337,21 @@ export default function ScheduleShiftsPage() {
       }
     }
 
-    // Match by shiftCategoryId, location, and isSameDay only
+    // Match by shiftCategoryId, location, isSameDay, AND recurringShiftId
+    // CRITICAL: Must match recurringShiftId to prevent slots and default users from being shared across different recurring shifts
     const matchingShifts = shifts.filter(shift => {
       const shiftStart = new Date(shift.startTime);
-      return (
-        String(shift.shiftCategoryId) === String(rec.shiftCategoryId) &&
-        shift.location === rec.location &&
-        isSameDay(shiftStart, nextDate)
-      );
+      const categoryMatch = String(shift.shiftCategoryId) === String(rec.shiftCategoryId);
+      const locationMatch = shift.location === rec.location;
+      const dateMatch = isSameDay(shiftStart, nextDate);
+      
+      // CRITICAL FIX: Match by recurringShiftId to ensure correct shift is matched
+      // This prevents slots and default users from being shared across different recurring shifts
+      const recurringMatch = shift.recurringShiftId 
+        ? shift.recurringShiftId === rec.id 
+        : true; // If shift doesn't have recurringShiftId, allow match (for one-time shifts or legacy data)
+      
+      return categoryMatch && locationMatch && dateMatch && recurringMatch;
     });
     const shiftForModal = matchingShifts[0];
 

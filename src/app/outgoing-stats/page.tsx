@@ -447,9 +447,12 @@ export default function OutgoingStatsPage() {
 
       // Aggregate data by month
       consolidatedData.forEach(row => {
-        const d = new Date(row.date);
-        if (isNaN(d.getTime())) return;
-        const m = d.getMonth() + 1;
+        // Parse date string directly to avoid timezone conversion issues
+        // When backend sends "2025-01-15", parse it as a local date, not UTC
+        const dateStr = typeof row.date === 'string' ? row.date : row.date.toISOString().split('T')[0];
+        const [year, month, day] = dateStr.split('-').map(Number);
+        if (!year || !month || !day) return;
+        const m = month; // month is already 1-12 from the parsed string
         monthMap[m].totalMealsServed += row.totalMealsServed;
         monthMap[m].mealsFromFoodBoxes += row.mealsFromFoodBoxes || 0;
         monthMap[m].mealsFromBackpacks += row.mealsFromBackpacks || 0;
@@ -560,9 +563,12 @@ export default function OutgoingStatsPage() {
 
       // Aggregate data by month
       displayData.forEach(row => {
-      const d = new Date(row['Date'] as string);
-      if (isNaN(d.getTime())) return;
-      const m = d.getMonth() + 1;
+      // Parse date string directly to avoid timezone conversion issues
+      // When backend sends "2025-01-15", parse it as a local date, not UTC
+      const dateStr = row['Date'] as string;
+      const [year, month, day] = dateStr.split('-').map(Number);
+      if (!year || !month || !day) return;
+      const m = month; // month is already 1-12 from the parsed string
       filteredColumns.forEach(col => {
         if (col !== 'Date' && typeof row[col] === 'number') {
           monthMap[m][col] += Number(row[col]);
@@ -677,9 +683,12 @@ export default function OutgoingStatsPage() {
 
       // Aggregate data by month
       backpackData.forEach(row => {
-        const d = new Date(row.date);
-        if (isNaN(d.getTime())) return;
-        const m = d.getMonth() + 1;
+        // Parse date string directly to avoid timezone conversion issues
+        // When backend sends "2025-01-15", parse it as a local date, not UTC
+        const dateStr = typeof row.date === 'string' ? row.date : row.date.toISOString().split('T')[0];
+        const [year, month, day] = dateStr.split('-').map(Number);
+        if (!year || !month || !day) return;
+        const m = month; // month is already 1-12 from the parsed string
         monthMap[m].totalMeals += row.totalMeals || 0;
       });
 
@@ -826,9 +835,12 @@ export default function OutgoingStatsPage() {
 
       // Aggregate data by month - sum already-calculated totalMeals
       foodBoxData.forEach(row => {
-        const d = new Date(row.date);
-        if (isNaN(d.getTime())) return;
-        const m = d.getMonth() + 1;
+        // Parse date string directly to avoid timezone conversion issues
+        // When backend sends "2025-01-15", parse it as a local date, not UTC
+        const dateStr = typeof row.date === 'string' ? row.date : row.date.toISOString().split('T')[0];
+        const [year, month, day] = dateStr.split('-').map(Number);
+        if (!year || !month || !day) return;
+        const m = month; // month is already 1-12 from the parsed string
         monthMap[m].foodBoxCount += row.foodBoxCount || 0;
         monthMap[m].weightKg += row.weightKg || 0;
         // Sum up already-calculated totalMeals (don't recalculate!)
@@ -955,9 +967,12 @@ export default function OutgoingStatsPage() {
 
       // Aggregate data by month
       outreachData.forEach(row => {
-            const d = new Date(row['Date'] as string);
-        if (isNaN(d.getTime())) return;
-        const m = d.getMonth() + 1;
+        // Parse date string directly to avoid timezone conversion issues
+        // When backend sends "2025-01-15", parse it as a local date, not UTC
+        const dateStr = row['Date'] as string;
+        const [year, month, day] = dateStr.split('-').map(Number);
+        if (!year || !month || !day) return;
+        const m = month; // month is already 1-12 from the parsed string
         outreachColumns.forEach(col => {
           if (col !== 'Date' && typeof row[col] === 'number') {
             monthMap[m][col] += Number(row[col]);

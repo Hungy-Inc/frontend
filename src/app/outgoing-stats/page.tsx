@@ -449,8 +449,7 @@ export default function OutgoingStatsPage() {
       consolidatedData.forEach(row => {
         // Parse date string directly to avoid timezone conversion issues
         // When backend sends "2025-01-15", parse it as a local date, not UTC
-        const dateStr = typeof row.date === 'string' ? row.date : row.date.toISOString().split('T')[0];
-        const [year, month, day] = dateStr.split('-').map(Number);
+        const [year, month, day] = row.date.split('-').map(Number);
         if (!year || !month || !day) return;
         const m = month; // month is already 1-12 from the parsed string
         monthMap[m].totalMealsServed += row.totalMealsServed;
@@ -685,8 +684,7 @@ export default function OutgoingStatsPage() {
       backpackData.forEach(row => {
         // Parse date string directly to avoid timezone conversion issues
         // When backend sends "2025-01-15", parse it as a local date, not UTC
-        const dateStr = typeof row.date === 'string' ? row.date : row.date.toISOString().split('T')[0];
-        const [year, month, day] = dateStr.split('-').map(Number);
+        const [year, month, day] = row.date.split('-').map(Number);
         if (!year || !month || !day) return;
         const m = month; // month is already 1-12 from the parsed string
         monthMap[m].totalMeals += row.totalMeals || 0;
@@ -837,8 +835,7 @@ export default function OutgoingStatsPage() {
       foodBoxData.forEach(row => {
         // Parse date string directly to avoid timezone conversion issues
         // When backend sends "2025-01-15", parse it as a local date, not UTC
-        const dateStr = typeof row.date === 'string' ? row.date : row.date.toISOString().split('T')[0];
-        const [year, month, day] = dateStr.split('-').map(Number);
+        const [year, month, day] = row.date.split('-').map(Number);
         if (!year || !month || !day) return;
         const m = month; // month is already 1-12 from the parsed string
         monthMap[m].foodBoxCount += row.foodBoxCount || 0;

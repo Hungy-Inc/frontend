@@ -33,10 +33,12 @@ export default function ForgotPasswordPage() {
     }
     
     try {
+      // Normalize email to lowercase for case-insensitive password reset
+      const normalizedEmail = email.toLowerCase().trim();
       const res = await fetch(`${apiUrl}/api/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: normalizedEmail })
       });
       
       const data = await res.json();
@@ -63,10 +65,12 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     
     try {
+      // Normalize email to lowercase for case-insensitive OTP verification
+      const normalizedEmail = email.toLowerCase().trim();
       const res = await fetch(`${apiUrl}/api/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp })
+        body: JSON.stringify({ email: normalizedEmail, otp })
       });
       
       const data = await res.json();

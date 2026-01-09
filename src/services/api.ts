@@ -177,5 +177,120 @@ export const api = {
       throw new Error('Failed to fetch users');
     }
     return response.json();
+  },
+
+  // Scheduled Emails API
+  async getScheduledEmails(filters?: { isActive?: boolean; emailType?: string }) {
+    const queryParams = new URLSearchParams();
+    if (filters?.isActive !== undefined) {
+      queryParams.append('isActive', filters.isActive.toString());
+    }
+    if (filters?.emailType) {
+      queryParams.append('emailType', filters.emailType);
+    }
+    const url = getApiUrl(`/scheduled-emails${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
+    const response = await fetch(url, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch scheduled emails');
+    }
+    return response.json();
+  },
+
+  async getScheduledEmail(id: number) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}`), {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch scheduled email');
+    }
+    return response.json();
+  },
+
+  async createScheduledEmail(data: any) {
+    const response = await fetch(getApiUrl('/scheduled-emails'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create scheduled email');
+    }
+    return response.json();
+  },
+
+  async updateScheduledEmail(id: number, data: any) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}`), {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update scheduled email');
+    }
+    return response.json();
+  },
+
+  async deleteScheduledEmail(id: number) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete scheduled email');
+    }
+    return response.json();
+  },
+
+  async toggleScheduledEmailActive(id: number, isActive: boolean) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}/toggle-active`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ isActive })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to toggle scheduled email');
+    }
+    return response.json();
+  },
+
+  async testScheduledEmail(id: number, testRecipientEmail?: string) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}/test`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ testRecipientEmail })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send test email');
+    }
+    return response.json();
+  },
+
+  async executeScheduledEmail(id: number) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}/execute-now`), {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to execute scheduled email');
+    }
+    return response.json();
+  },
+
+  async getScheduledEmailExecutions(id: number, limit = 50, offset = 0) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}/executions?limit=${limit}&offset=${offset}`), {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch execution history');
+    }
+    return response.json();
   }
 } 

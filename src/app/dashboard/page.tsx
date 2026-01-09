@@ -800,28 +800,30 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {/* Donation Location breakdown table */}
-                <table style={{ width: '100%', fontSize: 15 }}>
-                <thead>
-                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donation Location</th>
-                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Weight ({getIncomingUnitLabel()})</th>
-                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Value ($)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                    {Object.entries(orgTotals).map(([id, totals]) => (
-                      <tr key={id}>
-                        <td style={{ padding: '8px 8px 8px 0' }}>{totals.name}</td>
-                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToIncomingUnit(totals.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>
-                          ${(Number(totals.weight.toFixed(2)) * Number(incomingDollarValue.toFixed(2))).toFixed(2)}
-                          <div style={{ fontSize: 11, color: '#666' }}>
-                          </div>
-                        </td>
+                <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
+                  <table style={{ width: '100%', fontSize: 15 }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#fafafa', zIndex: 10 }}>
+                      <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+                          <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donation Location</th>
+                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Weight ({getIncomingUnitLabel()})</th>
+                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Value ($)</th>
                       </tr>
-                    ))}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                        {Object.entries(orgTotals).map(([id, totals]) => (
+                          <tr key={id}>
+                            <td style={{ padding: '8px 8px 8px 0' }}>{totals.name}</td>
+                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToIncomingUnit(totals.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>
+                              ${(Number(totals.weight.toFixed(2)) * Number(incomingDollarValue.toFixed(2))).toFixed(2)}
+                              <div style={{ fontSize: 11, color: '#666' }}>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -859,24 +861,26 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {/* Volunteer table */}
-              <table style={{ width: '100%', fontSize: 15 }}>
-                <thead>
-                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Name</th>
-                      <th style={{ textAlign: 'left', padding: '8px' }}>Role</th>
-                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Hours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                    {filteredVolunteers.slice(0, 8).map((v, idx) => (
-                      <tr key={idx}>
-                        <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
-                        <td style={{ padding: '8px' }}>{v.role}</td>
-                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{v.hours}</td>
+                <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
+                  <table style={{ width: '100%', fontSize: 15 }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#fafafa', zIndex: 10 }}>
+                      <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+                          <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Name</th>
+                          <th style={{ textAlign: 'left', padding: '8px' }}>Role</th>
+                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Hours</th>
                       </tr>
-                    ))}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                        {filteredVolunteers.map((v, idx) => (
+                          <tr key={`${v.name}-${idx}`}>
+                            <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
+                            <td style={{ padding: '8px' }}>{v.role}</td>
+                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{v.hours}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

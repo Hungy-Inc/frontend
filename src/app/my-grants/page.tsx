@@ -44,6 +44,8 @@ export default function MyGrants2Page() {
   const [viewDocumentsGrant, setViewDocumentsGrant] = useState<Grant | null>(null);
   const [reportGrant, setReportGrant] = useState<Grant | null>(null);
   const [showReportHistory, setShowReportHistory] = useState(false);
+  const [sortField, setSortField] = useState<keyof Grant | null>('deadline'); // Default to deadline
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc'); // Default to ascending (earliest first)
 
   useEffect(() => {
     fetchGrants();
@@ -223,10 +225,78 @@ export default function MyGrants2Page() {
     return matchesSearch && matchesStatus;
   });
 
+  // Sort grants
+  const sortedGrants = React.useMemo(() => {
+    if (!sortField) return filteredGrants;
+
+    return [...filteredGrants].sort((a, b) => {
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
+
+      // Handle null/undefined values - put them at the end
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      // Handle date fields
+      if (sortField === 'deadline' || sortField === 'createdAt' || sortField === 'updatedAt' || 
+          sortField === 'reportDueDate' || sortField === 'reportSubmittedDate') {
+        const dateA = new Date(aValue).getTime();
+        const dateB = new Date(bValue).getTime();
+        return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+
+      // Handle string fields
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        const comparison = aValue.localeCompare(bValue, undefined, { sensitivity: 'base' });
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
+
+      // Handle number fields (if any)
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      // Fallback
+      return 0;
+    });
+  }, [filteredGrants, sortField, sortDirection]);
+
+  // Handle column header click for sorting
+  const handleSort = (field: keyof Grant) => {
+    if (sortField === field) {
+      // Toggle direction if clicking the same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new field and default to ascending
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No deadline';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  // Sort Icon Component
+  const SortIcon = ({ field }: { field: keyof Grant }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      );
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    );
   };
 
 
@@ -532,7 +602,7 @@ export default function MyGrants2Page() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-[600px]">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">
-              Grant Applications ({filteredGrants.length})
+              Grant Applications ({sortedGrants.length})
             </h3>
           </div>
           
@@ -571,7 +641,7 @@ export default function MyGrants2Page() {
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
               <p className="mt-4 text-gray-600">Loading grants...</p>
             </div>
-          ) : filteredGrants.length === 0 ? (
+          ) : sortedGrants.length === 0 ? (
             <div className="text-center py-12">
               <svg
                 className="w-16 h-16 text-gray-400 mx-auto mb-4"
@@ -598,23 +668,59 @@ export default function MyGrants2Page() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Grant Name
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={() => handleSort('title')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Grant Name
+                        <SortIcon field="title" />
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Status
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Status
+                        <SortIcon field="status" />
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Program
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={() => handleSort('projectProgram')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Program
+                        <SortIcon field="projectProgram" />
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Deadline
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={() => handleSort('deadline')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Deadline
+                        <SortIcon field="deadline" />
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Amount
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={() => handleSort('grantLimit')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Amount
+                        <SortIcon field="grantLimit" />
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Assigned To
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                      onClick={() => handleSort('assignedTo')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Assigned To
+                        <SortIcon field="assignedTo" />
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Actions
@@ -622,7 +728,7 @@ export default function MyGrants2Page() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredGrants.map((grant) => (
+                  {sortedGrants.map((grant) => (
                     <React.Fragment key={grant.id}>
                     <tr className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">

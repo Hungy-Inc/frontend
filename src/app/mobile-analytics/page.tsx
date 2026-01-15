@@ -35,6 +35,62 @@ import {
 } from 'recharts';
 import { toast } from 'react-toastify';
 
+const HALIFAX_TIMEZONE = 'America/Halifax';
+
+/**
+ * Get today's date in Halifax timezone as YYYY-MM-DD string
+ * This ensures the date matches the user's local timezone (Halifax)
+ */
+const getHalifaxToday = (): string => {
+  const now = new Date();
+  // Use Intl.DateTimeFormat to get date in Halifax timezone
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: HALIFAX_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  // en-CA format returns YYYY-MM-DD directly
+  return formatter.format(now);
+};
+
+/**
+ * Get a date in Halifax timezone as YYYY-MM-DD string
+ * @param date - Date object (defaults to now)
+ */
+const getHalifaxDateString = (date: Date = new Date()): string => {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: HALIFAX_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return formatter.format(date);
+};
+
+/**
+ * Add or subtract days from a Halifax date string (YYYY-MM-DD)
+ * Returns a new Halifax date string
+ * Uses UTC date arithmetic to avoid timezone issues, then formats back to Halifax
+ * @param dateStr - Date string in YYYY-MM-DD format (Halifax timezone)
+ * @param days - Number of days to add (positive) or subtract (negative)
+ */
+const addDaysToHalifaxDate = (dateStr: string, days: number): string => {
+  // Parse the date string
+  const [year, month, day] = dateStr.split('-').map(Number);
+  
+  // Create a UTC date at noon to avoid DST edge cases
+  // We use noon because it's safely in the middle of the day
+  const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  
+  // Add/subtract days using UTC methods
+  utcDate.setUTCDate(utcDate.getUTCDate() + days);
+  
+  // Format back using Halifax timezone
+  // This will correctly show the date in Halifax, accounting for any timezone differences
+  return getHalifaxDateString(utcDate);
+};
+
 interface Activity {
   type: string;
   timestamp: string;
@@ -77,51 +133,64 @@ export default function MobileAnalyticsPage() {
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'overview' | 'user'>('overview');
   
-  // Date range state - default to today
+  // Date range state - default to today in Halifax timezone
   const [startDate, setStartDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return getHalifaxToday();
   });
   const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return getHalifaxToday();
   });
   
   // Quick filter buttons - auto-fetch on click
   const setToday = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getHalifaxToday();
     setStartDate(today);
     setEndDate(today);
     // Data will auto-fetch via useEffect
   };
   
   const setLast7Days = () => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 6); // Last 7 days including today
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
+    const today = getHalifaxToday();
+    const start = addDaysToHalifaxDate(today, -6); // Last 7 days including today
+    setStartDate(start);
+    setEndDate(today);
   };
   
   const setLast30Days = () => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 29); // Last 30 days including today
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
+    const today = getHalifaxToday();
+    const start = addDaysToHalifaxDate(today, -29); // Last 30 days including today
+    setStartDate(start);
+    setEndDate(today);
   };
   
   const setThisWeek = () => {
-    const today = new Date();
-    const start = new Date(today);
-    start.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
+    const today = getHalifaxToday();
+    // Get day of week in Halifax timezone
+    const [year, month, day] = today.split('-').map(Number);
+    // Create a UTC date representing this day
+    const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    // Get what day of week this is in Halifax
+    const dayOfWeekStr = utcDate.toLocaleDateString('en-US', {
+      timeZone: HALIFAX_TIMEZONE,
+      weekday: 'short'
+    });
+    // Map day names to numbers (0 = Sunday)
+    const dayMap: { [key: string]: number } = {
+      'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+    };
+    const dayOfWeek = dayMap[dayOfWeekStr] ?? 0;
+    const start = addDaysToHalifaxDate(today, -dayOfWeek); // Start of week (Sunday)
+    setStartDate(start);
+    setEndDate(today);
   };
   
   const setThisMonth = () => {
-    const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
+    const today = getHalifaxToday();
+    // Get first day of current month in Halifax
+    const [year, month] = today.split('-').map(Number);
+    const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
+    setStartDate(firstDay);
+    setEndDate(today);
   };
 
   // Data state
@@ -216,8 +285,7 @@ export default function MobileAnalyticsPage() {
 
   // Helper function to determine which filter is active
   const getActiveFilter = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const todayDate = new Date();
+    const today = getHalifaxToday();
     
     // Check if Today
     if (startDate === endDate && startDate === today) {
@@ -225,29 +293,36 @@ export default function MobileAnalyticsPage() {
     }
     
     // Check if This Week
-    const weekStart = new Date(todayDate);
-    weekStart.setDate(todayDate.getDate() - todayDate.getDay());
-    if (startDate === weekStart.toISOString().split('T')[0] && endDate === today) {
+    const [year, month, day] = today.split('-').map(Number);
+    const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    const dayOfWeekStr = utcDate.toLocaleDateString('en-US', {
+      timeZone: HALIFAX_TIMEZONE,
+      weekday: 'short'
+    });
+    const dayMap: { [key: string]: number } = {
+      'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+    };
+    const dayOfWeek = dayMap[dayOfWeekStr] ?? 0;
+    const weekStart = addDaysToHalifaxDate(today, -dayOfWeek);
+    if (startDate === weekStart && endDate === today) {
       return 'thisWeek';
     }
     
     // Check if This Month
-    const monthStart = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
-    if (startDate === monthStart.toISOString().split('T')[0] && endDate === today) {
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+    if (startDate === monthStart && endDate === today) {
       return 'thisMonth';
     }
     
     // Check if Last 7 Days
-    const last7Start = new Date(todayDate);
-    last7Start.setDate(todayDate.getDate() - 6);
-    if (startDate === last7Start.toISOString().split('T')[0] && endDate === today) {
+    const last7Start = addDaysToHalifaxDate(today, -6);
+    if (startDate === last7Start && endDate === today) {
       return 'last7Days';
     }
     
     // Check if Last 30 Days
-    const last30Start = new Date(todayDate);
-    last30Start.setDate(todayDate.getDate() - 29);
-    if (startDate === last30Start.toISOString().split('T')[0] && endDate === today) {
+    const last30Start = addDaysToHalifaxDate(today, -29);
+    if (startDate === last30Start && endDate === today) {
       return 'last30Days';
     }
     

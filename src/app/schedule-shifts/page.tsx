@@ -2632,10 +2632,33 @@ export default function ScheduleShiftsPage() {
                             </span>
                           )}
                         </div>
-                        {emp.signupId ? (
+                        {/* Show appropriate button based on user type */}
+                        {emp.isDefault ? (
+                          /* Default user - always show Mark Absent button */
+                          <button 
+                            onClick={() => {
+                              // Pre-select this default user and open the absence modal
+                              setSelectedUsersForAbsence([emp.id]);
+                              setShowAbsenceModal(true);
+                            }} 
+                            style={{ 
+                              background: '#fff', 
+                              color: '#ff9800', 
+                              border: '1px solid #ff9800', 
+                              borderRadius: 6, 
+                              padding: '4px 14px', 
+                              fontWeight: 600, 
+                              cursor: 'pointer', 
+                              fontSize: 15 
+                            }}
+                          >
+                            Mark Absent
+                          </button>
+                        ) : emp.signupId ? (
+                          /* Regular registered user - show Remove button */
                           <button onClick={() => handleRemoveEmployee(emp.signupId)} style={{ background: '#fff', color: '#e53935', border: '1px solid #e53935', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>Remove</button>
                         ) : (
-                          <span style={{ fontSize: 12, color: '#666', fontStyle: 'italic' }}>Default User</span>
+                          <span style={{ fontSize: 12, color: '#666', fontStyle: 'italic' }}>No action</span>
                         )}
                       </div>
                     ))

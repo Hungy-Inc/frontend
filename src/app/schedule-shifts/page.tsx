@@ -111,7 +111,7 @@ export default function ScheduleShiftsPage() {
 
   // --- Manage Employees Modal State ---
   const [manageModalOpen, setManageModalOpen] = useState(false);
-  const [manageModalData, setManageModalData] = useState<{ scheduled: any[]; unscheduled: any[]; slots: number; booked: number; defaultUsers?: number; availableSlots?: number } | null>(null);
+  const [manageModalData, setManageModalData] = useState<{ scheduled: any[]; unscheduled: any[]; slots: number; booked: number; defaultUsers?: number; absentDefaultUsers?: number; availableSlots?: number } | null>(null);
   const [manageModalShift, setManageModalShift] = useState<any>(null);
   const [manageModalLoading, setManageModalLoading] = useState(false);
 
@@ -190,17 +190,56 @@ export default function ScheduleShiftsPage() {
     }));
   };
 
+  // OPTIMIZED: Single combined fetch for all page data
+  const fetchAllPageData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/schedule-shifts-data`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch schedule data");
+      const data = await res.json();
+      
+      // Set all data at once
+      setShifts(data.shifts || []);
+      setRecurringShifts(data.recurringShifts || []);
+      setUsers(data.users || []);
+      
+      // Update absences cache from combined response
+      const absencesByShiftId = data.absencesByShiftId || {};
+      const newAbsencesCache: { [key: number]: number[] } = {};
+      for (const shiftId in absencesByShiftId) {
+        newAbsencesCache[Number(shiftId)] = absencesByShiftId[shiftId].map((a: any) => a.userId);
+      }
+      setShiftAbsencesCache(newAbsencesCache);
+      
+      // Pre-calculate shift counts using the absences data from the response
+      if (data.recurringShifts && data.shifts) {
+        calculateShiftCountsWithAbsences(data.recurringShifts, data.shifts, absencesByShiftId);
+      }
+    } catch (err) {
+      console.error('Error fetching schedule data:', err);
+      setError("Failed to load schedule data.");
+      // Fallback to individual fetches if combined endpoint fails
+      fetchShifts();
+      fetchUsers();
+      fetchRecurringShifts();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchShifts();
-    fetchUsers();
-    fetchCategories();
-    fetchRecurringShifts();
+    // OPTIMIZED: Single API call for all data
+    fetchAllPageData();
 
     // Clear URL display on page refresh
     setShowUrlDisplay(false);
     setLastCopiedUrl('');
 
-    // Smart refresh - check for changes every 10 seconds
+    // Smart refresh - check for changes every 30 seconds (reduced frequency, uses combined endpoint)
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem("token");
@@ -210,26 +249,24 @@ export default function ScheduleShiftsPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.lastUpdated > lastUpdateTime) {
-            fetchShifts();
-            fetchRecurringShifts();
+            // Use combined fetch for efficiency
+            fetchAllPageData();
             setLastUpdateTime(data.lastUpdated);
           }
         }
       } catch (err) {
         // Silently fail - don't interrupt user experience
-        // If endpoint doesn't exist, just refresh every 30 seconds as fallback
-        if (Date.now() - lastUpdateTime > 30000) {
-          fetchShifts();
-          fetchRecurringShifts();
+        // Fallback: refresh every 60 seconds if endpoint doesn't exist
+        if (Date.now() - lastUpdateTime > 60000) {
+          fetchAllPageData();
           setLastUpdateTime(Date.now());
         }
       }
-    }, 10000);
+    }, 30000); // Increased from 10s to 30s to reduce server load
 
     // Listen for shift signup events
     const handleShiftSignup = () => {
-      fetchShifts();
-      fetchRecurringShifts();
+      fetchAllPageData();
       setLastUpdateTime(Date.now());
     };
 
@@ -241,10 +278,7 @@ export default function ScheduleShiftsPage() {
     };
   }, [lastUpdateTime]);
 
-  // Fetch users on page load
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  // Note: fetchUsers is already called in the main useEffect above, no need for duplicate call
 
   const fetchUsers = async () => {
     try {
@@ -329,206 +363,220 @@ export default function ScheduleShiftsPage() {
     }
   };
 
-  // Calculate correct counts for each recurring shift considering absences
-  const calculateShiftCounts = async (recurringShiftsData: any[]) => {
+  // OPTIMIZED: Calculate counts using pre-fetched absences (no additional API calls)
+  const calculateShiftCountsWithAbsences = (
+    recurringShiftsData: any[], 
+    shiftsData: any[], 
+    absencesByShiftId: { [key: number]: any[] }
+  ) => {
     const newCounts: { [key: number]: { totalFilledSlots: number, presentDefaultUsers: number, pendingSlots: number } } = {};
+    const today = new Date();
+    const todayStr = today.toDateString();
+    const todayDayOfWeek = today.getDay();
 
     for (const rec of recurringShiftsData) {
-      try {
-        // Find TODAY'S shifts for this recurring shift
-        const todaysShifts = shifts.filter(shift =>
-          shift.recurringShiftId === rec.id &&
-          new Date(shift.startTime).toDateString() === new Date().toDateString()
-        );
+      const todaysShifts = shiftsData.filter(shift =>
+        shift.recurringShiftId === rec.id &&
+        new Date(shift.startTime).toDateString() === todayStr
+      );
 
-        // Check for day config for today's day of week
-        const today = new Date();
-        const todayDayOfWeek = today.getDay();
-        const dayConfig = rec.RecurringShiftDayConfig?.find(
-          (conf: any) => conf.dayOfWeek === todayDayOfWeek
-        );
+      // Get day config for today
+      const dayConfig = rec.RecurringShiftDayConfig?.find(
+        (conf: any) => conf.dayOfWeek === todayDayOfWeek
+      );
 
-        // Use day config slots if available, otherwise use global slots
-        const totalSlots = (dayConfig && dayConfig.slots !== null && dayConfig.slots !== undefined)
-          ? dayConfig.slots
-          : (rec.slots || 0);
+      const totalSlots = (dayConfig && dayConfig.slots !== null && dayConfig.slots !== undefined)
+        ? dayConfig.slots
+        : (rec.slots || 0);
 
-        // Priority: Use day-specific default users if they exist, otherwise use global default users
-        // IMPORTANT: dayOfWeek NULL = global default user (used when no day-specific users exist for that day)
-        const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
-          (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek
-        ) : [];
-        const defaultUsersForToday = daySpecificUsers.length > 0 
-          ? daySpecificUsers  // Use ONLY day-specific users if they exist (NOT global)
-          : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);  // Otherwise use ONLY global users (dayOfWeek = null)
-        const totalDefaultUsers = defaultUsersForToday.length;
+      const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
+        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek
+      ) : [];
+      const defaultUsersForToday = daySpecificUsers.length > 0 
+        ? daySpecificUsers
+        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);
+      const totalDefaultUsers = defaultUsersForToday.length;
+      const defaultUserIds = defaultUsersForToday.map((du: any) => du.userId);
 
-        // Count absent default users for TODAY'S shifts only
-        let absentDefaultUsers = 0;
-
-        for (const shift of todaysShifts) {
-          try {
-            const token = localStorage.getItem("token");
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${shift.id}/absences`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.ok) {
-              const response = await res.json();
-
-              // The API returns { absences: [...], defaultUsers: [...] }
-              if (response && Array.isArray(response.absences)) {
-                // Count default users who are absent for THIS SPECIFIC SHIFT ONLY
-                const absentDefaultUserIds = response.absences
-                  .filter((absence: any) => absence.isApproved)
-                  .map((absence: any) => absence.userId);
-
-                // Priority: Use day-specific default users if they exist, otherwise use global default users
-                // IMPORTANT: dayOfWeek NULL = global default user (used when no day-specific users exist for that day)
-                const todayDayOfWeek = new Date().getDay();
-                const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
-                  (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek
-                ) : [];
-                const defaultUsersForToday = daySpecificUsers.length > 0 
-                  ? daySpecificUsers  // Use ONLY day-specific users if they exist (NOT global)
-                  : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);  // Otherwise use ONLY global users (dayOfWeek = null)
-                const defaultUserIds = defaultUsersForToday.map((du: any) => du.userId);
-                const shiftAbsentDefaultUsers = absentDefaultUserIds.filter((id: any) => defaultUserIds.includes(id)).length;
-                absentDefaultUsers += shiftAbsentDefaultUsers;
-
-                // Debug logging
-                console.log(`Recurring Shift ${rec.id}, Shift ${shift.id} (${new Date(shift.startTime).toDateString()}):`, {
-                  shiftAbsentDefaultUsers,
-                  absentDefaultUserIds,
-                  defaultUserIds,
-                  totalAbsentDefaultUsers: absentDefaultUsers
-                });
-              } else {
-                console.warn(`Invalid absences response for shift ${shift.id}:`, response);
-              }
-            }
-          } catch (err) {
-            console.error(`Error fetching absences for shift ${shift.id}:`, err);
-          }
-        }
-
-        // Calculate present default users for today
-        const presentDefaultUsers = totalDefaultUsers - absentDefaultUsers;
-
-        // Get default user IDs for today (to exclude them from regular signup count)
-        const defaultUserIds = defaultUsersForToday.map((du: any) => du.userId);
-
-        // Calculate today's signups (excluding default users to avoid double counting)
-        const todaysSignups = todaysShifts.reduce((sum, shift) => {
-          if (!shift.ShiftSignup) return sum;
-          // Count only non-default user signups
-          const nonDefaultSignups = shift.ShiftSignup.filter((signup: any) => !defaultUserIds.includes(signup.userId));
-          return sum + nonDefaultSignups.length;
-        }, 0);
-
-        // Calculate total filled slots (non-default signups + present default users)
-        const totalFilledSlots = todaysSignups + presentDefaultUsers;
-
-        const pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
-
-        newCounts[rec.id] = {
-          totalFilledSlots,
-          presentDefaultUsers,
-          pendingSlots
-        };
-      } catch (err) {
-        console.error(`Error calculating counts for recurring shift ${rec.id}:`, err);
-        // Fallback to basic calculation
-        const today = new Date();
-        const todayDayOfWeek = today.getDay();
-        const dayConfig = rec.RecurringShiftDayConfig?.find(
-          (conf: any) => conf.dayOfWeek === todayDayOfWeek
-        );
-        const totalSlots = (dayConfig && dayConfig.slots !== null && dayConfig.slots !== undefined)
-          ? dayConfig.slots
-          : (rec.slots || 0);
-        
-        const todaysShifts = shifts.filter(shift =>
-          shift.recurringShiftId === rec.id &&
-          new Date(shift.startTime).toDateString() === new Date().toDateString()
-        );
-        const bookedSlots = todaysShifts.reduce((sum, shift) => sum + (shift.ShiftSignup ? shift.ShiftSignup.length : 0), 0);
-        
-        // Priority: Use day-specific default users if they exist, otherwise use global default users
-        // IMPORTANT: dayOfWeek NULL = global default user (used when no day-specific users exist for that day)
-        const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
-          (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek
-        ) : [];
-        const defaultUsersForToday = daySpecificUsers.length > 0 
-          ? daySpecificUsers  // Use ONLY day-specific users if they exist (NOT global)
-          : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);  // Otherwise use ONLY global users (dayOfWeek = null)
-        const defaultUsersCount = defaultUsersForToday.length;
-        const totalFilledSlots = bookedSlots + defaultUsersCount;
-        const pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
-
-        newCounts[rec.id] = {
-          totalFilledSlots,
-          presentDefaultUsers: defaultUsersCount,
-          pendingSlots
-        };
+      // Collect all absent user IDs across today's shifts
+      const allAbsentUserIds = new Set<number>();
+      let absentDefaultUsers = 0;
+      for (const shift of todaysShifts) {
+        const shiftAbsences = absencesByShiftId[shift.id] || [];
+        const absentUserIds = shiftAbsences.map((a: any) => a.userId);
+        absentUserIds.forEach((id: number) => allAbsentUserIds.add(id));
+        absentDefaultUsers += absentUserIds.filter((id: number) => defaultUserIds.includes(id)).length;
       }
+
+      const presentDefaultUsers = Math.max(0, totalDefaultUsers - absentDefaultUsers);
+      
+      // Count non-default signups EXCLUDING absent users
+      const todaysSignups = todaysShifts.reduce((sum, shift) => {
+        if (!shift.ShiftSignup) return sum;
+        const nonDefaultNonAbsentSignups = shift.ShiftSignup.filter((signup: any) => 
+          !defaultUserIds.includes(signup.userId) && !allAbsentUserIds.has(signup.userId)
+        );
+        return sum + nonDefaultNonAbsentSignups.length;
+      }, 0);
+
+      const totalFilledSlots = todaysSignups + presentDefaultUsers;
+      const pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
+
+      newCounts[rec.id] = { totalFilledSlots, presentDefaultUsers, pendingSlots };
     }
 
     setShiftCounts(newCounts);
   };
 
-  // Fetch categories and recurring shifts on page load
-  useEffect(() => {
-    fetchCategories();
-    fetchRecurringShifts();
-  }, []);
+  // Legacy function for fallback - uses API call
+  const calculateShiftCounts = async (recurringShiftsData: any[]) => {
+    const today = new Date();
+    const todayStr = today.toDateString();
 
-  // Recalculate counts when shifts change
-  useEffect(() => {
-    if (recurringShifts.length > 0) {
-      calculateShiftCounts(recurringShifts);
+    // Collect all TODAY's shift IDs across all recurring shifts
+    const allTodaysShiftIds: number[] = [];
+    for (const rec of recurringShiftsData) {
+      const todaysShifts = shifts.filter(shift =>
+        shift.recurringShiftId === rec.id &&
+        new Date(shift.startTime).toDateString() === todayStr
+      );
+      allTodaysShiftIds.push(...todaysShifts.map(s => s.id));
     }
-  }, [shifts, recurringShifts]);
 
-  // Fetch absences for all shifts when shifts change
-  useEffect(() => {
-    const fetchAbsencesForShifts = async () => {
-      if (shifts.length === 0) return;
-      
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      // Fetch absences for all shifts in parallel
-      const absencePromises = shifts.map(async (shift) => {
-        try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${shift.id}/absences`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const approvedAbsenceUserIds = (data.absences || [])
-              .filter((a: any) => a.isApproved)
-              .map((a: any) => a.userId);
-            return { shiftId: shift.id, absentUserIds: approvedAbsenceUserIds };
-          }
-        } catch (err) {
-          console.error(`Error fetching absences for shift ${shift.id}:`, err);
+    // BATCH: Fetch all absences for all today's shifts in ONE API call
+    let absencesByShiftId: { [key: number]: any[] } = {};
+    if (allTodaysShiftIds.length > 0) {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/batch-absences`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ shiftIds: allTodaysShiftIds })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          absencesByShiftId = data.absencesByShiftId || {};
         }
-        return null;
-      });
+      } catch (err) {
+        console.error('Error fetching batch absences:', err);
+      }
+    }
 
-      const results = await Promise.all(absencePromises);
-      const newCache: { [key: number]: number[] } = {};
-      results.forEach(result => {
-        if (result) {
-          newCache[result.shiftId] = result.absentUserIds;
+    // Use the optimized function with fetched absences
+    calculateShiftCountsWithAbsences(recurringShiftsData, shifts, absencesByShiftId);
+  };
+
+  // Original calculateShiftCounts logic for the useEffect (called when shifts/recurringShifts change independently)
+  const calculateShiftCountsLegacy = async (recurringShiftsData: any[]) => {
+    const newCounts: { [key: number]: { totalFilledSlots: number, presentDefaultUsers: number, pendingSlots: number } } = {};
+    const today = new Date();
+    const todayStr = today.toDateString();
+    const todayDayOfWeek = today.getDay();
+
+    const allTodaysShiftIds: number[] = [];
+    const todaysShiftsByRecurring: { [key: number]: any[] } = {};
+
+    for (const rec of recurringShiftsData) {
+      const todaysShifts = shifts.filter(shift =>
+        shift.recurringShiftId === rec.id &&
+        new Date(shift.startTime).toDateString() === todayStr
+      );
+      todaysShiftsByRecurring[rec.id] = todaysShifts;
+      allTodaysShiftIds.push(...todaysShifts.map(s => s.id));
+    }
+
+    let absencesByShiftId: { [key: number]: any[] } = {};
+    if (allTodaysShiftIds.length > 0) {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/batch-absences`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ shiftIds: allTodaysShiftIds })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          absencesByShiftId = data.absencesByShiftId || {};
         }
-      });
-      
-      setShiftAbsencesCache(prev => ({ ...prev, ...newCache }));
-    };
+      } catch (err) {
+        console.error('Error fetching batch absences:', err);
+      }
+    }
 
-    fetchAbsencesForShifts();
-  }, [shifts]);
+    for (const rec of recurringShiftsData) {
+      const todaysShifts = todaysShiftsByRecurring[rec.id] || [];
+
+      // Get day config for today
+      const dayConfig = rec.RecurringShiftDayConfig?.find(
+        (conf: any) => conf.dayOfWeek === todayDayOfWeek
+      );
+
+      // Use day config slots if available, otherwise use global slots
+      const totalSlots = (dayConfig && dayConfig.slots !== null && dayConfig.slots !== undefined)
+        ? dayConfig.slots
+        : (rec.slots || 0);
+
+      // Priority: Use day-specific default users if they exist, otherwise use global default users
+      const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
+        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek
+      ) : [];
+      const defaultUsersForToday = daySpecificUsers.length > 0 
+        ? daySpecificUsers
+        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);
+      const totalDefaultUsers = defaultUsersForToday.length;
+      const defaultUserIds = defaultUsersForToday.map((du: any) => du.userId);
+
+      // Collect all absent user IDs and count absent default users
+      const allAbsentUserIds = new Set<number>();
+      let absentDefaultUsers = 0;
+      for (const shift of todaysShifts) {
+        const shiftAbsences = absencesByShiftId[shift.id] || [];
+        const absentUserIds = shiftAbsences.map((a: any) => a.userId);
+        absentUserIds.forEach((id: number) => allAbsentUserIds.add(id));
+        absentDefaultUsers += absentUserIds.filter((id: number) => defaultUserIds.includes(id)).length;
+      }
+
+      // Calculate present default users for today
+      const presentDefaultUsers = Math.max(0, totalDefaultUsers - absentDefaultUsers);
+
+      // Calculate today's signups (excluding default users AND absent users)
+      const todaysSignups = todaysShifts.reduce((sum, shift) => {
+        if (!shift.ShiftSignup) return sum;
+        const nonDefaultNonAbsentSignups = shift.ShiftSignup.filter((signup: any) => 
+          !defaultUserIds.includes(signup.userId) && !allAbsentUserIds.has(signup.userId)
+        );
+        return sum + nonDefaultNonAbsentSignups.length;
+      }, 0);
+
+      // Calculate total filled slots (non-absent non-default signups + present default users)
+      const totalFilledSlots = todaysSignups + presentDefaultUsers;
+      const pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
+
+      newCounts[rec.id] = {
+        totalFilledSlots,
+        presentDefaultUsers,
+        pendingSlots
+      };
+    }
+
+    setShiftCounts(newCounts);
+  };
+
+  // NOTE: fetchRecurringShifts is already called in main useEffect, no need for duplicate call
+  // Categories are fetched on-demand when Add modal opens (see useEffect for showAdd)
+
+  // NOTE: Recalculation of counts is now done in fetchAllPageData using pre-fetched absences
+  // The useEffect below is kept as a fallback for when shifts/recurringShifts change independently
+  // (e.g., from other sources or after individual operations)
+  
+  // Removed: The N+1 useEffect that fetched absences for each shift individually
+  // Absences are now fetched in the combined endpoint and passed to calculateShiftCountsWithAbsences
 
   // Find all recurring shifts for selected category and day
   const matchingSlots = recurringShifts.filter(
@@ -1480,36 +1528,38 @@ export default function ScheduleShiftsPage() {
 
     // If shift exists, use EXACT same calculation as backend API (/api/shift-employees)
     if (shiftForModal) {
-      // EXACT COPY from backend: Calculate available slots including default users but excluding absent ones
-      const signedUpCount = shiftForModal.ShiftSignup ? shiftForModal.ShiftSignup.length : 0;
-      const signedUpUserIds = new Set(shiftForModal.ShiftSignup ? shiftForModal.ShiftSignup.map((su: any) => su.userId) : []);
-      
-      // Get absences from cache (fetched in useEffect when shifts change)
-      // EXACT COPY from backend: Get absences for this shift
+      // Get absences from cache
       const absentUserIds = new Set(shiftForModal.id && shiftAbsencesCache[shiftForModal.id] 
         ? shiftAbsencesCache[shiftForModal.id] 
         : []);
       
-      // EXACT COPY from backend: Priority: Use day-specific default users if they exist, otherwise use global default users
+      // Get signed up user IDs
+      const signedUpUserIds = new Set(shiftForModal.ShiftSignup ? shiftForModal.ShiftSignup.map((su: any) => su.userId) : []);
+      
+      // Count signups EXCLUDING absent users (this is what backend does)
+      const nonAbsentSignups = shiftForModal.ShiftSignup 
+        ? shiftForModal.ShiftSignup.filter((su: any) => !absentUserIds.has(su.userId)).length 
+        : 0;
+      
+      // Get default users for this day
       const shiftDate = new Date(shiftForModal.startTime);
       const shiftDayOfWeek = shiftDate.getDay();
       const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
         (du: any) => du.dayOfWeek !== null && du.dayOfWeek === shiftDayOfWeek
       ) : [];
       const defaultUsersForShift = daySpecificUsers.length > 0 
-        ? daySpecificUsers  // Use ONLY day-specific users if they exist (NOT global)
-        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);  // Otherwise use ONLY global users (dayOfWeek = null)
+        ? daySpecificUsers
+        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);
       
-      // EXACT COPY from backend: presentDefaultUsersCount = default users who are NOT absent and NOT already signed up
+      // Present default users = NOT absent AND NOT already signed up
       const presentDefaultUsersCount = defaultUsersForShift.filter((du: any) =>
         !absentUserIds.has(du.userId) && !signedUpUserIds.has(du.userId)
       ).length;
       
-      // EXACT COPY from backend: totalFilledSlots = signedUpCount + presentDefaultUsersCount
-      totalFilledSlots = signedUpCount + presentDefaultUsersCount;
+      // Total filled = non-absent signups + present default users (not signed up)
+      totalFilledSlots = nonAbsentSignups + presentDefaultUsersCount;
       presentDefaultUsers = presentDefaultUsersCount;
       
-      // EXACT COPY from backend: availableSlots = shift.slots - totalFilledSlots
       pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
     } else {
       // Shift doesn't exist yet - use recurring shift config
@@ -1539,27 +1589,34 @@ export default function ScheduleShiftsPage() {
         const defaultUserIds = defaultUsersForDay.map((du: any) => du.userId);
         
         // For future shifts (not created yet), count ALL default users (they will be auto-assigned)
-        // For existing shifts, count only default users who are signed up
+        // For existing shifts, count only default users who are signed up AND not absent
         if (matchingShifts.length > 0) {
-          // Shift exists - count signups excluding default users to avoid double counting
+          // Get absences for this shift from cache
+          const shiftId = matchingShifts[0].id;
+          const absentUserIds = new Set(shiftAbsencesCache[shiftId] || []);
+          
+          // Count signups EXCLUDING absent users and excluding default users
           const bookedSlots = matchingShifts.reduce((sum, shift) => {
             if (!shift.ShiftSignup) return sum;
-            // Count only non-default user signups
-            const nonDefaultSignups = shift.ShiftSignup.filter((signup: any) => !defaultUserIds.includes(signup.userId));
-            return sum + nonDefaultSignups.length;
+            const nonDefaultNonAbsentSignups = shift.ShiftSignup.filter((signup: any) => 
+              !defaultUserIds.includes(signup.userId) && !absentUserIds.has(signup.userId)
+            );
+            return sum + nonDefaultNonAbsentSignups.length;
           }, 0);
           
-          // Count default users who are actually signed up (to calculate present default users)
-          const defaultUsersSignedUp = matchingShifts.reduce((sum, shift) => {
+          // Count default users who are signed up AND not absent
+          const defaultUsersSignedUpNotAbsent = matchingShifts.reduce((sum, shift) => {
             if (!shift.ShiftSignup) return sum;
-            const defaultSignups = shift.ShiftSignup.filter((signup: any) => defaultUserIds.includes(signup.userId));
+            const defaultSignups = shift.ShiftSignup.filter((signup: any) => 
+              defaultUserIds.includes(signup.userId) && !absentUserIds.has(signup.userId)
+            );
             return sum + defaultSignups.length;
           }, 0);
           
-          // Present default users = default users who are signed up
-          presentDefaultUsers = defaultUsersSignedUp;
+          // Present default users = default users who are signed up and NOT absent
+          presentDefaultUsers = defaultUsersSignedUpNotAbsent;
           
-          // Total filled slots = non-default signups + present default users
+          // Total filled slots = non-absent non-default signups + present default users
           totalFilledSlots = bookedSlots + presentDefaultUsers;
         } else {
           // Shift doesn't exist yet (virtual shift) - count ALL default users (they will be auto-assigned)
@@ -2099,7 +2156,7 @@ export default function ScheduleShiftsPage() {
         });
       }
       await fetchScheduledEmployees(shift.id); // Always refresh after save
-      await fetchShifts(); // <--- Add this line to refresh shifts after saving
+      await fetchAllPageData(); // Refresh all data including absences
       toast.success("Successfully updated shift employees");
       handleCloseUserDropdown();
     } catch (err: any) {
@@ -2267,9 +2324,37 @@ export default function ScheduleShiftsPage() {
     }
   };
 
-  // Add employee to shift
+  // State for tracking which user is being added/removed (for loading indicators)
+  const [addingUserId, setAddingUserId] = useState<number | null>(null);
+  const [removingSignupId, setRemovingSignupId] = useState<number | null>(null);
+
+  // Add employee to shift with OPTIMISTIC UI UPDATE
   const handleAddEmployee = async (userId: number) => {
-    if (!manageModalShift) return;
+    if (!manageModalShift || !manageModalData) return;
+    
+    // Find the user being added from unscheduled list
+    const userToAdd = manageModalData.unscheduled.find(u => u.id === userId);
+    if (!userToAdd) return;
+
+    setAddingUserId(userId);
+
+    // OPTIMISTIC UPDATE: Immediately update the UI
+    const optimisticSignupId = Date.now(); // Temporary ID
+    setManageModalData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        scheduled: [...prev.scheduled, { ...userToAdd, signupId: optimisticSignupId, isDefault: false }],
+        unscheduled: prev.unscheduled.filter(u => u.id !== userId),
+        booked: prev.booked + 1,
+        availableSlots: Math.max(0, (prev.availableSlots ?? 0) - 1)
+      };
+    });
+    
+    toast.success("Employee added successfully");
+    setAddingUserId(null);
+
+    // Send request to server in background
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups`, {
@@ -2277,26 +2362,112 @@ export default function ScheduleShiftsPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ userId, shiftId: manageModalShift.id })
       });
-      if (!res.ok) throw new Error("Failed to add employee");
-      await openManageModal(manageModalShift); // Refresh modal data
-    } catch (err) {
-      toast.error("Failed to add employee");
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        // ROLLBACK: Revert the optimistic update on error
+        setManageModalData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            scheduled: prev.scheduled.filter(u => u.signupId !== optimisticSignupId),
+            unscheduled: [...prev.unscheduled, userToAdd],
+            booked: prev.booked - 1,
+            availableSlots: (prev.availableSlots ?? 0) + 1
+          };
+        });
+        toast.error(errorData.error || "Failed to add employee");
+        return;
+      }
+
+      // Update with real signup ID from server
+      const signup = await res.json();
+      setManageModalData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          scheduled: prev.scheduled.map(u => 
+            u.signupId === optimisticSignupId ? { ...u, signupId: signup.id } : u
+          )
+        };
+      });
+    } catch (err: any) {
+      // ROLLBACK on network error
+      setManageModalData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          scheduled: prev.scheduled.filter(u => u.signupId !== optimisticSignupId),
+          unscheduled: [...prev.unscheduled, userToAdd],
+          booked: prev.booked - 1,
+          availableSlots: (prev.availableSlots ?? 0) + 1
+        };
+      });
+      toast.error("Network error - failed to add employee");
     }
   };
 
-  // Remove employee from shift
+  // Remove employee from shift with OPTIMISTIC UI UPDATE
   const handleRemoveEmployee = async (signupId: number) => {
-    if (!manageModalShift) return;
+    if (!manageModalShift || !manageModalData) return;
+    
+    // Find the user being removed
+    const userToRemove = manageModalData.scheduled.find(u => u.signupId === signupId);
+    if (!userToRemove) return;
+
+    setRemovingSignupId(signupId);
+
+    // OPTIMISTIC UPDATE: Immediately update the UI
+    setManageModalData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        scheduled: prev.scheduled.filter(u => u.signupId !== signupId),
+        unscheduled: [...prev.unscheduled, { id: userToRemove.id, name: userToRemove.name }],
+        booked: prev.booked - 1,
+        availableSlots: (prev.availableSlots ?? 0) + 1
+      };
+    });
+    
+    toast.success("Employee removed successfully");
+    setRemovingSignupId(null);
+
+    // Send request to server in background
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shiftsignups/${signupId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error("Failed to remove employee");
-      await openManageModal(manageModalShift); // Refresh modal data
-    } catch (err) {
-      toast.error("Failed to remove employee");
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        // ROLLBACK: Revert the optimistic update on error
+        setManageModalData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            scheduled: [...prev.scheduled, userToRemove],
+            unscheduled: prev.unscheduled.filter(u => u.id !== userToRemove.id),
+            booked: prev.booked + 1,
+            availableSlots: Math.max(0, (prev.availableSlots ?? 0) - 1)
+          };
+        });
+        toast.error(errorData.error || "Failed to remove employee");
+      }
+    } catch (err: any) {
+      // ROLLBACK on network error
+      setManageModalData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          scheduled: [...prev.scheduled, userToRemove],
+          unscheduled: prev.unscheduled.filter(u => u.id !== userToRemove.id),
+          booked: prev.booked + 1,
+          availableSlots: Math.max(0, (prev.availableSlots ?? 0) - 1)
+        };
+      });
+      toast.error("Network error - failed to remove employee");
     }
   };
 
@@ -2344,45 +2515,210 @@ export default function ScheduleShiftsPage() {
     );
   };
 
-  // Handle making multiple users absent
+  // Handle making multiple users absent with OPTIMISTIC UI UPDATE
   const handleMakeAbsence = async () => {
-    if (selectedUsersForAbsence.length === 0 || !manageModalShift) return;
+    if (selectedUsersForAbsence.length === 0 || !manageModalShift || !manageModalData) return;
 
+    const usersToMarkAbsent = selectedUsersForAbsence;
+    const usersCount = usersToMarkAbsent.length;
+
+    // OPTIMISTIC UPDATE: Immediately update the UI
+    // 1. Mark users as absent (keep them in list but with isAbsent: true)
+    setManageModalData(prev => {
+      if (!prev) return prev;
+      const absentUserIdSet = new Set(usersToMarkAbsent);
+      const markedAbsentCount = prev.scheduled.filter(u => absentUserIdSet.has(u.id) && u.isDefault && !u.isAbsent).length;
+      
+      // Update users to mark them as absent with temporary absenceId
+      const newScheduled = prev.scheduled.map(u => {
+        if (absentUserIdSet.has(u.id) && u.isDefault) {
+          return { ...u, isAbsent: true, absenceId: Date.now() + u.id }; // Temporary ID
+        }
+        return u;
+      });
+      
+      return {
+        ...prev,
+        scheduled: newScheduled,
+        booked: prev.booked - markedAbsentCount, // Decrease booked count
+        defaultUsers: Math.max(0, (prev.defaultUsers || 0) - markedAbsentCount),
+        absentDefaultUsers: (prev.absentDefaultUsers || 0) + markedAbsentCount,
+        availableSlots: (prev.availableSlots ?? 0) + markedAbsentCount
+      };
+    });
+
+    // 2. Update shiftAbsences to show these users as absent in the absence modal
+    setShiftAbsences(prev => [
+      ...prev,
+      ...usersToMarkAbsent.map(userId => ({
+        id: Date.now() + userId, // Temporary ID
+        userId,
+        isApproved: true,
+        absenceType
+      }))
+    ]);
+
+    // Reset form state and close modal immediately
+    setSelectedUsersForAbsence([]);
+    setAbsenceReason('');
+    setAbsenceType('UNAVAILABLE');
+    setShowAbsenceModal(false);
+    
+    toast.success(`Marked ${usersCount} user(s) as absent`);
+
+    // Send requests to server in background
     try {
       const token = localStorage.getItem("token");
 
       // Create absences for all selected users
-      const promises = selectedUsersForAbsence.map(userId =>
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            userId,
-            absenceType,
-            reason: absenceReason || 'No reason provided',
-            isApproved: true
-          })
+      const results = await Promise.all(
+        usersToMarkAbsent.map(async (userId) => {
+          try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                userId,
+                absenceType,
+                reason: absenceReason || 'No reason provided',
+                isApproved: true
+              })
+            });
+            if (!res.ok) {
+              const data = await res.json();
+              return { userId, success: false, error: data.error };
+            }
+            return { userId, success: true };
+          } catch (err) {
+            return { userId, success: false, error: 'Network error' };
+          }
         })
       );
 
-      await Promise.all(promises);
+      // Check for failures
+      const failures = results.filter(r => !r.success);
+      if (failures.length > 0) {
+        if (failures.some(f => f.error?.includes('already'))) {
+          toast.info('Some users were already marked as absent');
+        } else {
+          toast.error(`Failed to mark ${failures.length} user(s) as absent`);
+        }
+      }
 
-      setSelectedUsersForAbsence([]);
-      setAbsenceReason('');
+      // Always refresh to get real absence IDs from server
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-employees?shiftId=${manageModalShift.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setManageModalData(data);
+      }
 
-      // Refresh default users and absences
+      // Refresh default users and absences for the absence modal list
       await fetchDefaultUsersAndAbsences(manageModalShift);
 
-      toast.success(`Marked ${selectedUsersForAbsence.length} user(s) as absent`);
     } catch (err) {
+      // On complete failure, refresh to get correct state
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-employees?shiftId=${manageModalShift.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setManageModalData(data);
+        }
+      } catch (e) {
+        console.error('Failed to refresh modal data:', e);
+      }
       toast.error('Failed to mark users as absent');
     }
   };
 
-  // Handle removing absence (making user present)
+  // State for tracking which absence is being removed (for loading indicator)
+  const [removingAbsenceId, setRemovingAbsenceId] = useState<number | null>(null);
+
+  // Handle removing absence (making user present) with OPTIMISTIC UI UPDATE
+  const handleMakePresent = async (userId: number, absenceId: number) => {
+    if (!manageModalShift || !manageModalData) return;
+
+    setRemovingAbsenceId(absenceId);
+
+    // Find the user being made present
+    const userToMakePresent = manageModalData.scheduled.find(u => u.id === userId && u.isAbsent);
+    
+    // OPTIMISTIC UPDATE: Immediately update the UI
+    setManageModalData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        scheduled: prev.scheduled.map(u => 
+          u.id === userId ? { ...u, isAbsent: false, absenceId: null } : u
+        ),
+        booked: prev.booked + 1,
+        defaultUsers: (prev.defaultUsers || 0) + 1,
+        availableSlots: Math.max(0, (prev.availableSlots ?? 0) - 1)
+      };
+    });
+
+    // Update shiftAbsences to remove this absence
+    setShiftAbsences(prev => prev.filter(a => a.id !== absenceId));
+
+    toast.success('User marked as present');
+    setRemovingAbsenceId(null);
+
+    // Send request to server in background
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences/${absenceId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        // ROLLBACK on error
+        setManageModalData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            scheduled: prev.scheduled.map(u => 
+              u.id === userId ? { ...u, isAbsent: true, absenceId } : u
+            ),
+            booked: prev.booked - 1,
+            defaultUsers: Math.max(0, (prev.defaultUsers || 0) - 1),
+            availableSlots: (prev.availableSlots ?? 0) + 1
+          };
+        });
+        setShiftAbsences(prev => [...prev, { id: absenceId, userId, isApproved: true }]);
+        toast.error('Failed to mark user as present');
+      }
+
+      // Refresh default users and absences
+      await fetchDefaultUsersAndAbsences(manageModalShift);
+    } catch (err) {
+      // ROLLBACK on network error
+      if (userToMakePresent) {
+        setManageModalData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            scheduled: prev.scheduled.map(u => 
+              u.id === userId ? { ...u, isAbsent: true, absenceId } : u
+            ),
+            booked: prev.booked - 1,
+            defaultUsers: Math.max(0, (prev.defaultUsers || 0) - 1),
+            availableSlots: (prev.availableSlots ?? 0) + 1
+          };
+        });
+      }
+      toast.error('Network error - failed to mark user as present');
+    }
+  };
+
+  // Legacy handler for absence modal (still needed for that UI)
   const handleRemoveAbsence = async (absenceId: number) => {
     if (!manageModalShift) return;
 
@@ -2397,6 +2733,15 @@ export default function ScheduleShiftsPage() {
 
       // Refresh default users and absences
       await fetchDefaultUsersAndAbsences(manageModalShift);
+
+      // Refresh the manage modal data to update scheduled list and available slots
+      const refreshRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shift-employees?shiftId=${manageModalShift.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        setManageModalData(data);
+      }
 
       toast.success('User marked as present');
     } catch (err) {
@@ -2437,7 +2782,7 @@ export default function ScheduleShiftsPage() {
     if (!manageModalOpen || !manageModalShift) return null;
     const handleCloseModal = async () => {
       setManageModalOpen(false);
-      await fetchShifts(); // Refresh shifts data after closing modal
+      await fetchAllPageData(); // Refresh all data including absences after closing modal
     };
 
     // Filter scheduled employees based on search term
@@ -2616,25 +2961,75 @@ export default function ScheduleShiftsPage() {
                     </div>
                   ) : (
                     filteredScheduled.map(emp => (
-                      <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 16 }}>{emp.name}</span>
-                          {emp.isDefault && (
-                            <span style={{
-                              fontSize: 10,
-                              background: '#ff9800',
-                              color: 'white',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              fontWeight: 600
-                            }}>
-                              DEFAULT
-                            </span>
+                      <div key={emp.id} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        padding: '10px 8px', 
+                        borderBottom: '1px solid #eee',
+                        background: emp.isAbsent ? '#fff3e0' : 'transparent',
+                        borderRadius: emp.isAbsent ? 6 : 0,
+                        marginBottom: emp.isAbsent ? 4 : 0
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <span style={{ fontSize: 16, fontWeight: 500, color: emp.isAbsent ? '#666' : '#333' }}>{emp.name}</span>
+                          {(emp.isDefault || emp.isAbsent) && (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              {emp.isDefault && (
+                                <span style={{
+                                  fontSize: 10,
+                                  background: '#ff9800',
+                                  color: 'white',
+                                  padding: '2px 8px',
+                                  borderRadius: 4,
+                                  fontWeight: 600
+                                }}>
+                                  DEFAULT
+                                </span>
+                              )}
+                              {emp.isAbsent && (
+                                <span style={{
+                                  fontSize: 10,
+                                  background: '#d32f2f',
+                                  color: 'white',
+                                  padding: '2px 8px',
+                                  borderRadius: 4,
+                                  fontWeight: 600
+                                }}>
+                                  ABSENT
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
-                        {/* Show appropriate button based on user type */}
-                        {emp.isDefault ? (
-                          /* Default user - always show Mark Absent button */
+                        {/* Show appropriate button based on user type and absence status */}
+                        {emp.isAbsent && emp.absenceId ? (
+                          /* Absent default user - show Make Present button */
+                          (() => {
+                            const isProcessing = removingAbsenceId === emp.absenceId;
+                            return (
+                              <button 
+                                onClick={() => handleMakePresent(emp.id, emp.absenceId)}
+                                disabled={isProcessing}
+                                style={{ 
+                                  background: '#fff', 
+                                  color: isProcessing ? '#999' : '#43a047', 
+                                  border: `1px solid ${isProcessing ? '#ccc' : '#43a047'}`, 
+                                  borderRadius: 6, 
+                                  padding: '4px 14px', 
+                                  fontWeight: 600, 
+                                  cursor: isProcessing ? 'not-allowed' : 'pointer', 
+                                  fontSize: 15,
+                                  opacity: isProcessing ? 0.6 : 1,
+                                  minWidth: 90
+                                }}
+                              >
+                                {isProcessing ? 'Processing...' : 'Make Present'}
+                              </button>
+                            );
+                          })()
+                        ) : emp.isDefault && !emp.isAbsent ? (
+                          /* Present default user - show Mark Absent button */
                           <button 
                             onClick={() => {
                               // Pre-select this default user and open the absence modal
@@ -2656,7 +3051,29 @@ export default function ScheduleShiftsPage() {
                           </button>
                         ) : emp.signupId ? (
                           /* Regular registered user - show Remove button */
-                          <button onClick={() => handleRemoveEmployee(emp.signupId)} style={{ background: '#fff', color: '#e53935', border: '1px solid #e53935', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>Remove</button>
+                          (() => {
+                            const isRemoving = removingSignupId === emp.signupId;
+                            return (
+                              <button 
+                                onClick={() => handleRemoveEmployee(emp.signupId)} 
+                                disabled={isRemoving}
+                                style={{ 
+                                  background: '#fff', 
+                                  color: isRemoving ? '#999' : '#e53935', 
+                                  border: `1px solid ${isRemoving ? '#ccc' : '#e53935'}`, 
+                                  borderRadius: 6, 
+                                  padding: '4px 14px', 
+                                  fontWeight: 600, 
+                                  cursor: isRemoving ? 'not-allowed' : 'pointer', 
+                                  fontSize: 15,
+                                  opacity: isRemoving ? 0.6 : 1,
+                                  minWidth: 85
+                                }}
+                              >
+                                {isRemoving ? 'Removing...' : 'Remove'}
+                              </button>
+                            );
+                          })()
                         ) : (
                           <span style={{ fontSize: 12, color: '#666', fontStyle: 'italic' }}>No action</span>
                         )}
@@ -2730,18 +3147,33 @@ export default function ScheduleShiftsPage() {
                       {unscheduledSearchTerm ? 'No employees match your search.' : 'No available employees.'}
                     </div>
                   ) : (
-                    filteredUnscheduled.map(emp => (
-                      <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-                        <span style={{ fontSize: 16 }}>{emp.name}</span>
-                        <button
-                          onClick={() => handleAddEmployee(emp.id)}
-                          disabled={!!manageModalData && (manageModalData.booked >= manageModalData.slots || (manageModalData.availableSlots ?? 0) <= 0)}
-                          style={{ background: '#fff', color: '#43a047', border: '1px solid #43a047', borderRadius: 6, padding: '4px 14px', fontWeight: 600, cursor: (!!manageModalData && (manageModalData.booked >= manageModalData.slots || (manageModalData.availableSlots ?? 0) <= 0)) ? 'not-allowed' : 'pointer', fontSize: 15, opacity: (!!manageModalData && (manageModalData.booked >= manageModalData.slots || (manageModalData.availableSlots ?? 0) <= 0)) ? 0.5 : 1 }}
-                        >
-                          Add
-                        </button>
-                      </div>
-                    ))
+                    filteredUnscheduled.map(emp => {
+                      const isAdding = addingUserId === emp.id;
+                      const isDisabled = isAdding || (!!manageModalData && (manageModalData.booked >= manageModalData.slots || (manageModalData.availableSlots ?? 0) <= 0));
+                      return (
+                        <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                          <span style={{ fontSize: 16 }}>{emp.name}</span>
+                          <button
+                            onClick={() => handleAddEmployee(emp.id)}
+                            disabled={isDisabled}
+                            style={{ 
+                              background: '#fff', 
+                              color: isAdding ? '#999' : '#43a047', 
+                              border: `1px solid ${isAdding ? '#ccc' : '#43a047'}`, 
+                              borderRadius: 6, 
+                              padding: '4px 14px', 
+                              fontWeight: 600, 
+                              cursor: isDisabled ? 'not-allowed' : 'pointer', 
+                              fontSize: 15, 
+                              opacity: isDisabled ? 0.6 : 1,
+                              minWidth: 70
+                            }}
+                          >
+                            {isAdding ? 'Adding...' : 'Add'}
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
                 </>
               )}
@@ -2760,9 +3192,8 @@ export default function ScheduleShiftsPage() {
           <p style={{ color: '#666', fontSize: 14 }}>Manage and schedule shifts for your organization</p>
         </div>
         <button
-          onClick={() => {
-            fetchShifts();
-            fetchRecurringShifts();
+          onClick={async () => {
+            await fetchAllPageData();
             toast.success('Data refreshed!');
           }}
           style={{
@@ -3286,27 +3717,29 @@ export default function ScheduleShiftsPage() {
                               alignItems: 'center',
                               padding: 12,
                               borderBottom: '1px solid #f0f0f0',
-                              background: isSelected ? '#e3f2fd' : 'transparent',
-                              cursor: 'pointer'
+                              background: isAbsent ? '#ffebee' : (isSelected ? '#e3f2fd' : 'transparent'),
+                              cursor: isAbsent ? 'not-allowed' : 'pointer',
+                              opacity: isAbsent ? 0.7 : 1
                             }}
-                              onClick={() => handleUserSelection(defaultUser.userId)}>
+                              onClick={() => !isAbsent && handleUserSelection(defaultUser.userId)}>
                               <input
                                 type="checkbox"
                                 checked={isSelected}
+                                disabled={isAbsent}
                                 onChange={(e) => {
                                   e.stopPropagation();
-                                  handleUserSelection(defaultUser.userId);
+                                  if (!isAbsent) handleUserSelection(defaultUser.userId);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                                 style={{ marginRight: 12 }}
                               />
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: isAbsent ? '#999' : '#333' }}>
                                   {defaultUser.user.firstName} {defaultUser.user.lastName}
                                 </div>
                                 {isAbsent && (
-                                  <div style={{ fontSize: 12, color: '#d32f2f', marginTop: 2 }}>
-                                    Currently absent
+                                  <div style={{ fontSize: 12, color: '#d32f2f', marginTop: 2, fontWeight: 500 }}>
+                                    ✓ Already marked absent
                                   </div>
                                 )}
                               </div>

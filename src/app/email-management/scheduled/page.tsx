@@ -171,6 +171,31 @@ export default function ScheduledEmailsPage() {
     return email.scheduleType;
   };
 
+  // Format date in Halifax timezone for consistent display
+  const formatDateInHalifax = (dateString: string | undefined, includeTime = false) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: 'America/Halifax',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      ...(includeTime && { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+    return date.toLocaleString('en-US', options);
+  };
+
+  const formatTimeInHalifax = (dateString: string | undefined) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      timeZone: 'America/Halifax',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -295,7 +320,7 @@ export default function ScheduledEmailsPage() {
                   <div className="bg-gray-50 rounded-lg p-3">
                     <div className="text-xs text-gray-500 uppercase">Last Run</div>
                     <div className="text-sm font-medium text-gray-700">
-                      {email.lastRunAt ? new Date(email.lastRunAt).toLocaleDateString() : 'Never'}
+                      {email.lastRunAt ? formatDateInHalifax(email.lastRunAt) : 'Never'}
                     </div>
                     {email.lastRunStatus && (
                       <span className={`text-xs px-1.5 py-0.5 rounded ${getStatusColor(email.lastRunStatus)}`}>
@@ -304,13 +329,13 @@ export default function ScheduledEmailsPage() {
                     )}
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-xs text-gray-500 uppercase">Next Run</div>
+                    <div className="text-xs text-gray-500 uppercase">Next Run (Halifax)</div>
                     <div className="text-sm font-medium text-gray-700">
-                      {email.nextRunAt ? new Date(email.nextRunAt).toLocaleDateString() : 'N/A'}
+                      {formatDateInHalifax(email.nextRunAt)}
                     </div>
                     {email.nextRunAt && (
                       <div className="text-xs text-gray-500">
-                        {new Date(email.nextRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatTimeInHalifax(email.nextRunAt)}
                       </div>
                     )}
                   </div>

@@ -85,8 +85,17 @@ export default function PreviewRecipientsPage() {
     }
   };
 
+  // Format date in Halifax timezone for consistent display
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleString('en-US', {
+      timeZone: 'America/Halifax',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }) + ' (Halifax)';
   };
 
   if (loading) {

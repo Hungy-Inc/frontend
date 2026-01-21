@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaEnvelope, FaEdit, FaTrash, FaEye, FaPlus, FaPlay, FaToggleOn, FaToggleOff, FaHistory, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaEnvelope, FaEdit, FaTrash, FaPlus, FaPlay, FaToggleOn, FaToggleOff, FaHistory, FaCheckCircle, FaUsers, FaBirthdayCake, FaCalendarAlt, FaClock, FaCog } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -116,37 +116,57 @@ export default function ScheduledEmailsPage() {
   const getEmailTypeLabel = (type: string) => {
     switch (type) {
       case 'BIRTHDAY': return 'Birthday';
-      case 'VOLUNTEER_ANNIVERSARY': return 'Volunteer Anniversary';
+      case 'VOLUNTEER_ANNIVERSARY': return 'Anniversary';
       case 'SHIFT_REMINDER': return 'Shift Reminder';
-      case 'CUSTOM_RECURRING': return 'Custom Recurring';
+      case 'CUSTOM_RECURRING': return 'Custom';
       default: return type;
+    }
+  };
+
+  const getEmailTypeIcon = (type: string) => {
+    switch (type) {
+      case 'BIRTHDAY': return <FaBirthdayCake className="text-pink-500" />;
+      case 'VOLUNTEER_ANNIVERSARY': return <FaCalendarAlt className="text-purple-500" />;
+      case 'SHIFT_REMINDER': return <FaClock className="text-blue-500" />;
+      case 'CUSTOM_RECURRING': return <FaCog className="text-gray-500" />;
+      default: return <FaEnvelope className="text-gray-500" />;
+    }
+  };
+
+  const getEmailTypeBgColor = (type: string) => {
+    switch (type) {
+      case 'BIRTHDAY': return 'bg-pink-50 border-pink-200';
+      case 'VOLUNTEER_ANNIVERSARY': return 'bg-purple-50 border-purple-200';
+      case 'SHIFT_REMINDER': return 'bg-blue-50 border-blue-200';
+      case 'CUSTOM_RECURRING': return 'bg-gray-50 border-gray-200';
+      default: return 'bg-gray-50 border-gray-200';
     }
   };
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'SUCCESS': return 'text-green-600';
-      case 'PARTIAL_SUCCESS': return 'text-yellow-600';
-      case 'FAILED': return 'text-red-600';
-      case 'RUNNING': return 'text-blue-600';
-      default: return 'text-gray-600';
+      case 'SUCCESS': return 'bg-green-100 text-green-800';
+      case 'PARTIAL_SUCCESS': return 'bg-yellow-100 text-yellow-800';
+      case 'FAILED': return 'bg-red-100 text-red-800';
+      case 'RUNNING': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const formatSchedule = (email: ScheduledEmail) => {
     if (email.emailType === 'BIRTHDAY') {
       const config = email.scheduleConfig || {};
-      return `Daily (${config.sendOnDay || 'BIRTHDAY'})`;
+      return config.sendOnDay === 'BIRTHDAY' ? 'On birthday' : `${config.daysBefore || 0} days before`;
     } else if (email.emailType === 'VOLUNTEER_ANNIVERSARY') {
       const config = email.scheduleConfig || {};
       const years = config.anniversaryYears || [];
-      return `Daily (Years: ${years.join(', ')})`;
+      return `Years: ${years.join(', ')}`;
     } else if (email.emailType === 'SHIFT_REMINDER') {
       const config = email.scheduleConfig || {};
       const hours = Array.isArray(config.hoursBefore) 
         ? config.hoursBefore.join(', ') 
         : config.hoursBefore || 24;
-      return `${hours} hours before shift`;
+      return `${hours}h before shift`;
     }
     return email.scheduleType;
   };
@@ -209,133 +229,157 @@ export default function ScheduledEmailsPage() {
         </div>
       </div>
 
-      {/* Scheduled Emails List */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        {scheduledEmails.length === 0 ? (
-          <div className="text-center py-12">
-            <FaEnvelope className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No scheduled emails</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by creating a new scheduled email.</p>
-            <div className="mt-6">
-              <Link
-                href="/email-management/scheduled/create"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
-              >
-                <FaPlus className="mr-2" />
-                Create Scheduled Email
-              </Link>
-            </div>
+      {/* Scheduled Emails Cards */}
+      {scheduledEmails.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border text-center py-12">
+          <FaEnvelope className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No scheduled emails</h3>
+          <p className="mt-1 text-sm text-gray-500">Get started by creating a new scheduled email.</p>
+          <div className="mt-6">
+            <Link
+              href="/email-management/scheduled/create"
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
+            >
+              <FaPlus className="mr-2" />
+              Create Scheduled Email
+            </Link>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Run</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Run</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sent</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {scheduledEmails.map((email) => (
-                  <tr key={email.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{email.name}</div>
-                        {email.description && (
-                          <div className="text-sm text-gray-500">{email.description}</div>
-                        )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {scheduledEmails.map((email) => (
+            <div 
+              key={email.id} 
+              className={`bg-white rounded-lg shadow-sm border-2 overflow-hidden ${email.isActive ? 'border-green-300' : 'border-gray-200 opacity-75'}`}
+            >
+              {/* Card Header */}
+              <div className={`px-5 py-4 ${getEmailTypeBgColor(email.emailType)} border-b`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">
+                      {getEmailTypeIcon(email.emailType)}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{email.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60 text-gray-700">
+                          {getEmailTypeLabel(email.emailType)}
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          {formatSchedule(email)}
+                        </span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {getEmailTypeLabel(email.emailType)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleActive(email.id, email.isActive)}
+                    className="text-3xl"
+                    title={email.isActive ? 'Click to Deactivate' : 'Click to Activate'}
+                  >
+                    {email.isActive ? (
+                      <FaToggleOn className="text-green-500 hover:text-green-600" />
+                    ) : (
+                      <FaToggleOff className="text-gray-400 hover:text-gray-500" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Card Body - Stats */}
+              <div className="px-5 py-4">
+                <div className="grid grid-cols-3 gap-4 text-center mb-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500 uppercase">Total Sent</div>
+                    <div className="text-xl font-bold text-gray-900">{email.totalSent}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500 uppercase">Last Run</div>
+                    <div className="text-sm font-medium text-gray-700">
+                      {email.lastRunAt ? new Date(email.lastRunAt).toLocaleDateString() : 'Never'}
+                    </div>
+                    {email.lastRunStatus && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${getStatusColor(email.lastRunStatus)}`}>
+                        {email.lastRunStatus}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatSchedule(email)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => toggleActive(email.id, email.isActive)}
-                          className="text-2xl"
-                          title={email.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          {email.isActive ? (
-                            <FaToggleOn className="text-green-500" />
-                          ) : (
-                            <FaToggleOff className="text-gray-400" />
-                          )}
-                        </button>
-                        {email.lastRunStatus && (
-                          <span className={`text-xs ${getStatusColor(email.lastRunStatus)}`}>
-                            {email.lastRunStatus}
-                          </span>
-                        )}
+                    )}
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500 uppercase">Next Run</div>
+                    <div className="text-sm font-medium text-gray-700">
+                      {email.nextRunAt ? new Date(email.nextRunAt).toLocaleDateString() : 'N/A'}
+                    </div>
+                    {email.nextRunAt && (
+                      <div className="text-xs text-gray-500">
+                        {new Date(email.nextRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {email.lastRunAt ? new Date(email.lastRunAt).toLocaleString() : 'Never'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {email.nextRunAt ? new Date(email.nextRunAt).toLocaleString() : 'Not scheduled'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {email.totalSent} ({email.lastSentCount} last run)
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <Link
-                          href={`/email-management/scheduled/${email.id}/edit`}
-                          className="text-orange-600 hover:text-orange-900"
-                          title="Edit"
-                        >
-                          <FaEdit />
-                        </Link>
-                        <button
-                          onClick={() => testScheduledEmail(email.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Test"
-                        >
-                          <FaPlay />
-                        </button>
-                        <Link
-                          href={`/email-management/scheduled/${email.id}/executions`}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="View History"
-                        >
-                          <FaHistory />
-                        </Link>
-                        <button
-                          onClick={() => executeNow(email.id)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Execute Now"
-                        >
-                          <FaCheckCircle />
-                        </button>
-                        <button
-                          onClick={() => deleteScheduledEmail(email.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons - PROMINENT */}
+                <div className="border-t pt-4">
+                  <div className="text-xs text-gray-500 uppercase mb-2 font-medium">Quick Actions</div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    <Link
+                      href={`/email-management/scheduled/${email.id}/preview`}
+                      className="flex flex-col items-center justify-center p-3 bg-cyan-50 hover:bg-cyan-100 rounded-lg transition-colors group"
+                      title="Preview who will receive this email"
+                    >
+                      <FaUsers className="text-cyan-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs text-cyan-700 font-medium">Preview</span>
+                    </Link>
+                    
+                    <button
+                      onClick={() => testScheduledEmail(email.id)}
+                      className="flex flex-col items-center justify-center p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
+                      title="Send a test email to yourself"
+                    >
+                      <FaPlay className="text-blue-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs text-blue-700 font-medium">Test</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => executeNow(email.id)}
+                      className="flex flex-col items-center justify-center p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group"
+                      title="Execute now and send to all recipients"
+                    >
+                      <FaCheckCircle className="text-green-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs text-green-700 font-medium">Run Now</span>
+                    </button>
+                    
+                    <Link
+                      href={`/email-management/scheduled/${email.id}/executions`}
+                      className="flex flex-col items-center justify-center p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group"
+                      title="View execution history"
+                    >
+                      <FaHistory className="text-purple-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs text-purple-700 font-medium">History</span>
+                    </Link>
+                    
+                    <Link
+                      href={`/email-management/scheduled/${email.id}/edit`}
+                      className="flex flex-col items-center justify-center p-3 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors group"
+                      title="Edit this scheduled email"
+                    >
+                      <FaEdit className="text-orange-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs text-orange-700 font-medium">Edit</span>
+                    </Link>
+                    
+                    <button
+                      onClick={() => deleteScheduledEmail(email.id)}
+                      className="flex flex-col items-center justify-center p-3 bg-red-50 hover:bg-red-100 rounded-lg transition-colors group"
+                      title="Delete this scheduled email"
+                    >
+                      <FaTrash className="text-red-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs text-red-700 font-medium">Delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-

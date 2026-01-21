@@ -292,5 +292,16 @@ export const api = {
       throw new Error('Failed to fetch execution history');
     }
     return response.json();
+  },
+
+  async previewScheduledEmailRecipients(id: number) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${id}/preview-recipients`), {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to preview recipients');
+    }
+    return response.json();
   }
 } 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaArrowLeft, FaUser, FaEnvelope, FaBirthdayCake, FaCalendarAlt, FaClock, FaSync, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaArrowLeft, FaUser, FaEnvelope, FaBirthdayCake, FaCalendarAlt, FaClock, FaSync, FaCheckCircle, FaTimesCircle, FaEye } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -22,6 +22,16 @@ interface Recipient {
   isDefaultUser?: boolean;
 }
 
+interface EmailPreview {
+  subject: string;
+  htmlContent: string;
+  textContent?: string | null;
+  sampleRecipient: {
+    name: string;
+    email: string;
+  };
+}
+
 interface PreviewData {
   emailType: string;
   scheduledEmailName: string;
@@ -31,6 +41,7 @@ interface PreviewData {
   totalRecipients: number;
   recipients: Recipient[];
   previewGeneratedAt: string;
+  emailPreview?: EmailPreview | null;
 }
 
 export default function PreviewRecipientsPage() {
@@ -226,6 +237,68 @@ export default function PreviewRecipientsPage() {
                   </>
                 )}
               </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Preview Section */}
+      {previewData.emailPreview && (
+        <div className="bg-white rounded-lg shadow-sm border mb-6">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                <FaEye className="text-blue-500" />
+                Email Preview
+              </h2>
+              <div className="text-sm text-gray-500">
+                Preview using: <span className="font-medium text-gray-700">{previewData.emailPreview.sampleRecipient.name}</span> ({previewData.emailPreview.sampleRecipient.email})
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            {/* Email Subject */}
+            <div className="mb-6">
+              <div className="text-sm font-medium text-gray-700 mb-2">Subject Line:</div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-900 font-medium">
+                {previewData.emailPreview.subject}
+              </div>
+            </div>
+
+            {/* Email HTML Content */}
+            <div className="mb-4">
+              <div className="text-sm font-medium text-gray-700 mb-2">Email Content:</div>
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 text-xs text-gray-500">
+                  HTML Preview (as recipients will see it)
+                </div>
+                <div 
+                  className="p-6 bg-white"
+                  dangerouslySetInnerHTML={{ __html: previewData.emailPreview.htmlContent }}
+                  style={{ 
+                    maxHeight: '600px', 
+                    overflowY: 'auto',
+                    fontFamily: 'Arial, sans-serif'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Text Content (if available) */}
+            {previewData.emailPreview.textContent && (
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-2">Plain Text Version:</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                  {previewData.emailPreview.textContent}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm text-blue-800">
+                <strong>Note:</strong> This preview uses data from the first recipient. Each recipient will receive personalized content with their own data.
+              </div>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaEnvelope, FaEdit, FaTrash, FaPlus, FaPlay, FaToggleOn, FaToggleOff, FaHistory, FaCheckCircle, FaUsers, FaBirthdayCake, FaCalendarAlt, FaClock, FaCog } from 'react-icons/fa';
+import { FaEnvelope, FaEdit, FaTrash, FaPlus, FaToggleOn, FaToggleOff, FaHistory, FaCheckCircle, FaUsers, FaBirthdayCake, FaCalendarAlt, FaClock, FaCog, FaArrowLeft } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -90,15 +90,6 @@ export default function ScheduledEmailsPage() {
     }
   };
 
-  const testScheduledEmail = async (id: number) => {
-    try {
-      await api.testScheduledEmail(id);
-      toast.success('Test email sent successfully');
-    } catch (error) {
-      console.error('Error sending test email:', error);
-      toast.error('Error sending test email');
-    }
-  };
 
   const executeNow = async (id: number) => {
     if (!confirm('Execute this scheduled email now? This will send emails to all matching recipients.')) return;
@@ -207,6 +198,13 @@ export default function ScheduledEmailsPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
+        <Link
+          href="/email-management"
+          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4"
+        >
+          <FaArrowLeft className="mr-2" />
+          Back to Email Management
+        </Link>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Scheduled Emails</h1>
@@ -343,8 +341,8 @@ export default function ScheduledEmailsPage() {
 
                 {/* Action Buttons - PROMINENT */}
                 <div className="border-t pt-4">
-                  <div className="text-xs text-gray-500 uppercase mb-2 font-medium">Quick Actions</div>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  <div className="text-xs text-gray-500 uppercase mb-2 font-medium text-center">Quick Actions</div>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 justify-items-center">
                     <Link
                       href={`/email-management/scheduled/${email.id}/preview`}
                       className="flex flex-col items-center justify-center p-3 bg-cyan-50 hover:bg-cyan-100 rounded-lg transition-colors group"
@@ -353,15 +351,6 @@ export default function ScheduledEmailsPage() {
                       <FaUsers className="text-cyan-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
                       <span className="text-xs text-cyan-700 font-medium">Preview</span>
                     </Link>
-                    
-                    <button
-                      onClick={() => testScheduledEmail(email.id)}
-                      className="flex flex-col items-center justify-center p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
-                      title="Send a test email to yourself"
-                    >
-                      <FaPlay className="text-blue-600 text-lg mb-1 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs text-blue-700 font-medium">Test</span>
-                    </button>
                     
                     <button
                       onClick={() => executeNow(email.id)}

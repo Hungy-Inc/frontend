@@ -300,10 +300,16 @@ export default function ScheduleShiftsPage() {
     }
   };
 
-  // Fetch categories for dropdown (existing code, but also for add modal)
+  // Fetch categories on page load (needed for displaying category names in cards)
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+  
+  // Also fetch categories when add modal opens (to ensure fresh data)
   useEffect(() => {
     if (showAdd) fetchCategories();
   }, [showAdd]);
+  
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -1105,8 +1111,8 @@ export default function ScheduleShiftsPage() {
   // Filter recurringShifts for the cards
   const filteredRecurring = expandRecurringShifts(recurringShifts).filter((rec: any) => {
     // Exclude Meals Counting and Collection categories
-    const category = categoryOptions.find(cat => cat.id === rec.shiftCategoryId);
-    if (category && (category.name === 'Meals Counting' || category.name === 'Collection')) return false;
+    const categoryName = rec.ShiftCategory?.name || categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name;
+    if (categoryName && (categoryName === 'Meals Counting' || categoryName === 'Collection')) return false;
 
     // Category filter
     if (selectedCardCategory && String(rec.shiftCategoryId) !== String(selectedCardCategory)) return false;
@@ -1170,8 +1176,8 @@ export default function ScheduleShiftsPage() {
     recurringShifts
       .filter(rec => {
         // Exclude Meals Counting and Collection categories
-        const category = categoryOptions.find(cat => cat.id === rec.shiftCategoryId);
-        if (category && (category.name === 'Meals Counting' || category.name === 'Collection')) return false;
+        const categoryName = rec.ShiftCategory?.name || categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name;
+        if (categoryName && (categoryName === 'Meals Counting' || categoryName === 'Collection')) return false;
 
         return !selectedCardCategory || String(rec.shiftCategoryId) === String(selectedCardCategory);
       })
@@ -1648,7 +1654,7 @@ export default function ScheduleShiftsPage() {
             <div>
               <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 2, fontFamily: 'Poppins,Inter,sans-serif', color: '#222' }}>{rec.name || 'Supper Shift'}</div>
               <div style={{ color: '#666', fontWeight: 500, fontSize: 12, marginBottom: 4 }}>
-                📋 {categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name || 'Unknown Category'}
+                📋 {rec.ShiftCategory?.name || categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name || 'Unknown Category'}
               </div>
               <div style={{ color: '#ff9800', fontWeight: 600, fontSize: 13, background: '#fff3e0', padding: '2px 8px', borderRadius: 8, display: 'inline-block' }}>
                 📅 {nextDate.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Halifax' })}
@@ -1723,7 +1729,7 @@ export default function ScheduleShiftsPage() {
           </button>
           <button
             onClick={async () => {
-              const categoryName = categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name || 'Unknown';
+              const categoryName = rec.ShiftCategory?.name || categoryOptions.find(cat => cat.id === rec.shiftCategoryId)?.name || 'Unknown';
               // Use the nextDate directly for consistent date calculation
               const dateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
               const signupUrl = `${window.location.origin}/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(rec.name)}?date=${dateStr}`;

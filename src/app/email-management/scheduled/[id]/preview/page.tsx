@@ -36,6 +36,14 @@ interface EmailPreview {
   };
 }
 
+interface ValidationIssue {
+  recipientIndex: number;
+  recipientEmail: string;
+  recipientName: string;
+  issue: string;
+  severity: 'error' | 'warning';
+}
+
 interface PreviewData {
   emailType: string;
   scheduledEmailName: string;
@@ -46,6 +54,13 @@ interface PreviewData {
   recipients: Recipient[];
   previewGeneratedAt: string;
   emailPreview?: EmailPreview | null;
+  validationIssues?: ValidationIssue[];
+  validationSummary?: {
+    totalIssues: number;
+    errors: number;
+    warnings: number;
+    message: string;
+  };
 }
 
 export default function PreviewRecipientsPage() {
@@ -225,6 +240,41 @@ export default function PreviewRecipientsPage() {
           </div>
         </div>
       </div>
+
+      {/* Validation Issues Warning */}
+      {previewData.validationSummary && previewData.validationSummary.totalIssues > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <FaTimesCircle className="text-red-500 mt-1" />
+            <div className="flex-1">
+              <div className="font-medium text-red-900">Validation Issues Detected</div>
+              <div className="text-red-700 mt-1">
+                {previewData.validationSummary.message}
+              </div>
+              <div className="mt-3 space-y-2">
+                {previewData.validationIssues?.map((issue, idx) => (
+                  <div key={idx} className="bg-white border border-red-200 rounded p-3 text-sm">
+                    <div className="font-medium text-red-900">
+                      {issue.recipientName} ({issue.recipientEmail})
+                    </div>
+                    <div className="text-red-700 mt-1">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mr-2 ${
+                        issue.severity === 'error' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {issue.severity === 'error' ? 'ERROR' : 'WARNING'}
+                      </span>
+                      {issue.issue}
+                    </div>
+                    <div className="text-red-600 text-xs mt-1 italic">
+                      This recipient will be skipped when emails are sent
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Warning if no recipients */}
       {previewData.totalRecipients === 0 && (
@@ -438,7 +488,15 @@ export default function PreviewRecipientsPage() {
                           {recipient.shiftName || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {recipient.shiftDate ? formatDate(recipient.shiftDate) : 'N/A'}
+                          {(recipient as any).hasDateIssue ? (
+                            <span className="flex items-center gap-2 text-red-600">
+                              <FaTimesCircle className="text-red-500" />
+                              <span className="font-medium">Invalid Date</span>
+                              <span className="text-xs text-red-500">(Will be skipped)</span>
+                            </span>
+                          ) : (
+                            recipient.shiftDate ? formatDate(recipient.shiftDate) : 'N/A'
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {recipient.hoursUntilShift !== undefined ? `${recipient.hoursUntilShift}h` : 'N/A'}

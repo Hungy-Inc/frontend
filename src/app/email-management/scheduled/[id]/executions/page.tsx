@@ -1,11 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaArrowLeft, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSpinner } from 'react-icons/fa';
+import { FaArrowLeft, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSpinner, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { api } from '@/services/api';
+
+interface RecipientFailure {
+  recipientEmail: string;
+  recipientName: string;
+  reason: string;
+  details?: any;
+}
+
+interface ExecutionDetails {
+  recipientsFound?: number;
+  emailsSent?: number;
+  emailsFailed?: number;
+  skippedCount?: number;
+  failedCount?: number;
+  failures?: RecipientFailure[];
+}
 
 interface Execution {
   id: number;
@@ -15,7 +31,7 @@ interface Execution {
   emailsSent: number;
   emailsFailed: number;
   errorMessage?: string;
-  executionDetails?: any;
+  executionDetails?: ExecutionDetails;
 }
 
 export default function ExecutionHistoryPage() {
@@ -158,41 +174,109 @@ export default function ExecutionHistoryPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {executions.map((execution) => (
-                    <tr key={execution.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(execution.executionDate).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(execution.status)}
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(execution.status)}`}>
-                            {execution.status}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {execution.recipientsFound}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                        {execution.emailsSent}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
-                        {execution.emailsFailed}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {execution.errorMessage ? (
-                          <span className="text-red-600" title={execution.errorMessage}>
-                            {execution.errorMessage.length > 50 
-                              ? execution.errorMessage.substring(0, 50) + '...' 
-                              : execution.errorMessage}
-                          </span>
-                        ) : (
-                          '-'
+                  {executions.map((execution) => {
+                    const isExpanded = expandedExecutionId === execution.id;
+                    const hasFailures = execution.executionDetails?.failures && execution.executionDetails.failures.length > 0;
+                    
+                    return (
+                      <>
+                        <tr key={execution.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(execution.executionDate).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              {getStatusIcon(execution.status)}
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(execution.status)}`}>
+                                {execution.status}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {execution.recipientsFound}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                            {execution.emailsSent}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                            {execution.emailsFailed}
+                            {execution.executionDetails?.skippedCount && execution.executionDetails.skippedCount > 0 && (
+                              <span className="ml-1 text-xs text-orange-600">
+                                ({execution.executionDetails.skippedCount} skipped)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            <div className="flex items-center justify-between">
+                              <span>
+                                {execution.errorMessage ? (
+                                  <span className="text-red-600" title={execution.errorMessage}>
+                                    {execution.errorMessage.length > 40 
+                                      ? execution.errorMessage.substring(0, 40) + '...' 
+                                      : execution.errorMessage}
+                                  </span>
+                                ) : (
+                                  '-'
+                                )}
+                              </span>
+                              {hasFailures && (
+                                <button
+                                  onClick={() => setExpandedExecutionId(isExpanded ? null : execution.id)}
+                                  className="ml-2 text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
+                                >
+                                  {isExpanded ? (
+                                    <>
+                                      <FaChevronUp className="text-xs" />
+                                      Hide Details
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FaChevronDown className="text-xs" />
+                                      Show Details
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && hasFailures && (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                              <div className="space-y-3">
+                                <div className="font-medium text-gray-900 text-sm mb-2">
+                                  Failure Details ({execution.executionDetails.failures.length} recipient(s))
+                                </div>
+                                <div className="space-y-2 max-h-96 overflow-y-auto">
+                                  {execution.executionDetails.failures.map((failure: RecipientFailure, idx: number) => (
+                                    <div key={idx} className="bg-white border border-red-200 rounded-lg p-3 text-sm">
+                                      <div className="font-medium text-gray-900">
+                                        {failure.recipientName} ({failure.recipientEmail})
+                                      </div>
+                                      <div className="text-red-700 mt-1">
+                                        <span className="inline-block px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs font-medium mr-2">
+                                          ERROR
+                                        </span>
+                                        {failure.reason}
+                                      </div>
+                                      {failure.details && (
+                                        <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                          <strong>Details:</strong>
+                                          <pre className="mt-1 whitespace-pre-wrap font-mono text-xs">
+                                            {JSON.stringify(failure.details, null, 2)}
+                                          </pre>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

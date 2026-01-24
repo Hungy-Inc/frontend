@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaArrowLeft, FaUser, FaEnvelope, FaBirthdayCake, FaCalendarAlt, FaClock, FaSync, FaCheckCircle, FaTimesCircle, FaEye } from 'react-icons/fa';
+import { FaArrowLeft, FaUser, FaEnvelope, FaBirthdayCake, FaCalendarAlt, FaClock, FaSync, FaCheckCircle, FaTimesCircle, FaEye, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -26,7 +26,11 @@ interface EmailPreview {
   subject: string;
   htmlContent: string;
   textContent?: string | null;
-  sampleRecipient: {
+  sampleRecipient?: {
+    name: string;
+    email: string;
+  };
+  recipient?: {
     name: string;
     email: string;
   };
@@ -51,6 +55,8 @@ export default function PreviewRecipientsPage() {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedRecipientPreview, setSelectedRecipientPreview] = useState<EmailPreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPreview();
@@ -107,6 +113,19 @@ export default function PreviewRecipientsPage() {
       minute: '2-digit',
       hour12: true
     }) + ' (Halifax)';
+  };
+
+  const handlePreviewRecipient = async (recipientIndex: number) => {
+    try {
+      setLoadingPreview(recipientIndex);
+      const preview = await api.previewRecipientEmail(id, recipientIndex);
+      setSelectedRecipientPreview(preview);
+    } catch (error) {
+      console.error('Error fetching recipient preview:', error);
+      toast.error('Failed to load email preview for this recipient');
+    } finally {
+      setLoadingPreview(null);
+    }
   };
 
   if (loading) {
@@ -252,7 +271,7 @@ export default function PreviewRecipientsPage() {
                 Email Preview
               </h2>
               <div className="text-sm text-gray-500">
-                Preview using: <span className="font-medium text-gray-700">{previewData.emailPreview.sampleRecipient.name}</span> ({previewData.emailPreview.sampleRecipient.email})
+                Preview using: <span className="font-medium text-gray-700">{previewData.emailPreview.sampleRecipient?.name || previewData.emailPreview.recipient?.name || 'Sample User'}</span> ({previewData.emailPreview.sampleRecipient?.email || previewData.emailPreview.recipient?.email || 'sample@example.com'})
               </div>
             </div>
           </div>
@@ -432,6 +451,26 @@ export default function PreviewRecipientsPage() {
                         </td>
                       </>
                     )}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => handlePreviewRecipient(index)}
+                        disabled={loadingPreview === index}
+                        className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Preview email for this recipient"
+                      >
+                        {loadingPreview === index ? (
+                          <>
+                            <FaSync className="mr-1.5 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            <FaEye className="mr-1.5" />
+                            Preview
+                          </>
+                        )}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -439,6 +478,84 @@ export default function PreviewRecipientsPage() {
           </div>
         )}
       </div>
+
+      {/* Individual Recipient Preview Modal */}
+      {selectedRecipientPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                  <FaEye className="text-blue-500" />
+                  Email Preview
+                </h2>
+                <div className="text-sm text-gray-500 mt-1">
+                  Recipient: <span className="font-medium text-gray-700">
+                    {selectedRecipientPreview.recipient?.name || selectedRecipientPreview.sampleRecipient?.name}
+                  </span> ({selectedRecipientPreview.recipient?.email || selectedRecipientPreview.sampleRecipient?.email})
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedRecipientPreview(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <FaTimes className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Email Subject */}
+              <div className="mb-6">
+                <div className="text-sm font-medium text-gray-700 mb-2">Subject Line:</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-900 font-medium">
+                  {selectedRecipientPreview.subject}
+                </div>
+              </div>
+
+              {/* Email HTML Content */}
+              <div className="mb-4">
+                <div className="text-sm font-medium text-gray-700 mb-2">Email Content:</div>
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 text-xs text-gray-500">
+                    HTML Preview (as recipient will see it)
+                  </div>
+                  <div 
+                    className="p-6 bg-white"
+                    dangerouslySetInnerHTML={{ __html: selectedRecipientPreview.htmlContent }}
+                    style={{ 
+                      maxHeight: '500px', 
+                      overflowY: 'auto',
+                      fontFamily: 'Arial, sans-serif'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Text Content (if available) */}
+              {selectedRecipientPreview.textContent && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-2">Plain Text Version:</div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                    {selectedRecipientPreview.textContent}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setSelectedRecipientPreview(null)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

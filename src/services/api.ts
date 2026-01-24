@@ -303,5 +303,16 @@ export const api = {
       throw new Error(error.error || 'Failed to preview recipients');
     }
     return response.json();
+  },
+
+  async previewRecipientEmail(scheduledEmailId: number, recipientIndex: number) {
+    const response = await fetch(getApiUrl(`/scheduled-emails/${scheduledEmailId}/preview-recipient/${recipientIndex}`), {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to preview recipient email');
+    }
+    return response.json();
   }
 } 

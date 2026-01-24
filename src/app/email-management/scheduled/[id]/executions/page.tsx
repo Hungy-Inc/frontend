@@ -43,6 +43,7 @@ export default function ExecutionHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [limit] = useState(50);
   const [offset, setOffset] = useState(0);
+  const [expandedExecutionId, setExpandedExecutionId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchExecutions();
@@ -240,15 +241,15 @@ export default function ExecutionHistoryPage() {
                             </div>
                           </td>
                         </tr>
-                        {isExpanded && hasFailures && (
+                        {isExpanded && hasFailures && execution.executionDetails?.failures && (
                           <tr>
                             <td colSpan={6} className="px-6 py-4 bg-gray-50">
                               <div className="space-y-3">
                                 <div className="font-medium text-gray-900 text-sm mb-2">
-                                  Failure Details ({execution.executionDetails.failures.length} recipient(s))
+                                  Failure Details ({execution.executionDetails?.failures?.length || 0} recipient(s))
                                 </div>
                                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                                  {execution.executionDetails.failures.map((failure: RecipientFailure, idx: number) => (
+                                  {execution.executionDetails?.failures?.map((failure: RecipientFailure, idx: number) => (
                                     <div key={idx} className="bg-white border border-red-200 rounded-lg p-3 text-sm">
                                       <div className="font-medium text-gray-900">
                                         {failure.recipientName} ({failure.recipientEmail})

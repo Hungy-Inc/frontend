@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaArrowLeft, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSpinner, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
@@ -180,8 +180,8 @@ export default function ExecutionHistoryPage() {
                     const hasFailures = execution.executionDetails?.failures && execution.executionDetails.failures.length > 0;
                     
                     return (
-                      <>
-                        <tr key={execution.id} className="hover:bg-gray-50">
+                      <React.Fragment key={execution.id}>
+                        <tr className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {new Date(execution.executionDate).toLocaleString()}
                           </td>
@@ -275,7 +275,7 @@ export default function ExecutionHistoryPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>

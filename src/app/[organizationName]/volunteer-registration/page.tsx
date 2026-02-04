@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { toast } from 'react-toastify';
-import { FaSpinner, FaCheckCircle } from 'react-icons/fa';
+import { FaSpinner, FaCheckCircle, FaFilePdf, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 
 interface FieldDefinition {
   id: number;
@@ -33,6 +32,14 @@ interface Organization {
   name: string;
   address?: string;
   email: string;
+}
+
+interface PublicTerm {
+  id: number;
+  title: string;
+  version: string;
+  fileUrl: string;
+  fileName: string;
 }
 const FloatingLabelInput = ({ 
   type = "text", 
@@ -164,9 +171,13 @@ export default function VolunteerRegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  
-  // Form state
   const [formData, setFormData] = useState<Record<string, any>>({});
+
+  // Multi-step: 1 = form, 2 = terms & sign
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const [terms, setTerms] = useState<PublicTerm[]>([]);
+  const [termsLoading, setTermsLoading] = useState(false);
+  const [signatures, setSignatures] = useState<Record<number, string>>({});
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -219,6 +230,52 @@ export default function VolunteerRegistrationPage() {
     setFormData(prev => ({ ...prev, [fieldName]: value }));
   };
 
+  // Same URL pattern as org + registration-fields (no encodeURIComponent so path matches what already works)
+  const termsUrl = `${apiUrl}/api/public/organizations/${organizationName}/terms-and-conditions`;
+
+  const fetchTerms = async () => {
+    setTermsLoading(true);
+    try {
+      const res = await fetch(termsUrl);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to load documents');
+      setTerms(Array.isArray(data) ? data : []);
+      setSignatures({});
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to load documents');
+      setTerms([]);
+    } finally {
+      setTermsLoading(false);
+    }
+  };
+
+  const handleNextToTerms = async () => {
+    if (!validateForm()) return;
+    setError('');
+    setTermsLoading(true);
+    try {
+      const res = await fetch(termsUrl);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to load documents');
+      const termList = Array.isArray(data) ? data : [];
+      setTerms(termList);
+      setSignatures({});
+      setCurrentStep(2);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to load documents');
+    } finally {
+      setTermsLoading(false);
+    }
+  };
+
+  const handleBackToForm = () => {
+    setCurrentStep(1);
+    setError('');
+  };
+
+  const setSignature = (termsId: number, value: string) => {
+    setSignatures(prev => ({ ...prev, [termsId]: value }));
+  };
 
   const validateForm = () => {
     // Check required fields
@@ -258,70 +315,70 @@ export default function VolunteerRegistrationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
+    if (currentStep === 1) {
+      handleNextToTerms();
       return;
     }
 
-    try {
-      setSubmitting(true);
-      setError('');
-
-      // Prepare field values for submission
-      const fieldValues = registrationFields.map(field => ({
-        fieldName: field.fieldDefinition.name,
-        value: formData[field.fieldDefinition.name]
-      }));
-
-      // Get email and phone from form data
-      const emailField = registrationFields.find(f => f.fieldDefinition.fieldType === 'EMAIL');
-      const phoneField = registrationFields.find(f => f.fieldDefinition.fieldType === 'PHONE');
-
-      const email = emailField ? formData[emailField.fieldDefinition.name] : '';
-      const phone = phoneField ? formData[phoneField.fieldDefinition.name] : '';
-
-      const response = await fetch(`${apiUrl}/api/public/organizations/${organizationName}/volunteer-registration`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          phone,
-          fieldValues
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Registration failed');
+    if (currentStep === 2) {
+      if (terms.length > 0) {
+        const missing = terms.filter(t => !(signatures[t.id] || '').trim());
+        if (missing.length > 0) {
+          toast.error('Please sign all required documents.');
+          return;
+        }
       }
 
-      const result = await response.json();
-      setSuccess(true);
-      toast.success(result.message || 'Registration successful!');
-      
-      // Trigger notification for admins via localStorage event
-      const notificationEvent = {
-        type: 'NEW_VOLUNTEER_REGISTRATION',
-        count: 1,
-        timestamp: Date.now(),
-        organizationName: organizationName
-      };
-      localStorage.setItem('volunteer_notification', JSON.stringify(notificationEvent));
-      // Remove it immediately to allow future notifications
-      setTimeout(() => {
-        localStorage.removeItem('volunteer_notification');
-      }, 100);
-      
-      // Redirect to home page after 3 seconds
-      setTimeout(() => {
-        router.push('/');
-      }, 3000);
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
-      toast.error(err.message || 'Registration failed. Please try again.');
-    } finally {
-      setSubmitting(false);
+      try {
+        setSubmitting(true);
+        setError('');
+
+        const fieldValues = registrationFields.map(field => ({
+          fieldName: field.fieldDefinition.name,
+          value: formData[field.fieldDefinition.name]
+        }));
+
+        const emailField = registrationFields.find(f => f.fieldDefinition.fieldType === 'EMAIL');
+        const phoneField = registrationFields.find(f => f.fieldDefinition.fieldType === 'PHONE');
+        const email = emailField ? formData[emailField.fieldDefinition.name] : '';
+        const phone = phoneField ? formData[phoneField.fieldDefinition.name] : '';
+
+        const signedTerms = terms.map(t => ({
+          termsAndConditionsId: t.id,
+          signatureText: (signatures[t.id] || '').trim()
+        }));
+
+        const response = await fetch(`${apiUrl}/api/public/organizations/${organizationName}/volunteer-registration`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, phone, fieldValues, signedTerms })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Registration failed');
+
+        setSuccess(true);
+        toast.success(data.message || 'Registration successful!');
+
+        try {
+          localStorage.setItem('volunteer_notification', JSON.stringify({
+            type: 'NEW_VOLUNTEER_REGISTRATION',
+            count: 1,
+            timestamp: Date.now(),
+            organizationName
+          }));
+        } catch (_) {}
+        setTimeout(() => {
+          try { localStorage.removeItem('volunteer_notification'); } catch (_) {}
+        }, 100);
+
+        setTimeout(() => router.push('/'), 3000);
+      } catch (err: any) {
+        setError(err.message || 'Registration failed. Please try again.');
+        toast.error(err.message || 'Registration failed. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -552,34 +609,98 @@ export default function VolunteerRegistrationPage() {
             {organization && (
               <p className="text-gray-600">Join {organization.name} as a volunteer</p>
             )}
+            <p className="text-sm text-gray-500 mt-2">
+              Step {currentStep} of 2 {currentStep === 1 ? '(Your details)' : '(Sign documents)'}
+            </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Dynamic Fields */}
-            {registrationFields.map((field) => (
-              <div key={field.id}>
-                {renderField(field)}
+          {currentStep === 1 && (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {registrationFields.map((field) => (
+                <div key={field.id}>{renderField(field)}</div>
+              ))}
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+              <div className="pt-4 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={termsLoading}
+                  className="bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {termsLoading ? <FaSpinner className="animate-spin" /> : null}
+                  <span>Next: Review & sign documents</span>
+                  <FaArrowRight />
+                </button>
               </div>
-            ))}
+            </form>
+          )}
 
-            {/* Submit Button */}
-            <div className="pt-4">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors duration-200"
-              >
-                {submitting ? (
-                  <>
-                    <FaSpinner className="animate-spin" />
-                    <span>Submitting...</span>
-                  </>
-                ) : (
-                  <span>Submit Registration</span>
-                )}
-              </button>
-            </div>
-          </form>
+          {currentStep === 2 && (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {terms.length === 0 ? (
+                <p className="text-gray-600">No documents to sign. You can submit your registration below.</p>
+              ) : (
+                <div className="space-y-6">
+                  <p className="text-gray-700">Please read and sign each document. Type your full name to sign.</p>
+                  {terms.map((term) => (
+                    <div key={term.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FaFilePdf className="text-orange-600" />
+                        <span className="font-medium text-gray-900">{term.title}</span>
+                        {term.version && <span className="text-gray-500 text-sm">(v{term.version})</span>}
+                      </div>
+                      <a
+                        href={term.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-orange-600 hover:underline text-sm mb-3 inline-block"
+                      >
+                        View document
+                      </a>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Type your full name to sign <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={signatures[term.id] || ''}
+                          onChange={(e) => setSignature(term.id, e.target.value)}
+                          placeholder="Full name"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          required={terms.length > 0}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+              <div className="pt-4 flex justify-between">
+                <button
+                  type="button"
+                  onClick={handleBackToForm}
+                  disabled={submitting}
+                  className="px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FaArrowLeft />
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <FaSpinner className="animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <span>Submit Registration</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 

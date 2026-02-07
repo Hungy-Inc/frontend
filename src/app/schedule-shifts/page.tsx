@@ -338,7 +338,6 @@ export default function ScheduleShiftsPage() {
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
       const data = await res.json();
-      console.log('Raw shifts data:', data); // Debug log for raw data
       setShifts(data);
     } catch (err) {
       console.error('Error fetching shifts:', err);
@@ -395,12 +394,13 @@ export default function ScheduleShiftsPage() {
         ? dayConfig.slots
         : (rec.slots || 0);
 
+      // Exclude test user so capacity matches backend (/api/shift-employees)
       const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
-        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek
+        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek && du.User?.email !== 'test@gmail.com'
       ) : [];
       const defaultUsersForToday = daySpecificUsers.length > 0 
         ? daySpecificUsers
-        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);
+        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null && du.User?.email !== 'test@gmail.com') : []);
       const totalDefaultUsers = defaultUsersForToday.length;
       const defaultUserIds = defaultUsersForToday.map((du: any) => du.userId);
 
@@ -528,13 +528,13 @@ export default function ScheduleShiftsPage() {
         ? dayConfig.slots
         : (rec.slots || 0);
 
-      // Priority: Use day-specific default users if they exist, otherwise use global default users
+      // Priority: Use day-specific default users if they exist, otherwise use global default users. Exclude test user.
       const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
-        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek
+        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === todayDayOfWeek && du.User?.email !== 'test@gmail.com'
       ) : [];
       const defaultUsersForToday = daySpecificUsers.length > 0 
         ? daySpecificUsers
-        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);
+        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null && du.User?.email !== 'test@gmail.com') : []);
       const totalDefaultUsers = defaultUsersForToday.length;
       const defaultUserIds = defaultUsersForToday.map((du: any) => du.userId);
 
@@ -560,7 +560,7 @@ export default function ScheduleShiftsPage() {
         return sum + nonDefaultNonAbsentSignups.length;
       }, 0);
 
-      // Calculate total filled slots (non-absent non-default signups + present default users)
+      // Total filled = non-default non-absent signups + present default users (matches backend)
       const totalFilledSlots = todaysSignups + presentDefaultUsers;
       const pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
 
@@ -1547,15 +1547,15 @@ export default function ScheduleShiftsPage() {
         ? shiftForModal.ShiftSignup.filter((su: any) => !absentUserIds.has(su.userId)).length 
         : 0;
       
-      // Get default users for this day
+      // Get default users for this day (exclude test user to match backend)
       const shiftDate = new Date(shiftForModal.startTime);
       const shiftDayOfWeek = shiftDate.getDay();
       const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
-        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === shiftDayOfWeek
+        (du: any) => du.dayOfWeek !== null && du.dayOfWeek === shiftDayOfWeek && du.User?.email !== 'test@gmail.com'
       ) : [];
       const defaultUsersForShift = daySpecificUsers.length > 0 
         ? daySpecificUsers
-        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);
+        : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null && du.User?.email !== 'test@gmail.com') : []);
       
       // Present default users = NOT absent AND NOT already signed up
       const presentDefaultUsersCount = defaultUsersForShift.filter((du: any) =>
@@ -1583,47 +1583,37 @@ export default function ScheduleShiftsPage() {
         pendingSlots = Math.max(0, totalSlots - totalFilledSlots);
       } else {
         // Shift doesn't exist yet (future/virtual shift) - calculate based on recurring shift config
-        // Priority: Use day-specific default users if they exist, otherwise use global default users
+        // Priority: Use day-specific default users if they exist, otherwise use global default users. Exclude test user.
         // IMPORTANT: dayOfWeek NULL = global default user (used when no day-specific users exist for that day)
-        // dayOfWeek is already calculated above
         const daySpecificUsers = rec.DefaultShiftUser ? rec.DefaultShiftUser.filter(
-          (du: any) => du.dayOfWeek !== null && du.dayOfWeek === dayOfWeek
+          (du: any) => du.dayOfWeek !== null && du.dayOfWeek === dayOfWeek && du.User?.email !== 'test@gmail.com'
         ) : [];
         const defaultUsersForDay = daySpecificUsers.length > 0 
-          ? daySpecificUsers  // Use ONLY day-specific users if they exist (NOT global)
-          : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null) : []);  // Otherwise use ONLY global users (dayOfWeek = null)
+          ? daySpecificUsers
+          : (rec.DefaultShiftUser ? rec.DefaultShiftUser.filter((du: any) => du.dayOfWeek === null && du.User?.email !== 'test@gmail.com') : []);
         const defaultUserIds = defaultUsersForDay.map((du: any) => du.userId);
         
-        // For future shifts (not created yet), count ALL default users (they will be auto-assigned)
-        // For existing shifts, count only default users who are signed up AND not absent
+        // For existing shifts: total filled = (all non-absent signups) + (default users NOT signed up, NOT absent)
+        // For virtual shifts: total filled = default users (they will be auto-assigned)
         if (matchingShifts.length > 0) {
-          // Get absences for this shift from cache
           const shiftId = matchingShifts[0].id;
           const absentUserIds = new Set(shiftAbsencesCache[shiftId] || []);
+          const signedUpUserIds = new Set(
+            matchingShifts.flatMap((s: any) => (s.ShiftSignup || []).map((su: any) => su.userId))
+          );
           
-          // Count signups EXCLUDING absent users and excluding default users
-          const bookedSlots = matchingShifts.reduce((sum, shift) => {
+          // Non-absent signups count (all signups excluding absent)
+          const nonAbsentSignups = matchingShifts.reduce((sum, shift) => {
             if (!shift.ShiftSignup) return sum;
-            const nonDefaultNonAbsentSignups = shift.ShiftSignup.filter((signup: any) => 
-              !defaultUserIds.includes(signup.userId) && !absentUserIds.has(signup.userId)
-            );
-            return sum + nonDefaultNonAbsentSignups.length;
+            return sum + shift.ShiftSignup.filter((su: any) => !absentUserIds.has(su.userId)).length;
           }, 0);
           
-          // Count default users who are signed up AND not absent
-          const defaultUsersSignedUpNotAbsent = matchingShifts.reduce((sum, shift) => {
-            if (!shift.ShiftSignup) return sum;
-            const defaultSignups = shift.ShiftSignup.filter((signup: any) => 
-              defaultUserIds.includes(signup.userId) && !absentUserIds.has(signup.userId)
-            );
-            return sum + defaultSignups.length;
-          }, 0);
+          // Default users who are NOT signed up and NOT absent (they fill a slot by default)
+          presentDefaultUsers = defaultUsersForDay.filter((du: any) =>
+            !absentUserIds.has(du.userId) && !signedUpUserIds.has(du.userId)
+          ).length;
           
-          // Present default users = default users who are signed up and NOT absent
-          presentDefaultUsers = defaultUsersSignedUpNotAbsent;
-          
-          // Total filled slots = non-absent non-default signups + present default users
-          totalFilledSlots = bookedSlots + presentDefaultUsers;
+          totalFilledSlots = nonAbsentSignups + presentDefaultUsers;
         } else {
           // Shift doesn't exist yet (virtual shift) - count ALL default users (they will be auto-assigned)
           // No absences for future shifts (shift doesn't exist yet)
@@ -2564,6 +2554,14 @@ export default function ScheduleShiftsPage() {
       }))
     ]);
 
+    // 3. Update shiftAbsencesCache so shift cards show correct capacity (e.g. "1 spot available")
+    if (manageModalShift?.id) {
+      setShiftAbsencesCache(prev => {
+        const existing = prev[manageModalShift.id] || [];
+        return { ...prev, [manageModalShift.id]: [...existing, ...usersToMarkAbsent] };
+      });
+    }
+
     // Reset form state and close modal immediately
     setSelectedUsersForAbsence([]);
     setAbsenceReason('');
@@ -2672,11 +2670,15 @@ export default function ScheduleShiftsPage() {
 
     // Update shiftAbsences to remove this absence
     setShiftAbsences(prev => prev.filter(a => a.id !== absenceId));
+    // Update shiftAbsencesCache so shift cards show correct capacity
+    if (manageModalShift?.id) {
+      setShiftAbsencesCache(prev => {
+        const existing = prev[manageModalShift.id] || [];
+        return { ...prev, [manageModalShift.id]: existing.filter(id => id !== userId) };
+      });
+    }
 
-    toast.success('User marked as present');
-    setRemovingAbsenceId(null);
-
-    // Send request to server in background
+    // Send request to server
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/absences/${absenceId}`, {
@@ -2684,8 +2686,10 @@ export default function ScheduleShiftsPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (!res.ok) {
-        // ROLLBACK on error
+      if (res.ok) {
+        toast.success('User marked as present');
+      } else {
+        // ROLLBACK on error (e.g. overbooking when making user present)
         setManageModalData(prev => {
           if (!prev) return prev;
           return {
@@ -2699,10 +2703,18 @@ export default function ScheduleShiftsPage() {
           };
         });
         setShiftAbsences(prev => [...prev, { id: absenceId, userId, isApproved: true }]);
-        toast.error('Failed to mark user as present');
+        if (manageModalShift?.id) {
+          setShiftAbsencesCache(prev => {
+            const existing = prev[manageModalShift.id] || [];
+            return existing.includes(userId) ? prev : { ...prev, [manageModalShift.id]: [...existing, userId] };
+          });
+        }
+        const errorData = await res.json().catch(() => ({}));
+        const message = errorData.details?.message || errorData.error || 'Failed to mark user as present';
+        toast.error(message);
       }
 
-      // Refresh default users and absences
+      // Refresh data
       await fetchDefaultUsersAndAbsences(manageModalShift);
     } catch (err) {
       // ROLLBACK on network error
@@ -2721,12 +2733,15 @@ export default function ScheduleShiftsPage() {
         });
       }
       toast.error('Network error - failed to mark user as present');
+    } finally {
+      setRemovingAbsenceId(null);
     }
   };
 
   // Legacy handler for absence modal (still needed for that UI)
   const handleRemoveAbsence = async (absenceId: number) => {
     if (!manageModalShift) return;
+    const userId = manageModalData?.scheduled.find(u => u.absenceId === absenceId)?.id;
 
     try {
       const token = localStorage.getItem("token");
@@ -2735,7 +2750,19 @@ export default function ScheduleShiftsPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (!res.ok) throw new Error("Failed to remove absence");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const message = errorData.details?.message || errorData.error || 'Failed to remove absence';
+        throw new Error(message);
+      }
+
+      // Update shiftAbsencesCache so shift cards show correct capacity
+      if (userId != null) {
+        setShiftAbsencesCache(prev => {
+          const existing = prev[manageModalShift!.id] || [];
+          return { ...prev, [manageModalShift!.id]: existing.filter(id => id !== userId) };
+        });
+      }
 
       // Refresh default users and absences
       await fetchDefaultUsersAndAbsences(manageModalShift);
@@ -2750,8 +2777,8 @@ export default function ScheduleShiftsPage() {
       }
 
       toast.success('User marked as present');
-    } catch (err) {
-      toast.error('Failed to remove absence');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to remove absence');
     }
   };
 
@@ -2772,14 +2799,18 @@ export default function ScheduleShiftsPage() {
         })
       });
 
-      if (!res.ok) throw new Error(`Failed to ${isApproved ? 'approve' : 'reject'} absence`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const message = errorData.details?.message || errorData.error || `Failed to ${isApproved ? 'approve' : 'reject'} absence`;
+        throw new Error(message);
+      }
 
       toast.success(`Absence ${isApproved ? 'approved' : 'rejected'} successfully`);
 
       // Refresh data
       await fetchDefaultUsersAndAbsences(manageModalShift);
-    } catch (err) {
-      toast.error(`Failed to ${isApproved ? 'approve' : 'reject'} absence`);
+    } catch (err: any) {
+      toast.error(err?.message || `Failed to ${isApproved ? 'approve' : 'reject'} absence`);
     }
   };
 

@@ -99,7 +99,15 @@ export default function ShiftSignupPage() {
       
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const response = await fetch(`${apiUrl}/api/public/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(shiftName)}`);
+        // Include date parameter if available (from URL query string)
+        const urlParams = new URLSearchParams();
+        if (urlDate) {
+          urlParams.append('date', urlDate);
+        }
+        const queryString = urlParams.toString();
+        const apiEndpoint = `${apiUrl}/api/public/shift-signup/${encodeURIComponent(categoryName)}/${encodeURIComponent(shiftName)}${queryString ? `?${queryString}` : ''}`;
+        
+        const response = await fetch(apiEndpoint);
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -111,7 +119,14 @@ export default function ShiftSignupPage() {
         }
         
         const data = await response.json();
-        setShift(data);
+        // Map backend response to frontend interface
+        // Backend returns: slots, availableSlots
+        // Frontend expects: totalSlots, availableSlots
+        setShift({
+          ...data,
+          totalSlots: data.slots || data.totalSlots || 0,
+          availableSlots: data.availableSlots || 0
+        });
       } catch (err) {
         console.error('Error fetching shift details:', err);
         setError('Failed to load shift details');
@@ -121,7 +136,7 @@ export default function ShiftSignupPage() {
     };
 
     fetchShiftDetails();
-  }, [categoryName, shiftName]);
+  }, [categoryName, shiftName, urlDate]);
 
   // Form validation
   const validateForm = (): boolean => {

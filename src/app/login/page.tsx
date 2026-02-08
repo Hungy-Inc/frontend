@@ -24,10 +24,12 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
+      // Normalize email to lowercase for case-insensitive login
+      const normalizedEmail = email.toLowerCase().trim();
       const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe })
+        body: JSON.stringify({ email: normalizedEmail, password, rememberMe })
       });
       const data = await res.json();
       if (!res.ok) {

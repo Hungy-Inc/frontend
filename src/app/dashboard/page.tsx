@@ -8,15 +8,89 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'react-toastify';
 
-export default function Dashboard() {
-  // Get current year and month
+const HALIFAX_TIMEZONE = 'America/Halifax';
+
+// Helper function to get current year in Halifax timezone
+const getCurrentHalifaxYear = (): number => {
   const now = new Date();
-  const currentYear = now.getFullYear().toString();
+  // Use Intl.DateTimeFormat for reliable timezone-aware date parsing
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: HALIFAX_TIMEZONE,
+    year: 'numeric'
+  });
+  const year = parseInt(formatter.format(now), 10);
+  // Validate year is reasonable
+  if (!isNaN(year) && year >= 2020 && year <= 2100) {
+    return year;
+  }
+  // Fallback: parse from full date string
+  const halifaxDateStr = now.toLocaleDateString('en-CA', { timeZone: HALIFAX_TIMEZONE });
+  const parts = halifaxDateStr.split('/');
+  // en-CA typically returns YYYY/MM/DD, but can vary - find the 4-digit year
+  for (const part of parts) {
+    const num = parseInt(part, 10);
+    if (num >= 2020 && num <= 2100) {
+      return num;
+    }
+  }
+  // Last resort fallback
+  return new Date().getFullYear();
+};
+
+// Helper function to get current month in Halifax timezone
+const getCurrentHalifaxMonth = (): number => {
+  const now = new Date();
+  // Use Intl.DateTimeFormat for reliable timezone-aware date parsing
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: HALIFAX_TIMEZONE,
+    month: 'numeric'
+  });
+  const month = parseInt(formatter.format(now), 10);
+  // Validate month is reasonable (1-12)
+  if (!isNaN(month) && month >= 1 && month <= 12) {
+    return month - 1; // Convert to 0-based index (0 = January)
+  }
+  // Fallback: parse from full date string
+  const halifaxDateStr = now.toLocaleDateString('en-CA', { timeZone: HALIFAX_TIMEZONE });
+  const parts = halifaxDateStr.split('/');
+  // en-CA typically returns YYYY/MM/DD format
+  if (parts.length === 3) {
+    // Find which part is the year (4 digits)
+    const yearIndex = parts.findIndex(p => {
+      const num = parseInt(p, 10);
+      return num >= 2020 && num <= 2100;
+    });
+    if (yearIndex === 0) {
+      // Format is YYYY/MM/DD, month is at index 1
+      return parseInt(parts[1], 10) - 1;
+    } else if (yearIndex === 2) {
+      // Format is MM/DD/YYYY, month is at index 0
+      return parseInt(parts[0], 10) - 1;
+    }
+  }
+  // Last resort fallback
+  return new Date().getMonth();
+};
+
+// Dynamically generate year options based on Halifax timezone
+const getYearOptions = (): string[] => {
+  const currentYear = getCurrentHalifaxYear();
+  const years: string[] = [];
+  // Include current year + 1 down to 2020
+  for (let y = currentYear + 1; y >= 2020; y--) {
+    years.push(y.toString());
+  }
+  return years;
+};
+
+export default function Dashboard() {
+  // Get current year and month in Halifax timezone
+  const currentYear = getCurrentHalifaxYear().toString();
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
-  const currentMonthName = monthNames[now.getMonth()];
+  const currentMonthName = monthNames[getCurrentHalifaxMonth()];
 
   // Filter state (default to current month and year)
   const [period, setPeriod] = useState(currentMonthName);
@@ -78,7 +152,7 @@ export default function Dashboard() {
   const periodOptions = [
     'All Months', ...monthNames
   ];
-  const yearOptions = ['2025', '2024', '2023', '2022', '2021', '2020'];
+  const yearOptions = getYearOptions(); // Dynamically generated based on Halifax timezone
   const unitOptions = ['Kilograms (kg)', 'Pounds (lb)'];
 
   // Map period to month number for API
@@ -726,28 +800,30 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {/* Donation Location breakdown table */}
-                <table style={{ width: '100%', fontSize: 15 }}>
-                <thead>
-                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donation Location</th>
-                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Weight ({getIncomingUnitLabel()})</th>
-                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Value ($)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                    {Object.entries(orgTotals).map(([id, totals]) => (
-                      <tr key={id}>
-                        <td style={{ padding: '8px 8px 8px 0' }}>{totals.name}</td>
-                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToIncomingUnit(totals.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>
-                          ${(Number(totals.weight.toFixed(2)) * Number(incomingDollarValue.toFixed(2))).toFixed(2)}
-                          <div style={{ fontSize: 11, color: '#666' }}>
-                          </div>
-                        </td>
+                <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
+                  <table style={{ width: '100%', fontSize: 15 }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#fafafa', zIndex: 10 }}>
+                      <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+                          <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Donation Location</th>
+                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Weight ({getIncomingUnitLabel()})</th>
+                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Value ($)</th>
                       </tr>
-                    ))}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                        {Object.entries(orgTotals).map(([id, totals]) => (
+                          <tr key={id}>
+                            <td style={{ padding: '8px 8px 8px 0' }}>{totals.name}</td>
+                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{convertToIncomingUnit(totals.weight).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>
+                              ${(Number(totals.weight.toFixed(2)) * Number(incomingDollarValue.toFixed(2))).toFixed(2)}
+                              <div style={{ fontSize: 11, color: '#666' }}>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -785,24 +861,26 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {/* Volunteer table */}
-              <table style={{ width: '100%', fontSize: 15 }}>
-                <thead>
-                  <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
-                      <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Name</th>
-                      <th style={{ textAlign: 'left', padding: '8px' }}>Role</th>
-                      <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Hours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                    {filteredVolunteers.slice(0, 8).map((v, idx) => (
-                      <tr key={idx}>
-                        <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
-                        <td style={{ padding: '8px' }}>{v.role}</td>
-                        <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{v.hours}</td>
+                <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
+                  <table style={{ width: '100%', fontSize: 15 }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#fafafa', zIndex: 10 }}>
+                      <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
+                          <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Name</th>
+                          <th style={{ textAlign: 'left', padding: '8px' }}>Role</th>
+                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Hours</th>
                       </tr>
-                    ))}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                        {filteredVolunteers.map((v, idx) => (
+                          <tr key={`${v.name}-${idx}`}>
+                            <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
+                            <td style={{ padding: '8px' }}>{v.role}</td>
+                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{v.hours}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

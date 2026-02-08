@@ -1,16 +1,16 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  FaEdit, 
-  FaTrash, 
-  FaSave, 
-  FaTimes, 
-  FaUserPlus, 
-  FaEye, 
-  FaEyeSlash, 
-  FaCheck, 
-  FaBan, 
+import {
+  FaEdit,
+  FaTrash,
+  FaSave,
+  FaTimes,
+  FaUserPlus,
+  FaEye,
+  FaEyeSlash,
+  FaCheck,
+  FaBan,
   FaUndo,
   FaUsers,
   FaShieldAlt,
@@ -22,9 +22,11 @@ import {
   FaUserCog,
   FaFileAlt,
   FaExternalLinkAlt,
-  FaCopy
+  FaCopy,
+  FaMobileAlt,
+  FaDesktop
 } from "react-icons/fa";
-import { ImSpinner2 } from "react-icons/im"; 
+import { ImSpinner2 } from "react-icons/im";
 import { toast } from 'react-toastify';
 
 interface User {
@@ -59,6 +61,7 @@ interface UserPermission {
   moduleName: string;
   moduleDescription: string;
   canAccess: boolean;
+  type?: 'MOBILE' | 'WEBSITE';
 }
 
 interface UserPermissionData {
@@ -72,7 +75,7 @@ interface UserPermissionData {
 const roles = ["VOLUNTEER", "STAFF", "ADMIN"];
 const statusColors = {
   PENDING: "bg-yellow-100 text-yellow-800",
-  APPROVED: "bg-green-100 text-green-800", 
+  APPROVED: "bg-green-100 text-green-800",
   DENIED: "bg-red-100 text-red-800"
 };
 
@@ -85,7 +88,7 @@ const statusIcons = {
 export default function ManageUsersPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'users' | 'permissions' | 'defaultPermissions'>('users');
-  
+
   // User Management State
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,13 +97,13 @@ export default function ManageUsersPage() {
   const [editData, setEditData] = useState<Partial<User>>({});
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [addData, setAddData] = useState({ 
-    firstName: "", 
-    lastName: "", 
-    email: "", 
-    phone: "", 
-    password: "", 
-    confirmPassword: "", 
+  const [addData, setAddData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
     role: "VOLUNTEER"
   });
   const [agreementFile, setAgreementFile] = useState<File | null>(null);
@@ -113,7 +116,7 @@ export default function ManageUsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
-  
+
   // Permission Management State
   const [permissionUsers, setPermissionUsers] = useState<User[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
@@ -200,11 +203,11 @@ export default function ManageUsersPage() {
 
       const baseUrl = window.location.origin;
       const registrationUrl = `${baseUrl}/${orgName}/volunteer-registration`;
-      
+
       try {
         await navigator.clipboard.writeText(registrationUrl);
         toast.success('Volunteer registration link copied to clipboard!');
-      } 
+      }
       catch (clipboardErr) {
         const tempInput = document.createElement('input');
         tempInput.value = registrationUrl;
@@ -312,9 +315,9 @@ export default function ManageUsersPage() {
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/roles/${role}/default-permissions`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ permissions })
       });
@@ -335,8 +338,8 @@ export default function ManageUsersPage() {
   const toggleDefaultPermission = (role: string, moduleId: number) => {
     setDefaultRolePermissions(prev => {
       const rolePermissions = prev[role] || [];
-      const updatedPermissions = rolePermissions.map(permission => 
-        permission.moduleId === moduleId 
+      const updatedPermissions = rolePermissions.map(permission =>
+        permission.moduleId === moduleId
           ? { ...permission, canAccess: !permission.canAccess }
           : permission
       );
@@ -393,14 +396,14 @@ export default function ManageUsersPage() {
   const denyUser = async (userId: string) => {
     const reason = prompt("Please enter a reason for denial:");
     if (!reason) return;
-    
+
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userId}/deny`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ reason })
       });
@@ -414,8 +417,8 @@ export default function ManageUsersPage() {
   };
 
   const resetUserStatus = async (userId: string) => {
-      try {
-        const token = localStorage.getItem("token");
+    try {
+      const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userId}/reset`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
@@ -477,7 +480,7 @@ export default function ManageUsersPage() {
       const response = await fetch(`${apiUrl}/api/users/${userId}/agreement`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!response.ok) {
         console.error('API response not ok:', response.status, response.statusText);
         if (response.status === 404) {
@@ -490,7 +493,7 @@ export default function ManageUsersPage() {
         setLoadingAgreements(false);
         return;
       }
-      
+
       const data = await response.json();
       console.log('Received agreement data:', data);
       
@@ -604,12 +607,12 @@ export default function ManageUsersPage() {
       const response = await fetch(`${apiUrl}/api/users/${userId}/permissions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to fetch user permissions");
       }
-      
-        const data = await response.json();
+
+      const data = await response.json();
       setUserPermissions(data);
     } catch (err) {
       console.error("Failed to load user permissions:", err);
@@ -621,44 +624,44 @@ export default function ManageUsersPage() {
 
   const updateUserPermissions = async () => {
     if (!userPermissions) return;
-    
+
     try {
       setSavingPermissions(true);
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${userPermissions.userId}/permissions`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           permissions: userPermissions.permissions.map(p => ({
             moduleId: p.moduleId,
             canAccess: p.canAccess
           }))
         })
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to update permissions");
       }
-      
+
       await fetchPermissionUsers();
-              toast.success("Permissions updated successfully!");
-      } catch (err) {
-        console.error("Failed to update permissions:", err);
-        toast.error("Failed to update permissions. Please try again.");
-      } finally {
+      toast.success("Permissions updated successfully!");
+    } catch (err) {
+      console.error("Failed to update permissions:", err);
+      toast.error("Failed to update permissions. Please try again.");
+    } finally {
       setSavingPermissions(false);
     }
   };
 
   const togglePermission = (moduleId: number) => {
     if (!userPermissions) return;
-    
+
     setUserPermissions({
       ...userPermissions,
-      permissions: userPermissions.permissions.map(p => 
+      permissions: userPermissions.permissions.map(p =>
         p.moduleId === moduleId ? { ...p, canAccess: !p.canAccess } : p
       )
     });
@@ -683,7 +686,7 @@ export default function ManageUsersPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      
+
       // Validate required fields
       if (!editData.name || !editData.email) {
         toast.error("Name and email are required fields");
@@ -716,7 +719,7 @@ export default function ManageUsersPage() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || "Failed to update user");
       }
-      
+
       await fetchUsers();
       setEditId(null);
       setEditData({});
@@ -731,7 +734,7 @@ export default function ManageUsersPage() {
 
   const deleteUser = async (id: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
-    
+
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${apiUrl}/api/users/${id}`, {
@@ -760,7 +763,7 @@ export default function ManageUsersPage() {
       'image/png',
       'image/gif'
     ];
-    
+
     if (!allowedTypes.includes(file.type)) {
       setAddUserError('Invalid file type. Only PDF, Word, text, and image files are allowed.');
       return;
@@ -802,7 +805,7 @@ export default function ManageUsersPage() {
       if (!result.fileUrl) {
         throw new Error('Upload successful but no file URL returned');
       }
-      
+
       setAgreementFileUrl(result.fileUrl);
       toast.success('Agreement document uploaded successfully!');
     } catch (err: any) {
@@ -835,7 +838,7 @@ export default function ManageUsersPage() {
           agreementFileSize: agreementFile?.size
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to add user");
@@ -843,13 +846,13 @@ export default function ManageUsersPage() {
 
       await fetchUsers();
       setShowAdd(false);
-      setAddData({ 
-        firstName: "", 
-        lastName: "", 
-        email: "", 
-        phone: "", 
-        password: "", 
-        confirmPassword: "", 
+      setAddData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
         role: "VOLUNTEER"
       });
       setAgreementFile(null);
@@ -905,7 +908,7 @@ export default function ManageUsersPage() {
   // Filter functions
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesStatus && matchesRole;
@@ -930,8 +933,8 @@ export default function ManageUsersPage() {
   // Filter permission users based on search term
   const filteredPermissionUsers = permissionUsers.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(permissionSearchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(permissionSearchTerm.toLowerCase()) ||
-                         user.role.toLowerCase().includes(permissionSearchTerm.toLowerCase());
+      user.email.toLowerCase().includes(permissionSearchTerm.toLowerCase()) ||
+      user.role.toLowerCase().includes(permissionSearchTerm.toLowerCase());
     return matchesSearch;
   });
 
@@ -973,11 +976,10 @@ export default function ManageUsersPage() {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('users')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'users'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'users'
+              ? 'border-orange-500 text-orange-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             style={{
               borderBottomColor: activeTab === 'users' ? '#EF5C11' : 'transparent',
               color: activeTab === 'users' ? '#EF5C11' : undefined
@@ -988,11 +990,10 @@ export default function ManageUsersPage() {
           </button>
           <button
             onClick={() => setActiveTab('permissions')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'permissions'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'permissions'
+              ? 'border-orange-500 text-orange-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             style={{
               borderBottomColor: activeTab === 'permissions' ? '#EF5C11' : 'transparent',
               color: activeTab === 'permissions' ? '#EF5C11' : undefined
@@ -1000,14 +1001,13 @@ export default function ManageUsersPage() {
           >
             <FaShieldAlt className="inline mr-2" />
             Permission Management
-        </button>
+          </button>
           <button
             onClick={() => setActiveTab('defaultPermissions')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'defaultPermissions'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'defaultPermissions'
+              ? 'border-orange-500 text-orange-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             style={{
               borderBottomColor: activeTab === 'defaultPermissions' ? '#EF5C11' : 'transparent',
               color: activeTab === 'defaultPermissions' ? '#EF5C11' : undefined
@@ -1015,7 +1015,7 @@ export default function ManageUsersPage() {
           >
             <FaUserCog className="inline mr-2" />
             Default Permissions
-        </button>
+          </button>
         </nav>
       </div>
 
@@ -1069,7 +1069,7 @@ export default function ManageUsersPage() {
               <button
                 onClick={() => setShowAdd(true)}
                 className="px-4 py-2 text-white rounded-lg flex items-center gap-2"
-                style={{ 
+                style={{
                   backgroundColor: '#EF5C11',
                   '&:hover': { backgroundColor: '#666666' }
                 } as React.CSSProperties}
@@ -1112,31 +1112,31 @@ export default function ManageUsersPage() {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                  {editId === user.id ? (
+                          {editId === user.id ? (
                             <div className="space-y-2">
-                        <input
+                              <input
                                 type="text"
-                          value={editData.name || ''}
+                                value={editData.name || ''}
                                 onChange={(e) => handleEditChange('name', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Full Name"
                               />
-                        <input
+                              <input
                                 type="email"
-                          value={editData.email || ''}
+                                value={editData.email || ''}
                                 onChange={(e) => handleEditChange('email', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Email"
                               />
-                        <input
+                              <input
                                 type="tel"
-                          value={editData.phone || ''}
+                                value={editData.phone || ''}
                                 onChange={(e) => handleEditChange('phone', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Phone"
                               />
                               <select
-                          value={editData.role || ''}
+                                value={editData.role || ''}
                                 onChange={(e) => handleEditChange('role', e.target.value)}
                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                                 style={{ '--tw-ring-color': '#EF5C11', '--tw-border-opacity': '1' } as React.CSSProperties}
@@ -1186,30 +1186,29 @@ export default function ManageUsersPage() {
                           <>
                             <button
                               onClick={() => saveEdit(user.id)}
-                          disabled={saving}
+                              disabled={saving}
                               className="p-2 text-green-600 hover:text-green-800 disabled:opacity-50"
                             >
-                          <FaSave />
-                        </button>
+                              <FaSave />
+                            </button>
                             <button
                               onClick={cancelEdit}
                               className="p-2 text-gray-600 hover:text-gray-800"
                             >
-                          <FaTimes />
-                        </button>
-                    </>
-                  ) : (
-                    <>
-                            
+                              <FaTimes />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+
                             {user.status === 'PENDING' && (
                               <>
                                 <button
                                   onClick={() => approveUser(user.id)}
-                                  className={`p-2 rounded ${
-                                    loadingUserId === user.id
-                                      ? "text-gray-400 cursor-not-allowed"
-                                      : "text-green-600 hover:text-green-800"
-                                  }`}
+                                  className={`p-2 rounded ${loadingUserId === user.id
+                                    ? "text-gray-400 cursor-not-allowed"
+                                    : "text-green-600 hover:text-green-800"
+                                    }`}
                                   disabled={loadingUserId === user.id}
                                   title="Approve User"
                                 >
@@ -1251,13 +1250,13 @@ export default function ManageUsersPage() {
                               onMouseEnter={(e) => e.currentTarget.style.color = '#666666'}
                               onMouseLeave={(e) => e.currentTarget.style.color = '#EF5C11'}
                             >
-                          <FaEdit />
-                        </button>
+                              <FaEdit />
+                            </button>
                             <button
                               onClick={() => deleteUser(user.id)}
                               className="p-2 text-red-600 hover:text-red-800"
                             >
-                          <FaTrash />
+                              <FaTrash />
                             </button>
                           </>
                         )}
@@ -1280,7 +1279,7 @@ export default function ManageUsersPage() {
               <div className="bg-white shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Select User</h3>
-                  
+
                   {/* Search Bar for Permission Management */}
                   <div className="mb-4">
                     <div className="relative">
@@ -1317,11 +1316,10 @@ export default function ManageUsersPage() {
                             setPermissionFilterTerm(''); // Clear filter when selecting new user
                             fetchUserPermissions(parseInt(user.id));
                           }}
-                          className={`w-full text-left p-3 rounded-lg border ${
-                            selectedUser === parseInt(user.id)
-                              ? 'border-orange-500'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                          className={`w-full text-left p-3 rounded-lg border ${selectedUser === parseInt(user.id)
+                            ? 'border-orange-500'
+                            : 'border-gray-200 hover:border-gray-300'
+                            }`}
                           style={selectedUser === parseInt(user.id) ? {
                             borderColor: '#EF5C11',
                             backgroundColor: '#F5F4F2'
@@ -1367,7 +1365,7 @@ export default function ManageUsersPage() {
                       <p className="mt-1 text-sm text-gray-500">Unable to load user permissions from the database.</p>
                     </div>
                   ) : (
-                                        <div>
+                    <div>
                       <div className="mb-4">
                         <div className="flex justify-between items-center mb-3">
                           <div>
@@ -1437,7 +1435,7 @@ export default function ManageUsersPage() {
                             onClick={updateUserPermissions}
                             disabled={savingPermissions}
                             className="px-4 py-2 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
-                            style={{ 
+                            style={{
                               backgroundColor: '#EF5C11'
                             } as React.CSSProperties}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
@@ -1453,14 +1451,14 @@ export default function ManageUsersPage() {
                       <div className="mb-6">
                         <div className="relative">
                           <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                                <input
-                        type="text"
-                        placeholder="Filter permissions..."
-                        value={permissionFilterTerm}
-                        onChange={(e) => setPermissionFilterTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                        style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
-                      />
+                          <input
+                            type="text"
+                            placeholder="Filter permissions..."
+                            value={permissionFilterTerm}
+                            onChange={(e) => setPermissionFilterTerm(e.target.value)}
+                            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                            style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
+                          />
                         </div>
                       </div>
 
@@ -1511,7 +1509,7 @@ export default function ManageUsersPage() {
                               </label>
                             </div>
                           ))}
-                          
+
                           <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                             <div className="text-sm text-gray-500">
                               {permissionFilterTerm ? (
@@ -1532,8 +1530,8 @@ export default function ManageUsersPage() {
                         </div>
                       )}
                     </div>
-        )}
-      </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1560,11 +1558,10 @@ export default function ManageUsersPage() {
                   <button
                     key={role}
                     onClick={() => setSelectedRole(role)}
-                    className={`px-4 py-2 rounded-lg font-medium ${
-                      selectedRole === role
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={`px-4 py-2 rounded-lg font-medium ${selectedRole === role
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     style={selectedRole === role ? { backgroundColor: '#EF5C11' } : undefined}
                   >
                     {role}
@@ -1607,30 +1604,74 @@ export default function ManageUsersPage() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="p-6">
-                    <div className="space-y-4">
-                      {filteredDefaultPermissions.map((permission) => (
-                        <div key={permission.moduleId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-900">{permission.moduleName}</h4>
-                            <p className="text-sm text-gray-500">{permission.moduleDescription}</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={permission.canAccess}
-                              onChange={() => toggleDefaultPermission(selectedRole, permission.moduleId)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
-                              style={{
-                                '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
-                                backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
-                              } as React.CSSProperties}></div>
-                          </label>
+                    <div className="space-y-8">
+                      {/* Mobile Permissions */}
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                          <FaMobileAlt className="text-blue-500" /> Mobile App Features
+                        </h4>
+                        <div className="space-y-4">
+                          {filteredDefaultPermissions.filter(p => !p.type || p.type === 'MOBILE').map((permission) => (
+                            <div key={permission.moduleId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-900">{permission.moduleName}</h4>
+                                <p className="text-sm text-gray-500">{permission.moduleDescription}</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={permission.canAccess}
+                                  onChange={() => toggleDefaultPermission(selectedRole, permission.moduleId)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
+                                  style={{
+                                    '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
+                                    backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
+                                  } as React.CSSProperties}></div>
+                              </label>
+                            </div>
+                          ))}
+                          {filteredDefaultPermissions.filter(p => !p.type || p.type === 'MOBILE').length === 0 && (
+                            <div className="text-gray-500 text-sm italic">No mobile permissions found matching filter.</div>
+                          )}
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Website Permissions */}
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                          <FaDesktop className="text-purple-500" /> Website Admin Features
+                        </h4>
+                        <div className="space-y-4">
+                          {filteredDefaultPermissions.filter(p => p.type === 'WEBSITE').map((permission) => (
+                            <div key={permission.moduleId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-900">{permission.moduleName}</h4>
+                                <p className="text-sm text-gray-500">{permission.moduleDescription}</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={permission.canAccess}
+                                  onChange={() => toggleDefaultPermission(selectedRole, permission.moduleId)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
+                                  style={{
+                                    '--tw-ring-color': 'rgba(239, 92, 17, 0.3)',
+                                    backgroundColor: permission.canAccess ? '#EF5C11' : '#E5E7EB'
+                                  } as React.CSSProperties}></div>
+                              </label>
+                            </div>
+                          ))}
+                          {filteredDefaultPermissions.filter(p => p.type === 'WEBSITE').length === 0 && (
+                            <div className="text-gray-500 text-sm italic">No website permissions found matching filter.</div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="mt-6 pt-4 border-t border-gray-200">
@@ -1642,7 +1683,7 @@ export default function ManageUsersPage() {
                           onClick={() => updateDefaultRolePermissions(selectedRole, defaultRolePermissions[selectedRole])}
                           disabled={savingDefaultPermissions}
                           className="px-4 py-2 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
-                          style={{ 
+                          style={{
                             backgroundColor: '#EF5C11'
                           } as React.CSSProperties}
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}
@@ -1684,7 +1725,7 @@ export default function ManageUsersPage() {
                   <input
                     type="text"
                     value={addData.firstName}
-                    onChange={(e) => setAddData({...addData, firstName: e.target.value})}
+                    onChange={(e) => setAddData({ ...addData, firstName: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                     style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                     required
@@ -1695,7 +1736,7 @@ export default function ManageUsersPage() {
                   <input
                     type="text"
                     value={addData.lastName}
-                    onChange={(e) => setAddData({...addData, lastName: e.target.value})}
+                    onChange={(e) => setAddData({ ...addData, lastName: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                     style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                     required
@@ -1706,7 +1747,7 @@ export default function ManageUsersPage() {
                   <input
                     type="email"
                     value={addData.email}
-                    onChange={(e) => setAddData({...addData, email: e.target.value})}
+                    onChange={(e) => setAddData({ ...addData, email: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                     style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                     required
@@ -1739,7 +1780,7 @@ export default function ManageUsersPage() {
                   <label className="block text-sm font-medium text-gray-700">Role</label>
                   <select
                     value={addData.role}
-                    onChange={(e) => setAddData({...addData, role: e.target.value})}
+                    onChange={(e) => setAddData({ ...addData, role: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                     style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                   >
@@ -1751,10 +1792,10 @@ export default function ManageUsersPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Password</label>
                   <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={addData.password}
-                      onChange={(e) => setAddData({...addData, password: e.target.value})}
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={addData.password}
+                      onChange={(e) => setAddData({ ...addData, password: e.target.value })}
                       className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                       style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                       required
@@ -1766,7 +1807,7 @@ export default function ManageUsersPage() {
                     >
                       {showPassword ? <FaEyeSlash className="h-4 w-4 text-gray-400" /> : <FaEye className="h-4 w-4 text-gray-400" />}
                     </button>
-              </div>
+                  </div>
                   {addData.password && validatePassword(addData.password) && (
                     <p className="text-red-500 text-xs mt-1">{validatePassword(addData.password)}</p>
                   )}
@@ -1774,10 +1815,10 @@ export default function ManageUsersPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
                   <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={addData.confirmPassword}
-                      onChange={(e) => setAddData({...addData, confirmPassword: e.target.value})}
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={addData.confirmPassword}
+                      onChange={(e) => setAddData({ ...addData, confirmPassword: e.target.value })}
                       className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                       style={{ '--tw-ring-color': '#EF5C11' } as React.CSSProperties}
                       required
@@ -1832,13 +1873,13 @@ export default function ManageUsersPage() {
                 <button
                   onClick={() => {
                     setShowAdd(false);
-                    setAddData({ 
-                      firstName: "", 
-                      lastName: "", 
-                      email: "", 
-                      phone: "", 
-                      password: "", 
-                      confirmPassword: "", 
+                    setAddData({
+                      firstName: "",
+                      lastName: "",
+                      email: "",
+                      phone: "",
+                      password: "",
+                      confirmPassword: "",
                       role: "VOLUNTEER"
                     });
                     setAgreementFile(null);
@@ -1854,7 +1895,7 @@ export default function ManageUsersPage() {
                   onClick={addUser}
                   disabled={adding || !isAddFormValid()}
                   className="px-4 py-2 text-white rounded-md disabled:opacity-50 flex items-center gap-2"
-                  style={{ 
+                  style={{
                     backgroundColor: '#EF5C11'
                   } as React.CSSProperties}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#666666'}

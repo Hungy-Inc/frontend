@@ -149,6 +149,16 @@ export default function EmailManagement() {
           </div>
         </Link>
 
+        <Link href="/email-management/scheduled" className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+          <div className="flex items-center space-x-3">
+            <FaEnvelope className="text-purple-500 text-xl" />
+            <div>
+              <h3 className="font-semibold text-gray-900">Scheduled Emails</h3>
+              <p className="text-sm text-gray-600">Automated birthday, anniversary & shift reminders</p>
+            </div>
+          </div>
+        </Link>
+
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center space-x-3">
             <FaEnvelope className="text-green-500 text-xl" />

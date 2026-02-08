@@ -24,8 +24,9 @@ export default function ClientLayout({
   const isVolunteerRegistrationPage = pathname.includes('/volunteer-registration');
   const isEnterWaitlistPage = pathname.includes('/waitlist');
   const isMealCountPage = pathname.startsWith('/meal-count');
-  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage && !isContactPage && !isPrivacyPolicyPage && !isTermsOfServicePage && !isVolunteerRegistrationPage && !isEnterWaitlistPage && !isMealCountPage;
-  
+  const isSuperAdminPage = pathname.startsWith('/superadmin');
+  const shouldShowSidebarAndHeader = !isHomePage && !isLoginPage && !isForgotPasswordPage && !isShiftSignupPage && !isContactPage && !isPrivacyPolicyPage && !isTermsOfServicePage && !isVolunteerRegistrationPage && !isEnterWaitlistPage && !isMealCountPage && !isSuperAdminPage;
+
   const lastNotificationTimestamp = useRef<number>(0);
 
   useEffect(() => {
@@ -50,19 +51,19 @@ export default function ClientLayout({
       if (e.key === 'volunteer_notification' && e.newValue) {
         try {
           const notification = JSON.parse(e.newValue);
-          
+
           // Prevent duplicate notifications
           if (notification.timestamp <= lastNotificationTimestamp.current) {
             return;
           }
-          
+
           lastNotificationTimestamp.current = notification.timestamp;
-          
+
           if (notification.type === 'NEW_VOLUNTEER_REGISTRATION') {
-            const message = notification.count === 1 
+            const message = notification.count === 1
               ? "A new volunteer has registered! Go to Manage Users to review the application."
               : `${notification.count} new volunteers have registered! Go to Manage Users to review the applications.`;
-            
+
             toast.success(message, {
               autoClose: 8000,
             });

@@ -78,6 +78,13 @@ export default function KitchenDetailsPage() {
   const [isEditingBackpackMealsCount, setIsEditingBackpackMealsCount] = useState(false);
   const [editingBackpackMealsCount, setEditingBackpackMealsCount] = useState<string>("");
 
+  // Approver email list state
+  const [approverEmails, setApproverEmails] = useState<string[]>([]);
+  const [newApproverEmail, setNewApproverEmail] = useState("");
+  const [isAddingApproverEmail, setIsAddingApproverEmail] = useState(false);
+  const [editingApproverEmailIndex, setEditingApproverEmailIndex] = useState<number | null>(null);
+  const [editingApproverEmail, setEditingApproverEmail] = useState("");
+
   // Forgot password flow state
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [forgotPasswordStep, setForgotPasswordStep] = useState<'otp' | 'password'>('otp');
@@ -180,6 +187,10 @@ export default function KitchenDetailsPage() {
       setMealsValue(mealsVal);
       setFoodBoxMealsCount(foodBoxMealsCountVal);
       setBackpackMealsCount(backpackMealsCountVal);
+
+      // Load approver email list
+      const approverEmailList = userOrg.approverEmailList || [];
+      setApproverEmails(Array.isArray(approverEmailList) ? approverEmailList : []);
 
       // Set addresses from already parsed data
       setAddresses(Array.isArray(parsedAddresses) ? parsedAddresses : []);
@@ -639,6 +650,116 @@ export default function KitchenDetailsPage() {
   const handleCancelEditBackpackMealsCount = () => {
     setIsEditingBackpackMealsCount(false);
     setEditingBackpackMealsCount("");
+  };
+
+  // Approver email list handlers
+  const handleAddApproverEmail = async () => {
+    const email = newApproverEmail.trim().toLowerCase();
+    if (!email) {
+      toast.error('Please enter an email address');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Check if email already exists
+    if (approverEmails.includes(email)) {
+      toast.error('This email is already in the list');
+      return;
+    }
+
+    const updatedEmails = [...approverEmails, email];
+    await handleSaveApproverEmails(updatedEmails);
+  };
+
+  const handleRemoveApproverEmail = async (index: number) => {
+    const updatedEmails = approverEmails.filter((_, i) => i !== index);
+    await handleSaveApproverEmails(updatedEmails);
+  };
+
+  const handleStartEditApproverEmail = (index: number) => {
+    setEditingApproverEmailIndex(index);
+    setEditingApproverEmail(approverEmails[index]);
+  };
+
+  const handleSaveEditApproverEmail = async () => {
+    if (editingApproverEmailIndex === null) return;
+
+    const email = editingApproverEmail.trim().toLowerCase();
+    if (!email) {
+      toast.error('Please enter an email address');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Check if email already exists (excluding current index)
+    if (approverEmails.some((e, i) => i !== editingApproverEmailIndex && e === email)) {
+      toast.error('This email is already in the list');
+      return;
+    }
+
+    const updatedEmails = [...approverEmails];
+    updatedEmails[editingApproverEmailIndex] = email;
+    await handleSaveApproverEmails(updatedEmails);
+  };
+
+  const handleCancelEditApproverEmail = () => {
+    setEditingApproverEmailIndex(null);
+    setEditingApproverEmail("");
+  };
+
+  const handleSaveApproverEmails = async (emailList: string[]) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error('Authentication token not found. Please login again.');
+        return;
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizations/${organization.id}/approver-email-list`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          approverEmailList: emailList
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast.error(errorData.error || 'Failed to update approver email list');
+        return;
+      }
+
+      const updatedOrg = await res.json();
+      setApproverEmails(updatedOrg.approverEmailList || []);
+      setOrganization((prev: any) => ({
+        ...prev,
+        approverEmailList: updatedOrg.approverEmailList
+      }));
+
+      setIsAddingApproverEmail(false);
+      setNewApproverEmail("");
+      setEditingApproverEmailIndex(null);
+      setEditingApproverEmail("");
+      toast.success('Approver email list updated successfully!');
+    } catch (error) {
+      console.error('Error updating approver email list:', error);
+      toast.error('Failed to update approver email list. Please try again.');
+    }
   };
 
   // Forgot password handlers
@@ -1247,6 +1368,153 @@ export default function KitchenDetailsPage() {
                 >
                   Forgot Password?
                 </button>
+              </div>
+            </div>
+          </div>
+
+          {/* User Approver Emails List Card */}
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 32, marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>User Approver Emails List</h2>
+            </div>
+
+            <div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, color: '#666', fontWeight: 500 }}>Approver Emails</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {approverEmails.length === 0 ? (
+                    <div style={{ color: '#888', fontSize: 14, fontStyle: 'italic' }}>No approver emails added yet</div>
+                  ) : (
+                    approverEmails.map((email, index) => (
+                      <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {editingApproverEmailIndex === index ? (
+                          <>
+                            <input
+                              type="email"
+                              value={editingApproverEmail}
+                              onChange={(e) => setEditingApproverEmail(e.target.value)}
+                              style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }}
+                              placeholder="email@example.com"
+                            />
+                            <button
+                              onClick={handleSaveEditApproverEmail}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#4CAF50',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaSave />
+                            </button>
+                            <button
+                              onClick={handleCancelEditApproverEmail}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ff4444',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ flex: 1, fontSize: 16, padding: '8px 0' }}>{email}</div>
+                            <button
+                              onClick={() => handleStartEditApproverEmail(index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#2196f3',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveApproverEmail(index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ff4444',
+                                cursor: 'pointer',
+                                padding: 4
+                              }}
+                            >
+                              <FaTimes />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  {isAddingApproverEmail ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="email"
+                        value={newApproverEmail}
+                        onChange={(e) => setNewApproverEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        style={{ flex: 1, padding: 8, borderRadius: 5, border: '1px solid #eee' }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddApproverEmail();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleAddApproverEmail}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#4CAF50',
+                          cursor: 'pointer',
+                          padding: 4
+                        }}
+                      >
+                        <FaSave />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsAddingApproverEmail(false);
+                          setNewApproverEmail("");
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ff4444',
+                          cursor: 'pointer',
+                          padding: 4
+                        }}
+                      >
+                        <FaTimes />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setIsAddingApproverEmail(true)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: 'none',
+                        border: '1px dashed #2196f3',
+                        color: '#2196f3',
+                        padding: '8px 16px',
+                        borderRadius: 5,
+                        cursor: 'pointer',
+                        width: 'fit-content'
+                      }}
+                    >
+                      <FaPlus /> Add Email
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

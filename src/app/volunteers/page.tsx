@@ -549,8 +549,8 @@ export default function VolunteersPage() {
                                         <span style={{
                                           padding: '4px 8px',
                                           borderRadius: 4,
-                                          background: shift.status === 'Registered' ? '#e3f2fd' : '#fff3e0',
-                                          color: shift.status === 'Registered' ? '#1976d2' : '#f57c00',
+                                          background: shift.status === 'Registered' ? '#e3f2fd' : shift.status === 'Default' ? '#e8f5e9' : '#fff3e0',
+                                          color: shift.status === 'Registered' ? '#1976d2' : shift.status === 'Default' ? '#2e7d32' : '#f57c00',
                                           fontSize: 12,
                                           fontWeight: 500
                                         }}>

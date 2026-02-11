@@ -493,9 +493,10 @@ export default function Dashboard() {
   };
 
   // Volunteer summary
-  const filteredVolunteers = volunteers.filter(u => u.role === 'VOLUNTEER' && u.hours >= 1);
+  const filteredVolunteers = volunteers.filter(u => u.role === 'VOLUNTEER' && (u.hours >= 1 || (u as any).extraHours >= 1));
   const totalVolunteers = filteredVolunteers.length;
   const totalHours = Number(filteredVolunteers.reduce((sum, u) => sum + u.hours, 0).toFixed(2));
+  const totalExtraHours = Number(filteredVolunteers.reduce((sum, u) => sum + ((u as any).extraHours ?? 0), 0).toFixed(2));
 
   // Custom units state (move these above helpers)
   const [customUnits, setCustomUnits] = useState<{ category: string; kilogram_kg_: number; pound_lb_: number }[]>([]);
@@ -856,8 +857,12 @@ export default function Dashboard() {
                     <div style={{ fontSize: 20, fontWeight: 700 }}>{totalVolunteers}</div>
                   </div>
                   <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
-                    <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Hours</div>
+                    <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Shift Hours</div>
                     <div style={{ fontSize: 20, fontWeight: 700 }}>{totalHours}</div>
+                  </div>
+                  <div style={{ flex: 1, background: '#E3F2FD', borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontWeight: 600, color: '#1976d2', marginBottom: 8 }}>Extra Hours</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{totalExtraHours}</div>
                   </div>
                 </div>
                 {/* Volunteer table */}
@@ -867,7 +872,8 @@ export default function Dashboard() {
                       <tr style={{ color: '#888', fontWeight: 600, background: '#fafafa' }}>
                           <th style={{ textAlign: 'left', padding: '8px 8px 8px 0' }}>Name</th>
                           <th style={{ textAlign: 'left', padding: '8px' }}>Role</th>
-                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Hours</th>
+                          <th style={{ textAlign: 'right', padding: '8px' }}>Hours</th>
+                          <th style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>Extra Hours</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -875,7 +881,8 @@ export default function Dashboard() {
                           <tr key={`${v.name}-${idx}`}>
                             <td style={{ padding: '8px 8px 8px 0' }}>{v.name}</td>
                             <td style={{ padding: '8px' }}>{v.role}</td>
-                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{v.hours}</td>
+                            <td style={{ textAlign: 'right', padding: '8px' }}>{v.hours}</td>
+                            <td style={{ textAlign: 'right', padding: '8px 0 8px 8px' }}>{(v as any).extraHours ?? 0}</td>
                           </tr>
                         ))}
                     </tbody>

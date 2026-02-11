@@ -48,6 +48,9 @@ interface User {
   totalModules?: number;
   hasPermissions?: boolean;
   isApprover?: boolean;
+  birthdate?: string | null;
+  age?: number | null;
+  isUnder16?: boolean;
 }
 
 interface Module {
@@ -1088,6 +1091,12 @@ export default function ManageUsersPage() {
             </div>
           )}
 
+          {filteredUsers.some(u => u.isUnder16) && (
+            <div className="bg-amber-100 border border-amber-500 text-amber-900 px-4 py-3 rounded mb-4 font-medium">
+              {filteredUsers.filter(u => u.isUnder16).length} user(s) under 16 — please review these signups.
+            </div>
+          )}
+
           {/* Users Table */}
           {filteredUsers.length === 0 ? (
             <div className="text-center py-12">
@@ -1101,12 +1110,12 @@ export default function ManageUsersPage() {
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
               <ul className="divide-y divide-gray-200">
                 {filteredUsers.map((user) => (
-                  <li key={user.id} className={`px-6 py-4 ${editId ? 'cursor-default bg-gray-100 opacity-75' : 'hover:bg-gray-50 cursor-pointer'}`} onClick={() => !editId && navigateToUserDetails(user.id)}>
+                  <li key={user.id} className={`px-6 py-4 ${user.isUnder16 ? 'bg-amber-50 border-l-4 border-amber-500' : ''} ${editId ? 'cursor-default bg-gray-100 opacity-75' : 'hover:bg-gray-50 cursor-pointer'}`} onClick={() => !editId && navigateToUserDetails(user.id)}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="flex-shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                            <span className="text-sm font-medium text-gray-700">
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${user.isUnder16 ? 'bg-amber-200' : 'bg-gray-300'}`}>
+                            <span className={`text-sm font-medium ${user.isUnder16 ? 'text-amber-900' : 'text-gray-700'}`}>
                               {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                             </span>
                           </div>
@@ -1148,12 +1157,17 @@ export default function ManageUsersPage() {
                             </div>
                           ) : (
                             <div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center flex-wrap gap-2">
                                 <p className="text-sm font-medium text-gray-900">{user.name}</p>
                                 {user.status && (
                                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[user.status]}`}>
                                     {statusIcons[user.status]}
                                     <span className="ml-1">{user.status}</span>
+                                  </span>
+                                )}
+                                {user.isUnder16 && (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-amber-950 border border-amber-600" title={user.age != null ? `Age: ${user.age}` : 'Under 16'}>
+                                    Under 16
                                   </span>
                                 )}
                               </div>

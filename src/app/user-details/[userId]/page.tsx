@@ -99,10 +99,6 @@ export default function UserDetailsPage() {
   const [showAddExtraHours, setShowAddExtraHours] = useState(false);
   const [addExtraHoursForm, setAddExtraHoursForm] = useState({ hours: '', recordDate: new Date().toISOString().split('T')[0], reason: '' });
   const [addingExtraHours, setAddingExtraHours] = useState(false);
-  const [extraHoursEligibleShifts, setExtraHoursEligibleShifts] = useState<{ shiftId: number; recurringShiftId: number | null; name: string; startTime: string; endTime: string }[]>([]);
-  const [extraHoursEligibleShiftsLoading, setExtraHoursEligibleShiftsLoading] = useState(false);
-  const [extraHoursSelectedShift, setExtraHoursSelectedShift] = useState<{ shiftId: number; recurringShiftId: number | null; name: string } | null>(null);
-
   // Approve/deny and document view state
   const [approveLoading, setApproveLoading] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -180,34 +176,7 @@ export default function UserDetailsPage() {
     fetchExtraHours();
   }, [userId, extraHoursMonth, extraHoursYear]);
 
-  // Fetch eligible shifts for Add extra hours when popup is open (user registered + checked in on recordDate)
-  useEffect(() => {
-    if (!showAddExtraHours || !userId || !addExtraHoursForm.recordDate) {
-      setExtraHoursEligibleShifts([]);
-      setExtraHoursSelectedShift(null);
-      return;
-    }
-    let cancelled = false;
-    setExtraHoursEligibleShiftsLoading(true);
-    setExtraHoursSelectedShift(null);
-    const token = localStorage.getItem('token');
-    fetch(`${apiUrl}/api/extra-hours/eligible-shifts?userId=${userId}&date=${addExtraHoursForm.recordDate}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then((data: any[]) => {
-        if (!cancelled) setExtraHoursEligibleShifts(Array.isArray(data) ? data : []);
-      })
-      .catch(() => { if (!cancelled) setExtraHoursEligibleShifts([]); })
-      .finally(() => { if (!cancelled) setExtraHoursEligibleShiftsLoading(false); });
-    return () => { cancelled = true; };
-  }, [showAddExtraHours, userId, addExtraHoursForm.recordDate]);
-
   const handleAddExtraHours = async () => {
-    if (!extraHoursSelectedShift) {
-      toast.error('Please select a shift (user must be registered and checked in on the selected date).');
-      return;
-    }
     const h = parseFloat(addExtraHoursForm.hours);
     if (isNaN(h) || h < 0) {
       toast.error('Please enter a valid number of hours.');
@@ -223,9 +192,7 @@ export default function UserDetailsPage() {
           userId: parseInt(userId),
           hours: h,
           recordDate: addExtraHoursForm.recordDate,
-          reason: addExtraHoursForm.reason || undefined,
-          shiftId: extraHoursSelectedShift.shiftId,
-          recurringShiftId: extraHoursSelectedShift.recurringShiftId ?? undefined
+          reason: addExtraHoursForm.reason || undefined
         })
       });
       if (!res.ok) {
@@ -235,7 +202,6 @@ export default function UserDetailsPage() {
       toast.success('Extra hours added.');
       setShowAddExtraHours(false);
       setAddExtraHoursForm({ hours: '', recordDate: new Date().toISOString().split('T')[0], reason: '' });
-      setExtraHoursSelectedShift(null);
       fetchExtraHours();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to add extra hours');
@@ -1051,10 +1017,7 @@ export default function UserDetailsPage() {
                     <input
                       type="date"
                       value={addExtraHoursForm.recordDate}
-                      onChange={(e) => {
-                        setAddExtraHoursForm(prev => ({ ...prev, recordDate: e.target.value }));
-                        setExtraHoursSelectedShift(null);
-                      }}
+                      onChange={(e) => setAddExtraHoursForm(prev => ({ ...prev, recordDate: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
@@ -1081,36 +1044,6 @@ export default function UserDetailsPage() {
                     />
                   </div>
                 </div>
-                <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Shift (registered & checked in on this date)</label>
-                  {extraHoursEligibleShiftsLoading ? (
-                    <p className="text-sm text-gray-500">Loading shifts...</p>
-                  ) : extraHoursEligibleShifts.length === 0 ? (
-                    <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">No shifts found. User must be registered and checked in for a shift on the selected date.</p>
-                  ) : (
-                    <select
-                      value={extraHoursSelectedShift ? extraHoursSelectedShift.shiftId : ''}
-                      onChange={(e) => {
-                        const id = parseInt(e.target.value, 10);
-                        const shift = extraHoursEligibleShifts.find(s => s.shiftId === id);
-                        setExtraHoursSelectedShift(shift ? { shiftId: shift.shiftId, recurringShiftId: shift.recurringShiftId, name: shift.name } : null);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      required
-                    >
-                      <option value="">Select shift</option>
-                      {extraHoursEligibleShifts.map(s => {
-                        const start = new Date(s.startTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
-                        const end = new Date(s.endTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
-                        return (
-                          <option key={s.shiftId} value={s.shiftId}>
-                            {s.name} ({start} – {end})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  )}
-                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -1122,7 +1055,7 @@ export default function UserDetailsPage() {
                   <button
                     type="button"
                     onClick={handleAddExtraHours}
-                    disabled={addingExtraHours || !extraHoursSelectedShift || extraHoursEligibleShifts.length === 0}
+                    disabled={addingExtraHours || !addExtraHoursForm.hours?.trim()}
                     className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50"
                   >
                     {addingExtraHours ? 'Adding...' : 'Add'}

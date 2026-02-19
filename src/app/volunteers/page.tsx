@@ -83,70 +83,12 @@ export default function VolunteersPage() {
   const [recordExtraHours, setRecordExtraHours] = useState('');
   const [recordExtraReason, setRecordExtraReason] = useState('');
   const [recordExtraSubmitting, setRecordExtraSubmitting] = useState(false);
-  const [recordExtraEligibleShifts, setRecordExtraEligibleShifts] = useState<{ shiftId: number; recurringShiftId: number | null; name: string; startTime: string; endTime: string }[]>([]);
-  const [recordExtraEligibleShiftsLoading, setRecordExtraEligibleShiftsLoading] = useState(false);
-  const [recordExtraSelectedShift, setRecordExtraSelectedShift] = useState<{ shiftId: number; recurringShiftId: number | null; name: string } | null>(null);
   // Extra hours list per volunteer (when card expanded). Key: `${userId}-${month}-${year}`
   const [extraHoursRecordsMap, setExtraHoursRecordsMap] = useState<Record<string, { loading: boolean; records: { id: number; hours: number; reason: string | null; recordDate: string; shiftId: number | null; recurringShiftId: number | null; Shift: { id: number; name: string; startTime: string; endTime: string } | null }[] }>>({});
-  const [editingExtraRecord, setEditingExtraRecord] = useState<{ volunteerId: number; recordId: number; hours: string; reason: string; recordDate: string; shiftId: number | null; recurringShiftId: number | null } | null>(null);
+  const [editingExtraRecord, setEditingExtraRecord] = useState<{ volunteerId: number; recordId: number; hours: string; reason: string; recordDate: string } | null>(null);
   const [savingExtraRecord, setSavingExtraRecord] = useState(false);
-  const [editExtraEligibleShifts, setEditExtraEligibleShifts] = useState<{ shiftId: number; recurringShiftId: number | null; name: string; startTime: string; endTime: string }[]>([]);
-  const [editExtraEligibleShiftsLoading, setEditExtraEligibleShiftsLoading] = useState(false);
 
   const extraHoursCacheKey = (userId: number) => `${userId}-${selectedMonth}-${selectedYear}`;
-
-  // Fetch eligible shifts when editing an extra hours record (same conditions as add: registered+checked in, not Collection, not already used by another record)
-  useEffect(() => {
-    if (!editingExtraRecord) {
-      setEditExtraEligibleShifts([]);
-      return;
-    }
-    const dateStr = editingExtraRecord.recordDate.includes('T') ? editingExtraRecord.recordDate.split('T')[0] : editingExtraRecord.recordDate;
-    if (!dateStr) {
-      setEditExtraEligibleShifts([]);
-      return;
-    }
-    let cancelled = false;
-    setEditExtraEligibleShiftsLoading(true);
-    const token = localStorage.getItem('token');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    fetch(`${apiUrl}/api/extra-hours/eligible-shifts?userId=${editingExtraRecord.volunteerId}&date=${dateStr}&excludeRecordId=${editingExtraRecord.recordId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then((data: any[]) => {
-        if (!cancelled) setEditExtraEligibleShifts(Array.isArray(data) ? data : []);
-      })
-      .catch(() => { if (!cancelled) setEditExtraEligibleShifts([]); })
-      .finally(() => { if (!cancelled) setEditExtraEligibleShiftsLoading(false); });
-    return () => { cancelled = true; };
-  }, [editingExtraRecord?.volunteerId, editingExtraRecord?.recordId, editingExtraRecord?.recordDate]);
-
-  // Fetch eligible shifts (registered + checked in) when user and date are set in Record extra hours modal
-  useEffect(() => {
-    if (!recordExtraSelectedUser || !recordExtraDate) {
-      setRecordExtraEligibleShifts([]);
-      setRecordExtraSelectedShift(null);
-      return;
-    }
-    let cancelled = false;
-    setRecordExtraEligibleShiftsLoading(true);
-    setRecordExtraSelectedShift(null);
-    const token = localStorage.getItem('token');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    fetch(`${apiUrl}/api/extra-hours/eligible-shifts?userId=${recordExtraSelectedUser.id}&date=${recordExtraDate}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then((data: any[]) => {
-        if (!cancelled) {
-          setRecordExtraEligibleShifts(Array.isArray(data) ? data : []);
-        }
-      })
-      .catch(() => { if (!cancelled) setRecordExtraEligibleShifts([]); })
-      .finally(() => { if (!cancelled) setRecordExtraEligibleShiftsLoading(false); });
-    return () => { cancelled = true; };
-  }, [recordExtraSelectedUser?.id, recordExtraDate]);
 
   useEffect(() => {
     if (activeTab === 'hours') {
@@ -271,10 +213,6 @@ export default function VolunteersPage() {
 
   const handleSaveExtraHoursEdit = async () => {
     if (!editingExtraRecord) return;
-    if (editExtraEligibleShifts.length > 0 && !editingExtraRecord.shiftId) {
-      toast.error('Please select a shift.');
-      return;
-    }
     const h = parseFloat(editingExtraRecord.hours);
     if (isNaN(h) || h < 0) {
       toast.error('Enter a valid number of hours.');
@@ -289,8 +227,9 @@ export default function VolunteersPage() {
         body: JSON.stringify({
           hours: h,
           reason: editingExtraRecord.reason || undefined,
-          shiftId: editingExtraRecord.shiftId ?? undefined,
-          recurringShiftId: editingExtraRecord.recurringShiftId ?? undefined
+          recordDate: editingExtraRecord.recordDate,
+          shiftId: null,
+          recurringShiftId: null
         })
       });
       if (!res.ok) {
@@ -350,10 +289,6 @@ export default function VolunteersPage() {
       toast.error('Please select a user.');
       return;
     }
-    if (!recordExtraSelectedShift) {
-      toast.error('Please select a shift (user must be registered and checked in on the selected date).');
-      return;
-    }
     const h = parseFloat(recordExtraHours);
     if (isNaN(h) || h < 0) {
       toast.error('Please enter a valid number of hours.');
@@ -369,9 +304,7 @@ export default function VolunteersPage() {
           userId: recordExtraSelectedUser.id,
           hours: h,
           recordDate: recordExtraDate,
-          reason: recordExtraReason || undefined,
-          shiftId: recordExtraSelectedShift.shiftId,
-          recurringShiftId: recordExtraSelectedShift.recurringShiftId ?? undefined
+          reason: recordExtraReason || undefined
         })
       });
       if (!res.ok) {
@@ -381,7 +314,6 @@ export default function VolunteersPage() {
       toast.success('Extra hours recorded.');
       setShowRecordExtraModal(false);
       setRecordExtraSelectedUser(null);
-      setRecordExtraSelectedShift(null);
       setRecordExtraHours('');
       setRecordExtraReason('');
       // Refetch volunteers so extra hours count updates
@@ -961,7 +893,6 @@ export default function VolunteersPage() {
                                   <thead>
                                     <tr style={{ background: '#f5f5f5' }}>
                                       <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Date</th>
-                                      <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Shift</th>
                                       <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Hours</th>
                                       <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Reason</th>
                                       <th style={{ padding: '10px', width: 80 }}></th>
@@ -974,62 +905,51 @@ export default function VolunteersPage() {
                                       return (
                                         <tr key={r.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                                           <td style={{ padding: '10px' }}>
-                                            {new Date(r.recordDate).toLocaleDateString('en-CA', { timeZone: 'America/Halifax', year: 'numeric', month: 'short', day: 'numeric' })}
+                                            {isEditing ? (
+                                              <input
+                                                type="date"
+                                                value={editingExtraRecord!.recordDate}
+                                                onChange={e => setEditingExtraRecord(prev => prev ? { ...prev, recordDate: e.target.value } : null)}
+                                                style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 }}
+                                              />
+                                            ) : (
+                                              new Date(r.recordDate).toLocaleDateString('en-CA', { timeZone: 'America/Halifax', year: 'numeric', month: 'short', day: 'numeric' })
+                                            )}
                                           </td>
-                                          {isEditing ? (
-                                            <>
-                                              <td style={{ padding: '8px' }}>
-                                                {editExtraEligibleShiftsLoading ? (
-                                                  <span style={{ fontSize: 12, color: '#888' }}>Loading...</span>
-                                                ) : editExtraEligibleShifts.length === 0 ? (
-                                                  <span style={{ fontSize: 12, color: '#c62828' }}>No eligible shifts</span>
-                                                ) : (
-                                                  <select
-                                                    value={editingExtraRecord!.shiftId ?? ''}
-                                                    onChange={e => {
-                                                      const id = parseInt(e.target.value, 10);
-                                                      const shift = editExtraEligibleShifts.find(s => s.shiftId === id);
-                                                      if (shift) setEditingExtraRecord(prev => prev ? { ...prev, shiftId: shift.shiftId, recurringShiftId: shift.recurringShiftId } : null);
-                                                    }}
-                                                    style={{ minWidth: 160, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 }}
-                                                  >
-                                                    <option value="">Select shift</option>
-                                                    {editExtraEligibleShifts.map(s => {
-                                                      const start = new Date(s.startTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
-                                                      const end = new Date(s.endTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
-                                                      return (
-                                                        <option key={s.shiftId} value={s.shiftId}>
-                                                          {s.name} ({start} – {end})
-                                                        </option>
-                                                      );
-                                                    })}
-                                                  </select>
-                                                )}
-                                              </td>
-                                              <td style={{ padding: '8px' }}>
-                                                <input
-                                                  type="number"
-                                                  min={0}
-                                                  step={0.25}
-                                                  value={editingExtraRecord!.hours}
-                                                  onChange={e => setEditingExtraRecord(prev => prev ? { ...prev, hours: e.target.value } : null)}
-                                                  style={{ width: 80, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6 }}
-                                                />
-                                              </td>
-                                              <td style={{ padding: '8px' }}>
-                                                <input
-                                                  type="text"
-                                                  value={editingExtraRecord!.reason}
-                                                  onChange={e => setEditingExtraRecord(prev => prev ? { ...prev, reason: e.target.value } : null)}
-                                                  placeholder="Reason"
-                                                  style={{ width: '100%', minWidth: 120, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6 }}
-                                                />
-                                              </td>
-                                              <td style={{ padding: '8px' }}>
+                                          <td style={{ padding: isEditing ? '8px' : '10px' }}>
+                                            {isEditing ? (
+                                              <input
+                                                type="number"
+                                                min={0}
+                                                step={0.25}
+                                                value={editingExtraRecord!.hours}
+                                                onChange={e => setEditingExtraRecord(prev => prev ? { ...prev, hours: e.target.value } : null)}
+                                                style={{ width: 80, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6 }}
+                                              />
+                                            ) : (
+                                              <span style={{ fontWeight: 500 }}>{Number(r.hours).toFixed(2)}</span>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: isEditing ? '8px' : '10px' }}>
+                                            {isEditing ? (
+                                              <input
+                                                type="text"
+                                                value={editingExtraRecord!.reason}
+                                                onChange={e => setEditingExtraRecord(prev => prev ? { ...prev, reason: e.target.value } : null)}
+                                                placeholder="Reason"
+                                                style={{ width: '100%', minWidth: 120, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6 }}
+                                              />
+                                            ) : (
+                                              <span style={{ color: '#666' }}>{r.reason || '—'}</span>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '10px' }}>
+                                            {isEditing ? (
+                                              <>
                                                 <button
                                                   type="button"
                                                   onClick={handleSaveExtraHoursEdit}
-                                                  disabled={savingExtraRecord || !editingExtraRecord!.shiftId || editExtraEligibleShifts.length === 0}
+                                                  disabled={savingExtraRecord}
                                                   style={{ marginRight: 6, padding: '4px 8px', background: '#2196f3', color: '#fff', border: 'none', borderRadius: 6, cursor: savingExtraRecord ? 'not-allowed' : 'pointer', fontSize: 12 }}
                                                 >
                                                   <FaSave style={{ verticalAlign: 'middle' }} />
@@ -1042,33 +962,24 @@ export default function VolunteersPage() {
                                                 >
                                                   <FaTimes style={{ verticalAlign: 'middle' }} />
                                                 </button>
-                                              </td>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <td style={{ padding: '10px', color: '#555' }}>{r.Shift?.name ?? '—'}</td>
-                                              <td style={{ padding: '10px', fontWeight: 500 }}>{Number(r.hours).toFixed(2)}</td>
-                                              <td style={{ padding: '10px', color: '#666' }}>{r.reason || '—'}</td>
-                                              <td style={{ padding: '10px' }}>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setEditingExtraRecord({
-                                                    volunteerId: volunteer.id,
-                                                    recordId: r.id,
-                                                    hours: String(r.hours),
-                                                    reason: r.reason || '',
-                                                    recordDate: recordDateStr,
-                                                    shiftId: r.shiftId ?? null,
-                                                    recurringShiftId: r.recurringShiftId ?? null
-                                                  })}
-                                                  style={{ padding: '4px 8px', background: '#fff', border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
-                                                  title="Edit"
-                                                >
-                                                  <FaEdit style={{ verticalAlign: 'middle', color: '#2196f3' }} />
-                                                </button>
-                                              </td>
-                                            </>
-                                          )}
+                                              </>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                onClick={() => setEditingExtraRecord({
+                                                  volunteerId: volunteer.id,
+                                                  recordId: r.id,
+                                                  hours: String(r.hours),
+                                                  reason: r.reason || '',
+                                                  recordDate: recordDateStr
+                                                })}
+                                                style={{ padding: '4px 8px', background: '#fff', border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                                                title="Edit"
+                                              >
+                                                <FaEdit style={{ verticalAlign: 'middle', color: '#2196f3' }} />
+                                              </button>
+                                            )}
+                                          </td>
                                         </tr>
                                       );
                                     })}
@@ -1182,10 +1093,7 @@ export default function VolunteersPage() {
               <input
                 type="date"
                 value={recordExtraDate}
-                onChange={e => {
-                  setRecordExtraDate(e.target.value);
-                  setRecordExtraSelectedShift(null);
-                }}
+                onChange={e => setRecordExtraDate(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -1196,48 +1104,6 @@ export default function VolunteersPage() {
                 }}
               />
             </div>
-
-            {recordExtraSelectedUser && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#333' }}>Shift (registered & checked in on this date)</label>
-                {recordExtraEligibleShiftsLoading ? (
-                  <div style={{ padding: '10px 12px', fontSize: 13, color: '#888' }}>Loading shifts...</div>
-                ) : recordExtraEligibleShifts.length === 0 ? (
-                  <div style={{ padding: '10px 12px', fontSize: 13, color: '#c62828', background: '#ffebee', borderRadius: 8 }}>
-                    No shifts found. User must be registered and checked in for a shift on the selected date.
-                  </div>
-                ) : (
-                  <select
-                    value={recordExtraSelectedShift ? recordExtraSelectedShift.shiftId : ''}
-                    onChange={e => {
-                      const id = parseInt(e.target.value, 10);
-                      const shift = recordExtraEligibleShifts.find(s => s.shiftId === id);
-                      setRecordExtraSelectedShift(shift ? { shiftId: shift.shiftId, recurringShiftId: shift.recurringShiftId, name: shift.name } : null);
-                    }}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #ddd',
-                      borderRadius: 8,
-                      fontSize: 14,
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <option value="">Select shift</option>
-                    {recordExtraEligibleShifts.map(s => {
-                      const start = new Date(s.startTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
-                      const end = new Date(s.endTime).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
-                      return (
-                        <option key={s.shiftId} value={s.shiftId}>
-                          {s.name} ({start} – {end})
-                        </option>
-                      );
-                    })}
-                  </select>
-                )}
-              </div>
-            )}
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#333' }}>Hours</label>
@@ -1297,7 +1163,7 @@ export default function VolunteersPage() {
               <button
                 type="button"
                 onClick={handleRecordExtraHoursSubmit}
-                disabled={recordExtraSubmitting || !recordExtraSelectedShift || recordExtraEligibleShifts.length === 0}
+                disabled={recordExtraSubmitting || !recordExtraSelectedUser || !recordExtraDate || !recordExtraHours?.trim()}
                 style={{
                   padding: '10px 18px',
                   background: '#2196f3',

@@ -37,6 +37,8 @@ type VolunteerDetail = {
 
 type ShiftDetail = {
   id: number;
+  signupId?: number;
+  recurringShiftId?: number;
   date: string;
   category: string;
   startTime: string;
@@ -87,8 +89,71 @@ export default function VolunteersPage() {
   const [extraHoursRecordsMap, setExtraHoursRecordsMap] = useState<Record<string, { loading: boolean; records: { id: number; hours: number; reason: string | null; recordDate: string; shiftId: number | null; recurringShiftId: number | null; Shift: { id: number; name: string; startTime: string; endTime: string } | null }[] }>>({});
   const [editingExtraRecord, setEditingExtraRecord] = useState<{ volunteerId: number; recordId: number; hours: string; reason: string; recordDate: string } | null>(null);
   const [savingExtraRecord, setSavingExtraRecord] = useState(false);
+  const [cancellingShiftKey, setCancellingShiftKey] = useState<string | null>(null);
 
   const extraHoursCacheKey = (userId: number) => `${userId}-${selectedMonth}-${selectedYear}`;
+
+  const refetchVolunteers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/details?month=${selectedMonth}&year=${selectedYear}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch');
+      const data = await response.json();
+      const filteredData = data.filter((volunteer: VolunteerDetail) => {
+        const role = (volunteer.role || '').toLowerCase().trim();
+        return role !== 'staff' && role !== 'admin';
+      });
+      setVolunteers(filteredData);
+    } catch (e) {
+      toast.error('Failed to refresh volunteers');
+    }
+  };
+
+  const handleCancelShift = async (volunteerId: number, shift: ShiftDetail) => {
+    const key = `${volunteerId}-${shift.startTime}`;
+    setCancellingShiftKey(key);
+    try {
+      const token = localStorage.getItem('token');
+      const body: Record<string, unknown> = {
+        userId: volunteerId,
+        status: shift.status
+      };
+      if (shift.status === 'Registered') {
+        if (shift.signupId == null) {
+          toast.error('Cannot cancel: signup id missing');
+          return;
+        }
+        body.signupId = shift.signupId;
+      } else {
+        body.shiftId = shift.id;
+        if (shift.id === 0 && shift.recurringShiftId != null) {
+          body.recurringShiftId = shift.recurringShiftId;
+          body.startTime = shift.startTime;
+        }
+      }
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/volunteer-shifts/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to cancel shift');
+        return;
+      }
+      toast.success('Shift cancelled');
+      await refetchVolunteers();
+    } catch (e) {
+      toast.error('Failed to cancel shift');
+    } finally {
+      setCancellingShiftKey(null);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'hours') {
@@ -767,11 +832,12 @@ export default function VolunteersPage() {
                                     <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Category</th>
                                     <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Time</th>
                                     <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Status</th>
+                                    <th style={{ padding: '10px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #eee' }}>Action</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {getFilteredShifts(volunteer.upcomingShifts, getShiftLimit(volunteer.id, 'upcoming')).map(shift => (
-                                    <tr key={shift.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                    <tr key={`${shift.id}-${shift.startTime}`} style={{ borderBottom: '1px solid #f0f0f0' }}>
                                       <td style={{ padding: '10px' }}>{formatDateOnly(shift.startTime)}</td>
                                       <td style={{ padding: '10px' }}>{shift.category}</td>
                                       <td style={{ padding: '10px' }}>
@@ -788,6 +854,25 @@ export default function VolunteersPage() {
                                         }}>
                                           {shift.status}
                                         </span>
+                                      </td>
+                                      <td style={{ padding: '10px' }}>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); handleCancelShift(volunteer.id, shift); }}
+                                          disabled={cancellingShiftKey === `${volunteer.id}-${shift.startTime}`}
+                                          style={{
+                                            padding: '4px 10px',
+                                            fontSize: 12,
+                                            border: '1px solid #d32f2f',
+                                            background: '#fff',
+                                            color: '#d32f2f',
+                                            borderRadius: 4,
+                                            cursor: cancellingShiftKey === `${volunteer.id}-${shift.startTime}` ? 'not-allowed' : 'pointer',
+                                            opacity: cancellingShiftKey === `${volunteer.id}-${shift.startTime}` ? 0.7 : 1
+                                          }}
+                                        >
+                                          {cancellingShiftKey === `${volunteer.id}-${shift.startTime}` ? 'Cancelling…' : 'Remove / Cancel shift'}
+                                        </button>
                                       </td>
                                     </tr>
                                   ))}

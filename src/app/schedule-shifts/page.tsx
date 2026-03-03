@@ -114,6 +114,8 @@ export default function ScheduleShiftsPage() {
   const [manageModalData, setManageModalData] = useState<{ scheduled: any[]; unscheduled: any[]; slots: number; booked: number; defaultUsers?: number; absentDefaultUsers?: number; availableSlots?: number } | null>(null);
   const [manageModalShift, setManageModalShift] = useState<any>(null);
   const [manageModalLoading, setManageModalLoading] = useState(false);
+  const [addSlotsInput, setAddSlotsInput] = useState<string>('');
+  const [updatingSlots, setUpdatingSlots] = useState(false);
 
   // Default Users Management State
   const [defaultUsers, setDefaultUsers] = useState<any[]>([]);
@@ -345,6 +347,30 @@ export default function ScheduleShiftsPage() {
       setShifts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Silent refresh so shift cards show live count after Manage modal changes (add/remove/absence).
+  // Uses same endpoint as initial load so card and modal stay in sync.
+  const refreshShiftsForCard = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/schedule-shifts-data`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setShifts(data.shifts || []);
+      const newAbsencesCache: { [key: number]: number[] } = {};
+      for (const shiftId in (data.absencesByShiftId || {})) {
+        newAbsencesCache[Number(shiftId)] = (data.absencesByShiftId[shiftId] || []).map((a: any) => a.userId);
+      }
+      setShiftAbsencesCache(newAbsencesCache);
+      if (data.recurringShifts && data.shifts) {
+        calculateShiftCountsWithAbsences(data.recurringShifts, data.shifts, data.absencesByShiftId || {});
+      }
+    } catch (err) {
+      console.error('Background refresh for card failed', err);
     }
   };
 
@@ -2244,9 +2270,10 @@ export default function ScheduleShiftsPage() {
     setManageModalLoading(true);
     setManageModalOpen(true);
     setManageModalShift(shift);
-    // Clear search terms when opening modal
+    // Clear search terms and add-slots input when opening modal
     setScheduledSearchTerm('');
     setUnscheduledSearchTerm('');
+    setAddSlotsInput('');
     try {
       const token = localStorage.getItem("token");
 
@@ -2387,6 +2414,8 @@ export default function ScheduleShiftsPage() {
           )
         };
       });
+      // Refresh card counter (same data source as page)
+      refreshShiftsForCard();
     } catch (err: any) {
       // ROLLBACK on network error
       setManageModalData(prev => {
@@ -2450,6 +2479,9 @@ export default function ScheduleShiftsPage() {
           };
         });
         toast.error(errorData.error || "Failed to remove employee");
+      } else {
+        // Refresh card counter so it shows updated filled/total
+        refreshShiftsForCard();
       }
     } catch (err: any) {
       // ROLLBACK on network error
@@ -2623,6 +2655,7 @@ export default function ScheduleShiftsPage() {
 
       // Refresh default users and absences for the absence modal list
       await fetchDefaultUsersAndAbsences(manageModalShift);
+      refreshShiftsForCard();
 
     } catch (err) {
       // On complete failure, refresh to get correct state
@@ -2688,6 +2721,7 @@ export default function ScheduleShiftsPage() {
 
       if (res.ok) {
         toast.success('User marked as present');
+        refreshShiftsForCard();
       } else {
         // ROLLBACK on error (e.g. overbooking when making user present)
         setManageModalData(prev => {
@@ -2777,6 +2811,7 @@ export default function ScheduleShiftsPage() {
       }
 
       toast.success('User marked as present');
+      refreshShiftsForCard();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to remove absence');
     }
@@ -2895,6 +2930,73 @@ export default function ScheduleShiftsPage() {
           </button>
 
           <h2 style={{ fontSize: 26, fontWeight: 700, marginBottom: 18 }}>Manage Employees for {manageModalShift.name}</h2>
+
+          {/* Increase number of slots - updates this shift only in Shift table */}
+          <div style={{ marginBottom: 24, padding: 20, border: '1px solid #e0e0e0', borderRadius: 10, backgroundColor: '#fafafa' }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 12 }}>Increase number of slots</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+              Current: <strong>{manageModalData?.slots ?? 0}</strong> slots ({manageModalData?.booked ?? 0} booked). Add more slots for this shift only.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <input
+                type="number"
+                min={1}
+                value={addSlotsInput}
+                onChange={(e) => setAddSlotsInput(e.target.value.replace(/[^0-9]/, ''))}
+                style={{
+                  width: 80,
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  fontSize: 15
+                }}
+              />
+              <span style={{ fontSize: 14, color: '#666' }}>slots to add</span>
+              <button
+                onClick={async () => {
+                  const num = parseInt(addSlotsInput, 10);
+                  if (!addSlotsInput.trim() || isNaN(num) || num < 1) {
+                    toast.error('Enter at least 1 slot to add');
+                    return;
+                  }
+                  setUpdatingSlots(true);
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/slots`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ addSlots: num })
+                    });
+                    if (!res.ok) {
+                      const err = await res.json();
+                      throw new Error(err.error || 'Failed to update slots');
+                    }
+                    toast.success(`Added ${num} slot(s). Total slots: ${(manageModalData?.slots ?? 0) + num}`);
+                    setAddSlotsInput('');
+                    await openManageModal(manageModalShift);
+                    await fetchAllPageData();
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to update slots');
+                  } finally {
+                    setUpdatingSlots(false);
+                  }
+                }}
+                disabled={updatingSlots}
+                style={{
+                  background: updatingSlots ? '#ccc' : '#ff9800',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: updatingSlots ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {updatingSlots ? 'Updating...' : 'Update slots'}
+              </button>
+            </div>
+          </div>
 
           {/* Default Users Management Section - Only show for recurring shifts */}
           {manageModalShift.recurringShiftId && (

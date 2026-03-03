@@ -4,6 +4,7 @@ import { FaEdit, FaTrash, FaSave, FaTimes } from "react-icons/fa";
 import { MultiSelect } from "react-multi-select-component";
 import { toast } from 'react-toastify';
 import type { ToastContainerProps } from 'react-toastify';
+import { getRecurringShiftWallClockHoursMinutes } from '@/utils/timezoneUtils';
 
 
 export default function ScheduleShiftsPage() {
@@ -665,10 +666,12 @@ export default function ScheduleShiftsPage() {
         const dayDiff = minDaysDiff || 7;
         const nextDate = new Date(today);
         nextDate.setDate(today.getDate() + dayDiff);
+        const startWall = getRecurringShiftWallClockHoursMinutes(rec.startTime);
+        const endWall = getRecurringShiftWallClockHoursMinutes(rec.endTime);
         const start = new Date(nextDate);
-        start.setHours(new Date(rec.startTime).getHours(), new Date(rec.startTime).getMinutes(), 0, 0);
+        start.setHours(startWall.hours, startWall.minutes, 0, 0);
         const end = new Date(nextDate);
-        end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
+        end.setHours(endWall.hours, endWall.minutes, 0, 0);
 
         // Find all existing shifts for this category and recurring shift pattern
         const existingShifts = shifts.filter(shift => {
@@ -813,10 +816,12 @@ export default function ScheduleShiftsPage() {
       const dayDiff = minDaysDiff || 7;
       const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + dayDiff);
+      const startWall = getRecurringShiftWallClockHoursMinutes(rec.startTime);
+      const endWall = getRecurringShiftWallClockHoursMinutes(rec.endTime);
       const start = new Date(nextDate);
-      start.setHours(new Date(rec.startTime).getHours(), new Date(rec.startTime).getMinutes(), 0, 0);
+      start.setHours(startWall.hours, startWall.minutes, 0, 0);
       const end = new Date(nextDate);
-      end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
+      end.setHours(endWall.hours, endWall.minutes, 0, 0);
 
       // Verify no duplicate shifts exist for these users
       const existingShifts = shifts.filter(shift =>
@@ -985,10 +990,12 @@ export default function ScheduleShiftsPage() {
         const dayDiff = minDaysDiff || 7;
         const nextDate = new Date(today);
         nextDate.setDate(today.getDate() + dayDiff);
+        const startWall = getRecurringShiftWallClockHoursMinutes(opt.startTime);
+        const endWall = getRecurringShiftWallClockHoursMinutes(opt.endTime);
         const start = new Date(nextDate);
-        start.setHours(new Date(opt.startTime).getHours(), new Date(opt.startTime).getMinutes(), 0, 0);
+        start.setHours(startWall.hours, startWall.minutes, 0, 0);
         const end = new Date(nextDate);
-        end.setHours(new Date(opt.endTime).getHours(), new Date(opt.endTime).getMinutes(), 0, 0);
+        end.setHours(endWall.hours, endWall.minutes, 0, 0);
         return `${start.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })} - ${end.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}`;
       })
   ));
@@ -1050,17 +1057,10 @@ export default function ScheduleShiftsPage() {
     const nextDate = new Date(today);
     nextDate.setDate(today.getDate() + minDaysDiff);
     
-    // Check for day config for the closest day
+    // Check for day config for the closest day (use wall-clock time so DST never changes shift time)
     const dayConfig = rec.RecurringShiftDayConfig?.find((conf: any) => conf.dayOfWeek === closestDay);
-    if (dayConfig && dayConfig.startTime) {
-      // Use day config time if available
-      const configStart = new Date(dayConfig.startTime);
-      nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-    } else {
-      // Fall back to global time
-      const recStart = new Date(rec.startTime);
-      nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-    }
+    const startWall = (dayConfig?.startTime ? getRecurringShiftWallClockHoursMinutes(dayConfig.startTime) : getRecurringShiftWallClockHoursMinutes(rec.startTime));
+    nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
 
     console.log('🔍 SCHEDULE-SHIFTS DATE DEBUGGING:', {
       '=== INPUT ===': {
@@ -1360,17 +1360,10 @@ export default function ScheduleShiftsPage() {
           // Create the date for the custom date
           nextDate = new Date(customDate + 'T00:00:00');
           
-          // Check for day config for this day
+          // Check for day config for this day (use wall-clock time so DST never changes shift time)
           const dayConfig = rec.RecurringShiftDayConfig?.find((conf: any) => conf.dayOfWeek === customDay);
-          if (dayConfig && dayConfig.startTime) {
-            // Use day config time if available
-            const configStart = new Date(dayConfig.startTime);
-            nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-          } else {
-            // Fall back to global time
-            const recStart = new Date(rec.startTime);
-            nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-          }
+          const startWall = (dayConfig?.startTime ? getRecurringShiftWallClockHoursMinutes(dayConfig.startTime) : getRecurringShiftWallClockHoursMinutes(rec.startTime));
+          nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
         } else {
           // This recurring shift doesn't occur on the custom date, so skip it
           return null;
@@ -1400,17 +1393,10 @@ export default function ScheduleShiftsPage() {
         nextDate = new Date(today);
         nextDate.setDate(today.getDate() + dayDiff);
 
-        // Check for day config for this occurrence day
+        // Check for day config for this occurrence day (use wall-clock time so DST never changes shift time)
         const dayConfig = rec.RecurringShiftDayConfig?.find((conf: any) => conf.dayOfWeek === occurrenceDay);
-        if (dayConfig && dayConfig.startTime) {
-          // Use day config time if available
-          const configStart = new Date(dayConfig.startTime);
-          nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-        } else {
-          // Fall back to global time
-          const recStart = new Date(rec.startTime);
-          nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-        }
+        const startWall = (dayConfig?.startTime ? getRecurringShiftWallClockHoursMinutes(dayConfig.startTime) : getRecurringShiftWallClockHoursMinutes(rec.startTime));
+        nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
       } else {
         // Use the existing getNextOccurrence logic for non-expanded shifts
         nextDate = getNextOccurrence(rec);
@@ -1461,26 +1447,15 @@ export default function ScheduleShiftsPage() {
       // Use day config values (ONLY day config, not global)
       isDayActive = dayConfig.isActive !== false; // Default to true if not explicitly false
       
-      // Use day config times if provided, otherwise use global
-      if (dayConfig.startTime && dayConfig.endTime) {
-        const configStart = new Date(dayConfig.startTime);
-        const configEnd = new Date(dayConfig.endTime);
-        currentStartTime = new Date(nextDate);
-        currentStartTime.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-        currentEndTime = new Date(nextDate);
-        currentEndTime.setHours(configEnd.getHours(), configEnd.getMinutes(), 0, 0);
-        // Update nextDate to match the day config start time
-        nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-      } else {
-        // Fall back to global times if day config times not provided
-        const globalStart = new Date(rec.startTime);
-        const globalEnd = new Date(rec.endTime);
-        currentStartTime = new Date(nextDate);
-        currentStartTime.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
-        currentEndTime = new Date(nextDate);
-        currentEndTime.setHours(globalEnd.getHours(), globalEnd.getMinutes(), 0, 0);
-        nextDate.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
-      }
+      // Use day config times if provided (wall-clock so DST never changes), otherwise use global
+      const startWall = (dayConfig.startTime && dayConfig.endTime)
+        ? { start: getRecurringShiftWallClockHoursMinutes(dayConfig.startTime), end: getRecurringShiftWallClockHoursMinutes(dayConfig.endTime) }
+        : { start: getRecurringShiftWallClockHoursMinutes(rec.startTime), end: getRecurringShiftWallClockHoursMinutes(rec.endTime) };
+      currentStartTime = new Date(nextDate);
+      currentStartTime.setHours(startWall.start.hours, startWall.start.minutes, 0, 0);
+      currentEndTime = new Date(nextDate);
+      currentEndTime.setHours(startWall.end.hours, startWall.end.minutes, 0, 0);
+      nextDate.setHours(startWall.start.hours, startWall.start.minutes, 0, 0);
 
       // Use day config slots if provided, otherwise use global
       if (dayConfig.slots !== null && dayConfig.slots !== undefined) {
@@ -1489,16 +1464,16 @@ export default function ScheduleShiftsPage() {
         currentSlots = rec.slots || 0;
       }
     } else {
-      // No day config - use global config
+      // No day config - use global config (wall-clock so DST never changes shift time)
       isDayActive = true;
-      const globalStart = new Date(rec.startTime);
-      const globalEnd = new Date(rec.endTime);
+      const startWall = getRecurringShiftWallClockHoursMinutes(rec.startTime);
+      const endWall = getRecurringShiftWallClockHoursMinutes(rec.endTime);
       currentStartTime = new Date(nextDate);
-      currentStartTime.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
+      currentStartTime.setHours(startWall.hours, startWall.minutes, 0, 0);
       currentEndTime = new Date(nextDate);
-      currentEndTime.setHours(globalEnd.getHours(), globalEnd.getMinutes(), 0, 0);
+      currentEndTime.setHours(endWall.hours, endWall.minutes, 0, 0);
       currentSlots = rec.slots || 0;
-      nextDate.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
+      nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
     }
 
     // If day is not active, do not render this shift

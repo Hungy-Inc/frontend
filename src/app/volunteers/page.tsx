@@ -3,6 +3,7 @@ import styles from '../incoming-stats/IncomingStats.module.css';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { FaChevronDown, FaChevronRight, FaSearch, FaEdit, FaTimes, FaSave } from 'react-icons/fa';
+import { getRecurringShiftWallClockTimeDisplay } from '@/utils/timezoneUtils';
 
 const months = [
   { value: 0, label: 'All Months' },
@@ -498,6 +499,13 @@ export default function VolunteersPage() {
     });
   };
 
+  const formatShiftTimeOnly = (shift: { startTime?: string; endTime?: string; recurringShiftId?: number | null }, which: 'start' | 'end') => {
+    const t = which === 'start' ? shift.startTime : shift.endTime;
+    if (!t) return '';
+    if (shift.recurringShiftId) return getRecurringShiftWallClockTimeDisplay(t);
+    return formatTimeOnly(t);
+  };
+
   const formatDateOnly = (dateStr: string) => {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -841,7 +849,7 @@ export default function VolunteersPage() {
                                       <td style={{ padding: '10px' }}>{formatDateOnly(shift.startTime)}</td>
                                       <td style={{ padding: '10px' }}>{shift.category}</td>
                                       <td style={{ padding: '10px' }}>
-                                        {formatTimeOnly(shift.startTime)} - {formatTimeOnly(shift.endTime)}
+                                        {formatShiftTimeOnly(shift, 'start')} - {formatShiftTimeOnly(shift, 'end')}
                                       </td>
                                       <td style={{ padding: '10px' }}>
                                         <span style={{
@@ -919,7 +927,7 @@ export default function VolunteersPage() {
                                       <td style={{ padding: '10px' }}>{formatDateOnly(shift.startTime)}</td>
                                       <td style={{ padding: '10px' }}>{shift.category}</td>
                                       <td style={{ padding: '10px' }}>
-                                        {formatTimeOnly(shift.startTime)} - {formatTimeOnly(shift.endTime)}
+                                        {formatShiftTimeOnly(shift, 'start')} - {formatShiftTimeOnly(shift, 'end')}
                                       </td>
                                       <td style={{ padding: '10px', fontSize: 12 }}>
                                         {shift.checkIn ? (
@@ -928,7 +936,7 @@ export default function VolunteersPage() {
                                             {shift.checkOut ? (
                                               <div>Out: {formatTimeOnly(shift.checkOut)}</div>
                                             ) : shift.autoCheckout ? (
-                                              <div style={{ color: '#f57c00' }}>Out: {formatTimeOnly(shift.endTime)} (Auto)</div>
+                                              <div style={{ color: '#f57c00' }}>Out: {formatShiftTimeOnly(shift, 'end')} (Auto)</div>
                                             ) : null}
                                           </div>
                                         ) : (

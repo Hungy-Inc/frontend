@@ -233,3 +233,36 @@ export const createDateStringWithHalifaxOffset = (dateString: string, timeString
 export const getHalifaxDateString = (date: Date): string => {
   return date.toLocaleDateString('en-CA', { timeZone: HALIFAX_TIMEZONE }).split('/').reverse().join('-');
 };
+
+/**
+ * Recurring shifts are stored in UTC with a fixed reference (AST, UTC-4) so that
+ * "9:00 AM" is always the same wall-clock time year-round. This returns that
+ * wall-clock time (hours 0-23, minutes 0-59) so display never changes with DST.
+ */
+export const getRecurringShiftWallClockHoursMinutes = (utcIsoString: string): { hours: number; minutes: number } => {
+  const d = new Date(utcIsoString);
+  if (isNaN(d.getTime())) return { hours: 0, minutes: 0 };
+  const utcHours = d.getUTCHours();
+  const utcMinutes = d.getUTCMinutes();
+  const AST_OFFSET_HOURS = 4;
+  const hours = (utcHours - AST_OFFSET_HOURS + 24) % 24;
+  return { hours, minutes: utcMinutes };
+};
+
+/**
+ * Same as above but returns "HH:MM" for form inputs and display.
+ */
+export const getRecurringShiftWallClockTimeString = (utcIsoString: string): string => {
+  const { hours, minutes } = getRecurringShiftWallClockHoursMinutes(utcIsoString);
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+/**
+ * Wall-clock time for display in 12-hour format (e.g. "5:00 PM") so shift times never change with DST.
+ */
+export const getRecurringShiftWallClockTimeDisplay = (utcIsoString: string): string => {
+  const { hours, minutes } = getRecurringShiftWallClockHoursMinutes(utcIsoString);
+  const h12 = hours % 12 || 12;
+  const ampm = hours < 12 ? 'AM' : 'PM';
+  return `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`;
+};

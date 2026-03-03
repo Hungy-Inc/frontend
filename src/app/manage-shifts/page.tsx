@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FaEdit, FaTrash, FaPlusCircle, FaToggleOn, FaToggleOff, FaCalendarAlt, FaClock, FaCheck, FaBan, FaTimes, FaPlus, FaSave } from "react-icons/fa";
 import { toast } from 'react-toastify';
-import { createDateStringWithHalifaxOffset } from '@/utils/timezoneUtils';
+import { createDateStringWithHalifaxOffset, convertHalifaxToUTC, getRecurringShiftWallClockHoursMinutes, getRecurringShiftWallClockTimeString } from '@/utils/timezoneUtils';
 
 export default function ManageShiftsPage() {
   const router = useRouter();
@@ -397,9 +397,9 @@ export default function ManageShiftsPage() {
       let startTime, endTime;
 
       if (addRecurring.isRecurring) {
-        // Recurring shift - use time inputs with current date
+        // Recurring shift - use fixed reference (AST) so 9:00 AM is always stored the same year-round (DST-safe)
         if (addRecurring.startTime && addRecurring.endTime) {
-          const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+          const baseDate = new Date().toISOString().split('T')[0];
           const start = new Date(`${baseDate}T${addRecurring.startTime}`);
           const end = new Date(`${baseDate}T${addRecurring.endTime}`);
           const diffMs = end.getTime() - start.getTime();
@@ -408,8 +408,8 @@ export default function ManageShiftsPage() {
             setAddingRecurring(false);
             return;
           }
-          startTime = createDateStringWithHalifaxOffset(baseDate, `${addRecurring.startTime}:00`);
-          endTime = createDateStringWithHalifaxOffset(baseDate, `${addRecurring.endTime}:00`);
+          startTime = convertHalifaxToUTC(addRecurring.startTime, true);
+          endTime = convertHalifaxToUTC(addRecurring.endTime, true);
         }
       } else {
         // One-time shift - use datetime inputs
@@ -486,7 +486,7 @@ export default function ManageShiftsPage() {
     setEditRecurringId(shift.id);
 
     if (shift.isRecurring) {
-      // Recurring shift - extract time from datetime
+      // Recurring shift - show wall-clock time (e.g. 09:00) so it never changes with DST
       const daysOfWeek = shift.newDaysOfWeek && shift.newDaysOfWeek.length > 0
         ? shift.newDaysOfWeek
         : (shift.dayOfWeek !== null ? [shift.dayOfWeek] : []);
@@ -494,8 +494,8 @@ export default function ManageShiftsPage() {
       setEditRecurring({
         name: shift.name,
         newDaysOfWeek: daysOfWeek,
-        startTime: shift.startTime ? shift.startTime.slice(11, 16) : '',
-        endTime: shift.endTime ? shift.endTime.slice(11, 16) : '',
+        startTime: shift.startTime ? getRecurringShiftWallClockTimeString(shift.startTime) : '',
+        endTime: shift.endTime ? getRecurringShiftWallClockTimeString(shift.endTime) : '',
         shiftCategoryId: String(shift.shiftCategoryId),
         location: shift.location,
         slots: shift.slots,
@@ -554,7 +554,7 @@ export default function ManageShiftsPage() {
       if (editRecurring.isRecurring) {
         // Recurring shift - use time inputs with current date
         if (editRecurring.startTime && editRecurring.endTime) {
-          const baseDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+          const baseDate = new Date().toISOString().split('T')[0];
           const start = new Date(`${baseDate}T${editRecurring.startTime}`);
           const end = new Date(`${baseDate}T${editRecurring.endTime}`);
           const diffMs = end.getTime() - start.getTime();
@@ -563,8 +563,8 @@ export default function ManageShiftsPage() {
             setEditingRecurring(false);
             return;
           }
-          startTime = `${baseDate}T${editRecurring.startTime}:00-03:00`;
-          endTime = `${baseDate}T${editRecurring.endTime}:00-03:00`;
+          startTime = convertHalifaxToUTC(editRecurring.startTime, true);
+          endTime = convertHalifaxToUTC(editRecurring.endTime, true);
         }
       } else {
         // One-time shift - use datetime inputs
@@ -730,26 +730,14 @@ export default function ManageShiftsPage() {
 
           // Check for day-specific configuration
           const dayConfig = shift.RecurringShiftDayConfig?.find((config: any) => config.dayOfWeek === dayOfWeek);
-          
-          // Set the time for this occurrence - use day config if available, otherwise global
-          let startTime: Date;
-          let endTime: Date;
-          
-          if (dayConfig && dayConfig.startTime && dayConfig.endTime) {
-            // Use day-specific times
-            startTime = new Date(dayConfig.startTime);
-            endTime = new Date(dayConfig.endTime);
-          } else {
-            // Use global times
-            startTime = new Date(shift.startTime);
-            endTime = new Date(shift.endTime);
-          }
+          const startWall = (dayConfig?.startTime && dayConfig?.endTime)
+            ? { start: getRecurringShiftWallClockHoursMinutes(dayConfig.startTime), end: getRecurringShiftWallClockHoursMinutes(dayConfig.endTime) }
+            : { start: getRecurringShiftWallClockHoursMinutes(shift.startTime), end: getRecurringShiftWallClockHoursMinutes(shift.endTime) };
 
           const occurrenceStart = new Date(occurrenceDate);
-          occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-
+          occurrenceStart.setHours(startWall.start.hours, startWall.start.minutes, 0, 0);
           const occurrenceEnd = new Date(occurrenceDate);
-          occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+          occurrenceEnd.setHours(startWall.end.hours, startWall.end.minutes, 0, 0);
 
           occurrences.push({
             date: occurrenceDate,
@@ -783,26 +771,14 @@ export default function ManageShiftsPage() {
 
           // Check for day-specific configuration
           const dayConfig = shift.RecurringShiftDayConfig?.find((config: any) => config.dayOfWeek === dayOfWeek);
-          
-          // Set the time for this occurrence - use day config if available, otherwise global
-          let startTime: Date;
-          let endTime: Date;
-          
-          if (dayConfig && dayConfig.startTime && dayConfig.endTime) {
-            // Use day-specific times
-            startTime = new Date(dayConfig.startTime);
-            endTime = new Date(dayConfig.endTime);
-          } else {
-            // Use global times
-            startTime = new Date(shift.startTime);
-            endTime = new Date(shift.endTime);
-          }
+          const startWall = (dayConfig?.startTime && dayConfig?.endTime)
+            ? { start: getRecurringShiftWallClockHoursMinutes(dayConfig.startTime), end: getRecurringShiftWallClockHoursMinutes(dayConfig.endTime) }
+            : { start: getRecurringShiftWallClockHoursMinutes(shift.startTime), end: getRecurringShiftWallClockHoursMinutes(shift.endTime) };
 
           const occurrenceStart = new Date(occurrenceDate);
-          occurrenceStart.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-
+          occurrenceStart.setHours(startWall.start.hours, startWall.start.minutes, 0, 0);
           const occurrenceEnd = new Date(occurrenceDate);
-          occurrenceEnd.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+          occurrenceEnd.setHours(startWall.end.hours, startWall.end.minutes, 0, 0);
 
           // Debug first few occurrences
           if (i < 3) {
@@ -1969,20 +1945,20 @@ export default function ManageShiftsPage() {
                             }
                           </td>
                           <td style={{ padding: 12 }}>
-                            {shift.startTime ? new Date(shift.startTime).toLocaleTimeString('en-CA', {
+                            {shift.startTime ? (shift.recurringShiftId ? getRecurringShiftWallClockTimeString(shift.startTime) : new Date(shift.startTime).toLocaleTimeString('en-CA', {
                               hour: '2-digit',
                               minute: '2-digit',
                               hour12: false,
                               timeZone: 'America/Halifax'
-                            }) : ''}
+                            })) : ''}
                           </td>
                           <td style={{ padding: 12 }}>
-                            {shift.endTime ? new Date(shift.endTime).toLocaleTimeString('en-CA', {
+                            {shift.endTime ? (shift.recurringShiftId ? getRecurringShiftWallClockTimeString(shift.endTime) : new Date(shift.endTime).toLocaleTimeString('en-CA', {
                               hour: '2-digit',
                               minute: '2-digit',
                               hour12: false,
                               timeZone: 'America/Halifax'
-                            }) : ''}
+                            })) : ''}
                           </td>
                           <td style={{ padding: 12 }}>{shift.location}</td>
                           <td style={{ padding: 12 }}>{shift.slots}</td>

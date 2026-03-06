@@ -116,6 +116,7 @@ export default function ScheduleShiftsPage() {
   const [manageModalShift, setManageModalShift] = useState<any>(null);
   const [manageModalLoading, setManageModalLoading] = useState(false);
   const [addSlotsInput, setAddSlotsInput] = useState<string>('');
+  const [reduceSlotsInput, setReduceSlotsInput] = useState<string>('');
   const [updatingSlots, setUpdatingSlots] = useState(false);
 
   // Default Users Management State
@@ -2249,6 +2250,7 @@ export default function ScheduleShiftsPage() {
     setScheduledSearchTerm('');
     setUnscheduledSearchTerm('');
     setAddSlotsInput('');
+    setReduceSlotsInput('');
     try {
       const token = localStorage.getItem("token");
 
@@ -2971,6 +2973,94 @@ export default function ScheduleShiftsPage() {
                 {updatingSlots ? 'Updating...' : 'Update slots'}
               </button>
             </div>
+          </div>
+
+          {/* Decrease number of slots - only excess slots; never below booked (signed up + default users) */}
+          <div style={{ marginBottom: 24, padding: 20, border: '1px solid #e0e0e0', borderRadius: 10, backgroundColor: '#fafafa' }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 12 }}>Decrease number of slots</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+              You can only reduce <strong>excess</strong> slots. Current: <strong>{manageModalData?.slots ?? 0}</strong> slots, <strong>{manageModalData?.booked ?? 0}</strong> booked. You cannot reduce below the booked count.
+            </div>
+            {(() => {
+              const slots = manageModalData?.slots ?? 0;
+              const booked = manageModalData?.booked ?? 0;
+              const maxReduce = Math.max(0, slots - booked);
+              if (maxReduce <= 0) {
+                return (
+                  <div style={{ fontSize: 13, color: '#c62828', padding: '10px 12px', background: '#ffebee', borderRadius: 8 }}>
+                    You cannot reduce slots—all current slots are filled ({booked} people booked). Remove someone from the shift first if you need to lower capacity.
+                  </div>
+                );
+              }
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={maxReduce}
+                    value={reduceSlotsInput}
+                    onChange={(e) => setReduceSlotsInput(e.target.value.replace(/[^0-9]/, ''))}
+                    placeholder={`Max ${maxReduce}`}
+                    style={{
+                      width: 80,
+                      padding: '8px 12px',
+                      borderRadius: 6,
+                      border: '1px solid #ddd',
+                      fontSize: 15
+                    }}
+                  />
+                  <span style={{ fontSize: 14, color: '#666' }}>slots to remove (max {maxReduce})</span>
+                  <button
+                    onClick={async () => {
+                      const num = parseInt(reduceSlotsInput, 10);
+                      if (!reduceSlotsInput.trim() || isNaN(num) || num < 1) {
+                        toast.error('Enter at least 1 slot to remove');
+                        return;
+                      }
+                      if (num > maxReduce) {
+                        toast.error(`You can only remove up to ${maxReduce} excess slot(s). ${booked} are already booked.`);
+                        return;
+                      }
+                      const newTotal = slots - num;
+                      setUpdatingSlots(true);
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/slots`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ slots: newTotal })
+                        });
+                        if (!res.ok) {
+                          const err = await res.json();
+                          throw new Error(err.error || err.details?.message || 'Failed to update slots');
+                        }
+                        toast.success(`Reduced by ${num} slot(s). Total slots: ${newTotal}`);
+                        setReduceSlotsInput('');
+                        await openManageModal(manageModalShift);
+                        await fetchAllPageData();
+                      } catch (err: any) {
+                        toast.error(err.message || 'Failed to reduce slots');
+                      } finally {
+                        setUpdatingSlots(false);
+                      }
+                    }}
+                    disabled={updatingSlots}
+                    style={{
+                      background: updatingSlots ? '#ccc' : '#1976d2',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '8px 16px',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: updatingSlots ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {updatingSlots ? 'Updating...' : 'Reduce slots'}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Default Users Management Section - Only show for recurring shifts */}

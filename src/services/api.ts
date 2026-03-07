@@ -143,17 +143,39 @@ export const api = {
     return response.json();
   },
 
+  async getCustomEmailUsage(): Promise<{ used: number; limit: number; resetsAt: string }> {
+    const response = await fetch(getApiUrl('/emails/custom-usage'), {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch custom email usage');
+    }
+    return response.json();
+  },
+
   async sendCustomEmail(emailData: any) {
     const response = await fetch(getApiUrl('/emails/send-custom'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(emailData)
     });
+    const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to send email');
+      if (response.status === 429) {
+        const err: any = new Error(body.error || 'Custom email limit reached.');
+        err.resetsAt = body.resetsAt;
+        err.used = body.used;
+        err.limit = body.limit;
+        throw err;
+      }
+      if (response.status === 503 && body.code === 'GMAIL_DAILY_LIMIT') {
+        const err: any = new Error(body.error || "Gmail's daily sending limit reached.");
+        err.code = 'GMAIL_DAILY_LIMIT';
+        throw err;
+      }
+      throw new Error(body.error || 'Failed to send email');
     }
-    return response.json();
+    return body;
   },
 
   async sendTemplateEmail(emailData: any) {

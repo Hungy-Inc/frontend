@@ -51,45 +51,63 @@ export const convertUTCTimeToHalifaxTime = (utcTimeString: string): string => {
  */
 export const convertHalifaxToUTC = (halifaxTimeString: string, useFixedReference: boolean = true): string => {
   try {
-    // If already a full ISO datetime string, parse it directly
+    // If already a full ISO datetime string with timezone offset, parse directly
     if (halifaxTimeString.includes('T') && halifaxTimeString.includes('-')) {
-      // Check if it has timezone offset (e.g., -03:00 or -04:00)
       if (halifaxTimeString.match(/[+-]\d{2}:\d{2}$/)) {
-        // Has timezone offset, parse directly - this is correct
-        return new Date(halifaxTimeString).toISOString();
-      } else {
-        // No timezone specified - treat as UTC
         return new Date(halifaxTimeString).toISOString();
       }
+      // No timezone (e.g. "2025-03-15T09:00") - treat as Halifax local on that date
+      // so one-time shifts are stored correctly regardless of server/browser timezone
+      if (!useFixedReference) {
+        const datePart = halifaxTimeString.split('T')[0];
+        const timePart = halifaxTimeString.split('T')[1] || '00:00';
+        const tParts = timePart.split(':').map(s => s.trim());
+        const hours = parseInt(tParts[0]) || 0;
+        const minutes = parseInt(tParts[1] || '0') || 0;
+        const seconds = parseInt(tParts[2] || '0') || 0;
+        const [refYear, refMonth, refDay] = datePart.split('-').map(Number);
+        const testUTCDate = new Date(Date.UTC(refYear, refMonth - 1, refDay, 12, 0, 0));
+        const halifaxNoonTime = testUTCDate.toLocaleString('en-US', {
+          timeZone: HALIFAX_TIMEZONE,
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        });
+        const halifaxNoonHour = parseInt(halifaxNoonTime.split(':')[0]);
+        const offsetHours = 12 - halifaxNoonHour;
+        let utcHour = hours + offsetHours;
+        let utcDay = refDay, utcMonth = refMonth, utcYear = refYear;
+        if (utcHour < 0) {
+          utcHour += 24;
+          utcDay--;
+          if (utcDay < 1) {
+            utcMonth--;
+            if (utcMonth < 1) { utcMonth = 12; utcYear--; }
+            utcDay = new Date(utcYear, utcMonth, 0).getDate();
+          }
+        } else if (utcHour >= 24) {
+          utcHour -= 24;
+          utcDay++;
+          const daysInMonth = new Date(utcYear, utcMonth, 0).getDate();
+          if (utcDay > daysInMonth) { utcDay = 1; utcMonth++; if (utcMonth > 12) { utcMonth = 1; utcYear++; } }
+        }
+        return new Date(Date.UTC(utcYear, utcMonth - 1, utcDay, utcHour, minutes, seconds)).toISOString();
+      }
+      // useFixedReference with datetime string: treat as local (legacy); prefer time-only for recurring
+      return new Date(halifaxTimeString).toISOString();
     }
-    
+
     // Handle time-only format (HH:MM or HH:MM:SS)
-    // Parse the time components
     const timeParts = halifaxTimeString.split(':').map(s => s.trim());
     const hours = parseInt(timeParts[0]);
     const minutes = parseInt(timeParts[1] || '0');
     const seconds = parseInt(timeParts[2] || '0');
-    
-    // Determine reference date based on useFixedReference flag
+
     let referenceDateStr: string;
     if (useFixedReference) {
-      // For recurring shifts: Use fixed date to ensure consistent UTC storage
-      // This ensures 9:00 AM always stores as same UTC value regardless of DST period
-      referenceDateStr = '2000-01-15'; // Fixed date always in AST
+      referenceDateStr = '2000-01-15';
     } else {
-      // For one-time shifts: Use the date from the input string
-      // Check if input has date component (YYYY-MM-DD format)
-      if (halifaxTimeString.includes('T') && halifaxTimeString.includes('-')) {
-        // Extract date part from datetime string (e.g., "2025-11-10T09:00")
-        const datePart = halifaxTimeString.split('T')[0];
-        referenceDateStr = datePart;
-      } else {
-        // If no date in input, use today (fallback - shouldn't happen for one-time shifts)
-        const now = new Date();
-        referenceDateStr = now.toLocaleDateString('en-CA', { timeZone: HALIFAX_TIMEZONE });
-      }
+      referenceDateStr = getHalifaxDateString(new Date());
     }
-    
+
     const [refYear, refMonth, refDay] = referenceDateStr.split('-').map(Number);
     
     // CORRECT METHOD: Use a date string with Halifax timezone offset

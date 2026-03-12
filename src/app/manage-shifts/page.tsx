@@ -412,7 +412,7 @@ export default function ManageShiftsPage() {
           endTime = convertHalifaxToUTC(addRecurring.endTime, true);
         }
       } else {
-        // One-time shift - use datetime inputs
+        // One-time shift - interpret datetime as Halifax and convert to UTC (same as add-shift / edit-shift)
         if (addRecurring.startTime && addRecurring.endTime) {
           const start = new Date(addRecurring.startTime);
           const end = new Date(addRecurring.endTime);
@@ -422,8 +422,8 @@ export default function ManageShiftsPage() {
             setAddingRecurring(false);
             return;
           }
-          startTime = addRecurring.startTime;
-          endTime = addRecurring.endTime;
+          startTime = convertHalifaxToUTC(addRecurring.startTime, false);
+          endTime = convertHalifaxToUTC(addRecurring.endTime, false);
         }
       }
 

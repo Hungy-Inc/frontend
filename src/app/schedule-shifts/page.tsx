@@ -4,6 +4,7 @@ import { FaEdit, FaTrash, FaSave, FaTimes } from "react-icons/fa";
 import { MultiSelect } from "react-multi-select-component";
 import { toast } from 'react-toastify';
 import type { ToastContainerProps } from 'react-toastify';
+import { getRecurringShiftWallClockHoursMinutes } from '@/utils/timezoneUtils';
 
 
 export default function ScheduleShiftsPage() {
@@ -114,6 +115,9 @@ export default function ScheduleShiftsPage() {
   const [manageModalData, setManageModalData] = useState<{ scheduled: any[]; unscheduled: any[]; slots: number; booked: number; defaultUsers?: number; absentDefaultUsers?: number; availableSlots?: number } | null>(null);
   const [manageModalShift, setManageModalShift] = useState<any>(null);
   const [manageModalLoading, setManageModalLoading] = useState(false);
+  const [addSlotsInput, setAddSlotsInput] = useState<string>('');
+  const [reduceSlotsInput, setReduceSlotsInput] = useState<string>('');
+  const [updatingSlots, setUpdatingSlots] = useState(false);
 
   // Default Users Management State
   const [defaultUsers, setDefaultUsers] = useState<any[]>([]);
@@ -345,6 +349,30 @@ export default function ScheduleShiftsPage() {
       setShifts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Silent refresh so shift cards show live count after Manage modal changes (add/remove/absence).
+  // Uses same endpoint as initial load so card and modal stay in sync.
+  const refreshShiftsForCard = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/schedule-shifts-data`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setShifts(data.shifts || []);
+      const newAbsencesCache: { [key: number]: number[] } = {};
+      for (const shiftId in (data.absencesByShiftId || {})) {
+        newAbsencesCache[Number(shiftId)] = (data.absencesByShiftId[shiftId] || []).map((a: any) => a.userId);
+      }
+      setShiftAbsencesCache(newAbsencesCache);
+      if (data.recurringShifts && data.shifts) {
+        calculateShiftCountsWithAbsences(data.recurringShifts, data.shifts, data.absencesByShiftId || {});
+      }
+    } catch (err) {
+      console.error('Background refresh for card failed', err);
     }
   };
 
@@ -639,10 +667,12 @@ export default function ScheduleShiftsPage() {
         const dayDiff = minDaysDiff || 7;
         const nextDate = new Date(today);
         nextDate.setDate(today.getDate() + dayDiff);
+        const startWall = getRecurringShiftWallClockHoursMinutes(rec.startTime);
+        const endWall = getRecurringShiftWallClockHoursMinutes(rec.endTime);
         const start = new Date(nextDate);
-        start.setHours(new Date(rec.startTime).getHours(), new Date(rec.startTime).getMinutes(), 0, 0);
+        start.setHours(startWall.hours, startWall.minutes, 0, 0);
         const end = new Date(nextDate);
-        end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
+        end.setHours(endWall.hours, endWall.minutes, 0, 0);
 
         // Find all existing shifts for this category and recurring shift pattern
         const existingShifts = shifts.filter(shift => {
@@ -787,10 +817,12 @@ export default function ScheduleShiftsPage() {
       const dayDiff = minDaysDiff || 7;
       const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + dayDiff);
+      const startWall = getRecurringShiftWallClockHoursMinutes(rec.startTime);
+      const endWall = getRecurringShiftWallClockHoursMinutes(rec.endTime);
       const start = new Date(nextDate);
-      start.setHours(new Date(rec.startTime).getHours(), new Date(rec.startTime).getMinutes(), 0, 0);
+      start.setHours(startWall.hours, startWall.minutes, 0, 0);
       const end = new Date(nextDate);
-      end.setHours(new Date(rec.endTime).getHours(), new Date(rec.endTime).getMinutes(), 0, 0);
+      end.setHours(endWall.hours, endWall.minutes, 0, 0);
 
       // Verify no duplicate shifts exist for these users
       const existingShifts = shifts.filter(shift =>
@@ -959,10 +991,12 @@ export default function ScheduleShiftsPage() {
         const dayDiff = minDaysDiff || 7;
         const nextDate = new Date(today);
         nextDate.setDate(today.getDate() + dayDiff);
+        const startWall = getRecurringShiftWallClockHoursMinutes(opt.startTime);
+        const endWall = getRecurringShiftWallClockHoursMinutes(opt.endTime);
         const start = new Date(nextDate);
-        start.setHours(new Date(opt.startTime).getHours(), new Date(opt.startTime).getMinutes(), 0, 0);
+        start.setHours(startWall.hours, startWall.minutes, 0, 0);
         const end = new Date(nextDate);
-        end.setHours(new Date(opt.endTime).getHours(), new Date(opt.endTime).getMinutes(), 0, 0);
+        end.setHours(endWall.hours, endWall.minutes, 0, 0);
         return `${start.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })} - ${end.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}`;
       })
   ));
@@ -1024,17 +1058,10 @@ export default function ScheduleShiftsPage() {
     const nextDate = new Date(today);
     nextDate.setDate(today.getDate() + minDaysDiff);
     
-    // Check for day config for the closest day
+    // Check for day config for the closest day (use wall-clock time so DST never changes shift time)
     const dayConfig = rec.RecurringShiftDayConfig?.find((conf: any) => conf.dayOfWeek === closestDay);
-    if (dayConfig && dayConfig.startTime) {
-      // Use day config time if available
-      const configStart = new Date(dayConfig.startTime);
-      nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-    } else {
-      // Fall back to global time
-      const recStart = new Date(rec.startTime);
-      nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-    }
+    const startWall = (dayConfig?.startTime ? getRecurringShiftWallClockHoursMinutes(dayConfig.startTime) : getRecurringShiftWallClockHoursMinutes(rec.startTime));
+    nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
 
     console.log('🔍 SCHEDULE-SHIFTS DATE DEBUGGING:', {
       '=== INPUT ===': {
@@ -1334,17 +1361,10 @@ export default function ScheduleShiftsPage() {
           // Create the date for the custom date
           nextDate = new Date(customDate + 'T00:00:00');
           
-          // Check for day config for this day
+          // Check for day config for this day (use wall-clock time so DST never changes shift time)
           const dayConfig = rec.RecurringShiftDayConfig?.find((conf: any) => conf.dayOfWeek === customDay);
-          if (dayConfig && dayConfig.startTime) {
-            // Use day config time if available
-            const configStart = new Date(dayConfig.startTime);
-            nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-          } else {
-            // Fall back to global time
-            const recStart = new Date(rec.startTime);
-            nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-          }
+          const startWall = (dayConfig?.startTime ? getRecurringShiftWallClockHoursMinutes(dayConfig.startTime) : getRecurringShiftWallClockHoursMinutes(rec.startTime));
+          nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
         } else {
           // This recurring shift doesn't occur on the custom date, so skip it
           return null;
@@ -1374,17 +1394,10 @@ export default function ScheduleShiftsPage() {
         nextDate = new Date(today);
         nextDate.setDate(today.getDate() + dayDiff);
 
-        // Check for day config for this occurrence day
+        // Check for day config for this occurrence day (use wall-clock time so DST never changes shift time)
         const dayConfig = rec.RecurringShiftDayConfig?.find((conf: any) => conf.dayOfWeek === occurrenceDay);
-        if (dayConfig && dayConfig.startTime) {
-          // Use day config time if available
-          const configStart = new Date(dayConfig.startTime);
-          nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-        } else {
-          // Fall back to global time
-          const recStart = new Date(rec.startTime);
-          nextDate.setHours(recStart.getHours(), recStart.getMinutes(), 0, 0);
-        }
+        const startWall = (dayConfig?.startTime ? getRecurringShiftWallClockHoursMinutes(dayConfig.startTime) : getRecurringShiftWallClockHoursMinutes(rec.startTime));
+        nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
       } else {
         // Use the existing getNextOccurrence logic for non-expanded shifts
         nextDate = getNextOccurrence(rec);
@@ -1435,26 +1448,15 @@ export default function ScheduleShiftsPage() {
       // Use day config values (ONLY day config, not global)
       isDayActive = dayConfig.isActive !== false; // Default to true if not explicitly false
       
-      // Use day config times if provided, otherwise use global
-      if (dayConfig.startTime && dayConfig.endTime) {
-        const configStart = new Date(dayConfig.startTime);
-        const configEnd = new Date(dayConfig.endTime);
-        currentStartTime = new Date(nextDate);
-        currentStartTime.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-        currentEndTime = new Date(nextDate);
-        currentEndTime.setHours(configEnd.getHours(), configEnd.getMinutes(), 0, 0);
-        // Update nextDate to match the day config start time
-        nextDate.setHours(configStart.getHours(), configStart.getMinutes(), 0, 0);
-      } else {
-        // Fall back to global times if day config times not provided
-        const globalStart = new Date(rec.startTime);
-        const globalEnd = new Date(rec.endTime);
-        currentStartTime = new Date(nextDate);
-        currentStartTime.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
-        currentEndTime = new Date(nextDate);
-        currentEndTime.setHours(globalEnd.getHours(), globalEnd.getMinutes(), 0, 0);
-        nextDate.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
-      }
+      // Use day config times if provided (wall-clock so DST never changes), otherwise use global
+      const startWall = (dayConfig.startTime && dayConfig.endTime)
+        ? { start: getRecurringShiftWallClockHoursMinutes(dayConfig.startTime), end: getRecurringShiftWallClockHoursMinutes(dayConfig.endTime) }
+        : { start: getRecurringShiftWallClockHoursMinutes(rec.startTime), end: getRecurringShiftWallClockHoursMinutes(rec.endTime) };
+      currentStartTime = new Date(nextDate);
+      currentStartTime.setHours(startWall.start.hours, startWall.start.minutes, 0, 0);
+      currentEndTime = new Date(nextDate);
+      currentEndTime.setHours(startWall.end.hours, startWall.end.minutes, 0, 0);
+      nextDate.setHours(startWall.start.hours, startWall.start.minutes, 0, 0);
 
       // Use day config slots if provided, otherwise use global
       if (dayConfig.slots !== null && dayConfig.slots !== undefined) {
@@ -1463,16 +1465,16 @@ export default function ScheduleShiftsPage() {
         currentSlots = rec.slots || 0;
       }
     } else {
-      // No day config - use global config
+      // No day config - use global config (wall-clock so DST never changes shift time)
       isDayActive = true;
-      const globalStart = new Date(rec.startTime);
-      const globalEnd = new Date(rec.endTime);
+      const startWall = getRecurringShiftWallClockHoursMinutes(rec.startTime);
+      const endWall = getRecurringShiftWallClockHoursMinutes(rec.endTime);
       currentStartTime = new Date(nextDate);
-      currentStartTime.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
+      currentStartTime.setHours(startWall.hours, startWall.minutes, 0, 0);
       currentEndTime = new Date(nextDate);
-      currentEndTime.setHours(globalEnd.getHours(), globalEnd.getMinutes(), 0, 0);
+      currentEndTime.setHours(endWall.hours, endWall.minutes, 0, 0);
       currentSlots = rec.slots || 0;
-      nextDate.setHours(globalStart.getHours(), globalStart.getMinutes(), 0, 0);
+      nextDate.setHours(startWall.hours, startWall.minutes, 0, 0);
     }
 
     // If day is not active, do not render this shift
@@ -2244,9 +2246,11 @@ export default function ScheduleShiftsPage() {
     setManageModalLoading(true);
     setManageModalOpen(true);
     setManageModalShift(shift);
-    // Clear search terms when opening modal
+    // Clear search terms and add-slots input when opening modal
     setScheduledSearchTerm('');
     setUnscheduledSearchTerm('');
+    setAddSlotsInput('');
+    setReduceSlotsInput('');
     try {
       const token = localStorage.getItem("token");
 
@@ -2387,6 +2391,8 @@ export default function ScheduleShiftsPage() {
           )
         };
       });
+      // Refresh card counter (same data source as page)
+      refreshShiftsForCard();
     } catch (err: any) {
       // ROLLBACK on network error
       setManageModalData(prev => {
@@ -2450,6 +2456,9 @@ export default function ScheduleShiftsPage() {
           };
         });
         toast.error(errorData.error || "Failed to remove employee");
+      } else {
+        // Refresh card counter so it shows updated filled/total
+        refreshShiftsForCard();
       }
     } catch (err: any) {
       // ROLLBACK on network error
@@ -2623,6 +2632,7 @@ export default function ScheduleShiftsPage() {
 
       // Refresh default users and absences for the absence modal list
       await fetchDefaultUsersAndAbsences(manageModalShift);
+      refreshShiftsForCard();
 
     } catch (err) {
       // On complete failure, refresh to get correct state
@@ -2688,6 +2698,7 @@ export default function ScheduleShiftsPage() {
 
       if (res.ok) {
         toast.success('User marked as present');
+        refreshShiftsForCard();
       } else {
         // ROLLBACK on error (e.g. overbooking when making user present)
         setManageModalData(prev => {
@@ -2777,6 +2788,7 @@ export default function ScheduleShiftsPage() {
       }
 
       toast.success('User marked as present');
+      refreshShiftsForCard();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to remove absence');
     }
@@ -2895,6 +2907,161 @@ export default function ScheduleShiftsPage() {
           </button>
 
           <h2 style={{ fontSize: 26, fontWeight: 700, marginBottom: 18 }}>Manage Employees for {manageModalShift.name}</h2>
+
+          {/* Increase number of slots - updates this shift only in Shift table */}
+          <div style={{ marginBottom: 24, padding: 20, border: '1px solid #e0e0e0', borderRadius: 10, backgroundColor: '#fafafa' }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 12 }}>Increase number of slots</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+              Current: <strong>{manageModalData?.slots ?? 0}</strong> slots ({manageModalData?.booked ?? 0} booked). Add more slots for this shift only.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <input
+                type="number"
+                min={1}
+                value={addSlotsInput}
+                onChange={(e) => setAddSlotsInput(e.target.value.replace(/[^0-9]/, ''))}
+                style={{
+                  width: 80,
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ddd',
+                  fontSize: 15
+                }}
+              />
+              <span style={{ fontSize: 14, color: '#666' }}>slots to add</span>
+              <button
+                onClick={async () => {
+                  const num = parseInt(addSlotsInput, 10);
+                  if (!addSlotsInput.trim() || isNaN(num) || num < 1) {
+                    toast.error('Enter at least 1 slot to add');
+                    return;
+                  }
+                  setUpdatingSlots(true);
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/slots`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ addSlots: num })
+                    });
+                    if (!res.ok) {
+                      const err = await res.json();
+                      throw new Error(err.error || 'Failed to update slots');
+                    }
+                    toast.success(`Added ${num} slot(s). Total slots: ${(manageModalData?.slots ?? 0) + num}`);
+                    setAddSlotsInput('');
+                    await openManageModal(manageModalShift);
+                    await fetchAllPageData();
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to update slots');
+                  } finally {
+                    setUpdatingSlots(false);
+                  }
+                }}
+                disabled={updatingSlots}
+                style={{
+                  background: updatingSlots ? '#ccc' : '#ff9800',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: updatingSlots ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {updatingSlots ? 'Updating...' : 'Update slots'}
+              </button>
+            </div>
+          </div>
+
+          {/* Decrease number of slots - only excess slots; never below booked (signed up + default users) */}
+          <div style={{ marginBottom: 24, padding: 20, border: '1px solid #e0e0e0', borderRadius: 10, backgroundColor: '#fafafa' }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 12 }}>Decrease number of slots</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+              You can only reduce <strong>excess</strong> slots. Current: <strong>{manageModalData?.slots ?? 0}</strong> slots, <strong>{manageModalData?.booked ?? 0}</strong> booked. You cannot reduce below the booked count.
+            </div>
+            {(() => {
+              const slots = manageModalData?.slots ?? 0;
+              const booked = manageModalData?.booked ?? 0;
+              const maxReduce = Math.max(0, slots - booked);
+              if (maxReduce <= 0) {
+                return (
+                  <div style={{ fontSize: 13, color: '#c62828', padding: '10px 12px', background: '#ffebee', borderRadius: 8 }}>
+                    You cannot reduce slots—all current slots are filled ({booked} people booked). Remove someone from the shift first if you need to lower capacity.
+                  </div>
+                );
+              }
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={maxReduce}
+                    value={reduceSlotsInput}
+                    onChange={(e) => setReduceSlotsInput(e.target.value.replace(/[^0-9]/, ''))}
+                    placeholder={`Max ${maxReduce}`}
+                    style={{
+                      width: 80,
+                      padding: '8px 12px',
+                      borderRadius: 6,
+                      border: '1px solid #ddd',
+                      fontSize: 15
+                    }}
+                  />
+                  <span style={{ fontSize: 14, color: '#666' }}>slots to remove (max {maxReduce})</span>
+                  <button
+                    onClick={async () => {
+                      const num = parseInt(reduceSlotsInput, 10);
+                      if (!reduceSlotsInput.trim() || isNaN(num) || num < 1) {
+                        toast.error('Enter at least 1 slot to remove');
+                        return;
+                      }
+                      if (num > maxReduce) {
+                        toast.error(`You can only remove up to ${maxReduce} excess slot(s). ${booked} are already booked.`);
+                        return;
+                      }
+                      const newTotal = slots - num;
+                      setUpdatingSlots(true);
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/shifts/${manageModalShift.id}/slots`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ slots: newTotal })
+                        });
+                        if (!res.ok) {
+                          const err = await res.json();
+                          throw new Error(err.error || err.details?.message || 'Failed to update slots');
+                        }
+                        toast.success(`Reduced by ${num} slot(s). Total slots: ${newTotal}`);
+                        setReduceSlotsInput('');
+                        await openManageModal(manageModalShift);
+                        await fetchAllPageData();
+                      } catch (err: any) {
+                        toast.error(err.message || 'Failed to reduce slots');
+                      } finally {
+                        setUpdatingSlots(false);
+                      }
+                    }}
+                    disabled={updatingSlots}
+                    style={{
+                      background: updatingSlots ? '#ccc' : '#1976d2',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '8px 16px',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: updatingSlots ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {updatingSlots ? 'Updating...' : 'Reduce slots'}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Default Users Management Section - Only show for recurring shifts */}
           {manageModalShift.recurringShiftId && (

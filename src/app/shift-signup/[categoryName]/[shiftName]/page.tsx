@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FaCheckCircle, FaExclamationTriangle, FaClock, FaMapMarkerAlt, FaUser, FaCalendarAlt } from 'react-icons/fa';
+import { getRecurringShiftWallClockTimeDisplay } from '@/utils/timezoneUtils';
 
 interface Shift {
   id: number;
@@ -13,6 +14,7 @@ interface Shift {
   location: string;
   availableSlots: number;
   totalSlots: number;
+  recurringShiftId?: number | null;
   dynamicFields: Array<{
     id: number;
     fieldDefinitionId: number;
@@ -441,17 +443,9 @@ export default function ShiftSignupPage() {
               📅 {formData.selectedDate ? formatHalifaxDateString(formData.selectedDate) : 'Date selected'}
             </p>
             <p className="text-sm text-gray-600">
-              🕒 {shift && `${new Date(shift.startTime).toLocaleTimeString('en-CA', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-                timeZone: 'America/Halifax'
-              })} - ${new Date(shift.endTime).toLocaleTimeString('en-CA', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-                timeZone: 'America/Halifax'
-              })}`}
+              🕒 {shift && (shift.recurringShiftId
+                ? `${getRecurringShiftWallClockTimeDisplay(shift.startTime)} - ${getRecurringShiftWallClockTimeDisplay(shift.endTime)}`
+                : `${new Date(shift.startTime).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })} - ${new Date(shift.endTime).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}`)}
             </p>
             <p className="text-sm text-gray-600">
               📍 {shift?.location}
@@ -515,17 +509,9 @@ export default function ShiftSignupPage() {
                 <div className="flex items-center text-gray-600">
                   <FaClock className="mr-2" />
                   <span>
-                    {new Date(shift.startTime).toLocaleTimeString('en-CA', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                      timeZone: 'America/Halifax'
-                    })} - {new Date(shift.endTime).toLocaleTimeString('en-CA', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                      timeZone: 'America/Halifax'
-                    })}
+                    {shift.recurringShiftId
+                      ? `${getRecurringShiftWallClockTimeDisplay(shift.startTime)} - ${getRecurringShiftWallClockTimeDisplay(shift.endTime)}`
+                      : `${new Date(shift.startTime).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })} - ${new Date(shift.endTime).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}`}
                   </span>
                 </div>
                 <div className="flex items-center text-gray-600">

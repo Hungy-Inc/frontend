@@ -19,8 +19,10 @@ import {
   FaClock,
   FaCheckCircle,
   FaTimesCircle,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaExternalLinkAlt
 } from "react-icons/fa";
+import { ImSpinner2 } from "react-icons/im";
 import { toast } from 'react-toastify';
 
 interface CustomField {
@@ -53,6 +55,8 @@ interface User {
   address?: string;
   organizationName?: string;
   customFields?: CustomField[];
+  age?: number | null;
+  isUnder16?: boolean;
 }
 
 const roles = ["VOLUNTEER", "STAFF", "ADMIN"];
@@ -88,6 +92,25 @@ export default function UserDetailsPage() {
   });
   const [editCustomFields, setEditCustomFields] = useState<Record<number, any>>({});
   const [saving, setSaving] = useState(false);
+  const [extraHoursRecords, setExtraHoursRecords] = useState<{ id: number; hours: number; reason: string | null; recordDate: string }[]>([]);
+  const [extraHoursLoading, setExtraHoursLoading] = useState(false);
+  const [extraHoursMonth, setExtraHoursMonth] = useState(0);
+  const [extraHoursYear, setExtraHoursYear] = useState(new Date().getFullYear());
+  const [showAddExtraHours, setShowAddExtraHours] = useState(false);
+  const [addExtraHoursForm, setAddExtraHoursForm] = useState({ hours: '', recordDate: new Date().toISOString().split('T')[0], reason: '' });
+  const [addingExtraHours, setAddingExtraHours] = useState(false);
+  // Approve/deny and document view state
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [userAgreements, setUserAgreements] = useState<Array<{
+    id: number;
+    documentUrl: string;
+    signature: string;
+    acceptedAt: string;
+    termsTitle?: string;
+    termsVersion?: string;
+  }>>([]);
+  const [loadingAgreements, setLoadingAgreements] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -128,6 +151,64 @@ export default function UserDetailsPage() {
   useEffect(() => {
     fetchUserDetails();
   }, [userId]);
+
+  const fetchExtraHours = async () => {
+    if (!userId) return;
+    setExtraHoursLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = `${apiUrl}/api/extra-hours?userId=${userId}&month=${extraHoursMonth}&year=${extraHoursYear}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setExtraHoursRecords(Array.isArray(data) ? data : []);
+      } else {
+        setExtraHoursRecords([]);
+      }
+    } catch {
+      setExtraHoursRecords([]);
+    } finally {
+      setExtraHoursLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchExtraHours();
+  }, [userId, extraHoursMonth, extraHoursYear]);
+
+  const handleAddExtraHours = async () => {
+    const h = parseFloat(addExtraHoursForm.hours);
+    if (isNaN(h) || h < 0) {
+      toast.error('Please enter a valid number of hours.');
+      return;
+    }
+    setAddingExtraHours(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${apiUrl}/api/extra-hours`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: parseInt(userId),
+          hours: h,
+          recordDate: addExtraHoursForm.recordDate,
+          reason: addExtraHoursForm.reason || undefined
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to add extra hours');
+      }
+      toast.success('Extra hours added.');
+      setShowAddExtraHours(false);
+      setAddExtraHoursForm({ hours: '', recordDate: new Date().toISOString().split('T')[0], reason: '' });
+      fetchExtraHours();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to add extra hours');
+    } finally {
+      setAddingExtraHours(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
@@ -384,6 +465,124 @@ export default function UserDetailsPage() {
     router.push('/manage-users');
   };
 
+  const approveUser = async () => {
+    if (approveLoading || !userId) return;
+    setApproveLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/approve`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to approve user");
+      await fetchUserDetails();
+      toast.success("User approved successfully!");
+    } catch (err) {
+      toast.error("Failed to approve user. Please try again.");
+    } finally {
+      setApproveLoading(false);
+    }
+  };
+
+  const denyUser = async () => {
+    const reason = prompt("Please enter a reason for denial:");
+    if (!reason) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/deny`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason }),
+      });
+      if (!response.ok) throw new Error("Failed to deny user");
+      await fetchUserDetails();
+      toast.success("User denied successfully!");
+    } catch (err) {
+      toast.error("Failed to deny user. Please try again.");
+    }
+  };
+
+  const resetUserStatus = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/reset`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to reset user status");
+      await fetchUserDetails();
+      toast.success("User status reset successfully!");
+    } catch (err) {
+      toast.error("Failed to reset user status. Please try again.");
+    }
+  };
+
+  const viewUserAgreement = async () => {
+    if (!userId) return;
+    try {
+      setLoadingAgreements(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${apiUrl}/api/users/${userId}/agreement`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        if (response.status === 404) {
+          toast.error("No license agreement found for this user");
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          toast.error(errorData.error || "Failed to fetch user agreements");
+        }
+        setLoadingAgreements(false);
+        return;
+      }
+      const data = await response.json();
+      if (data.agreements && Array.isArray(data.agreements)) {
+        if (data.agreements.length === 0) {
+          toast.error("No agreement documents available for this user");
+          setLoadingAgreements(false);
+          return;
+        }
+        if (data.agreements.length === 1) {
+          window.open(data.agreements[0].documentUrl, '_blank');
+          setLoadingAgreements(false);
+          return;
+        }
+        setUserAgreements(data.agreements);
+        setShowDocumentModal(true);
+      } else if (data.documentUrl) {
+        window.open(data.documentUrl, '_blank');
+      } else {
+        toast.error("No agreement document available for this user");
+      }
+      setLoadingAgreements(false);
+    } catch (err) {
+      toast.error("Failed to fetch user agreements");
+      setLoadingAgreements(false);
+    }
+  };
+
+  const openDocument = (documentUrl: string) => {
+    window.open(documentUrl, '_blank');
+  };
+
+  const formatDateTime = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-CA', {
+        timeZone: 'America/Halifax',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -429,13 +628,20 @@ export default function UserDetailsPage() {
                 <FaUser className="h-8 w-8 text-orange-600" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {user.firstName} {user.lastName}
-                </h1>
+                <div className="flex items-center flex-wrap gap-2">
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {user.firstName} {user.lastName}
+                  </h1>
+                  {user.isUnder16 && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-amber-500 text-amber-950 border border-amber-600" title={user.age != null ? `Age: ${user.age}` : 'Under 16'}>
+                      Under 16
+                    </span>
+                  )}
+                </div>
                 <p className="text-gray-600">{user.email}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center flex-wrap gap-2">
               {!isEditing ? (
                 <>
                   <button
@@ -481,12 +687,19 @@ export default function UserDetailsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Basic Information */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-black">Basic Information</h3>
-            </div>
-            <div className="px-6 py-4 space-y-4">
+          {/* Left column: Under 16 notice + Basic Information */}
+          <div className="space-y-6">
+            {user.isUnder16 && (
+              <div className="bg-amber-50 border border-amber-400 rounded-lg px-6 py-4 shadow-sm">
+                <p className="text-amber-900 font-medium">This account holder is under 16.</p>
+              </div>
+            )}
+            {/* Basic Information */}
+            <div className="bg-white shadow rounded-lg">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-black">Basic Information</h3>
+              </div>
+              <div className="px-6 py-4 space-y-4">
               {/* First Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -579,6 +792,7 @@ export default function UserDetailsPage() {
               </div>
             </div>
           </div>
+          </div>
 
           {/* Status & Additional Information */}
           <div className="space-y-6">
@@ -606,6 +820,52 @@ export default function UserDetailsPage() {
                       <span className="block text-red-600">Reason: {user.denialReason}</span>
                     )}
                   </p>
+                )}
+                {!isEditing && (
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <p className="text-sm font-medium text-gray-700 mb-3">Actions</p>
+                    <div className="flex flex-wrap gap-2">
+                      {user.status === 'PENDING' && (
+                        <>
+                          <button
+                            onClick={approveUser}
+                            disabled={approveLoading}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {approveLoading ? (
+                              <ImSpinner2 className="animate-spin w-4 h-4" />
+                            ) : (
+                              <FaCheck className="w-4 h-4" />
+                            )}
+                            Approve
+                          </button>
+                          <button
+                            onClick={denyUser}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                          >
+                            <FaBan className="w-4 h-4" />
+                            Deny
+                          </button>
+                        </>
+                      )}
+                      {(user.status === 'APPROVED' || user.status === 'DENIED') && (
+                        <button
+                          onClick={resetUserStatus}
+                          className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 flex items-center gap-2"
+                        >
+                          <FaUndo className="w-4 h-4" />
+                          Reset Status
+                        </button>
+                      )}
+                      <button
+                        onClick={viewUserAgreement}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                      >
+                        <FaFileAlt className="w-4 h-4" />
+                        View Agreement
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -683,6 +943,207 @@ export default function UserDetailsPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Extra Hours (by month/year) */}
+        <div className="bg-white shadow rounded-lg mt-6">
+          <div className="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
+            <h3 className="text-lg font-medium text-black">Extra Hours</h3>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAddExtraHours(true)}
+                className="px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm"
+              >
+                Add extra hours
+              </button>
+              <select
+                value={extraHoursMonth}
+                onChange={(e) => setExtraHoursMonth(Number(e.target.value))}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value={0}>All months</option>
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                  <option key={m} value={m}>{new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}</option>
+                ))}
+              </select>
+              <select
+                value={extraHoursYear}
+                onChange={(e) => setExtraHoursYear(Number(e.target.value))}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="px-6 py-4">
+            {extraHoursLoading ? (
+              <p className="text-gray-500">Loading...</p>
+            ) : extraHoursRecords.length === 0 ? (
+              <p className="text-gray-500">No extra hours recorded for this period.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-gray-600">
+                    <th className="py-2 pr-4">Date</th>
+                    <th className="py-2 pr-4">Hours</th>
+                    <th className="py-2">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {extraHoursRecords.map((r: any) => (
+                    <tr key={r.id} className="border-b border-gray-100">
+                      <td className="py-2 pr-4 text-black">{formatDate(r.recordDate)}</td>
+                      <td className="py-2 pr-4 text-black">{Number(r.hours).toFixed(2)}</td>
+                      <td className="py-2 text-gray-600">{r.reason || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <p className="text-gray-500 text-xs mt-2">Total: {extraHoursRecords.reduce((s, r) => s + Number(r.hours), 0).toFixed(2)} hours this period.</p>
+
+            {showAddExtraHours && (
+              <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <h4 className="font-medium text-black mb-3">Add extra hours</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={addExtraHoursForm.recordDate}
+                      onChange={(e) => setAddExtraHoursForm(prev => ({ ...prev, recordDate: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Hours</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      value={addExtraHoursForm.hours}
+                      onChange={(e) => setAddExtraHoursForm(prev => ({ ...prev, hours: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="e.g. 1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Reason (optional)</label>
+                    <input
+                      type="text"
+                      value={addExtraHoursForm.reason}
+                      onChange={(e) => setAddExtraHoursForm(prev => ({ ...prev, reason: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="e.g. Snow day"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddExtraHours(false)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddExtraHours}
+                    disabled={addingExtraHours || !addExtraHoursForm.hours?.trim()}
+                    className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {addingExtraHours ? 'Adding...' : 'Add'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Document Modal */}
+        {showDocumentModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    License Agreements for {user?.firstName} {user?.lastName}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowDocumentModal(false);
+                      setUserAgreements([]);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <FaTimes className="w-5 h-5" />
+                  </button>
+                </div>
+                {loadingAgreements ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                  </div>
+                ) : userAgreements.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FaFileAlt className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-500">No agreement documents found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {userAgreements.map((agreement, index) => (
+                      <div
+                        key={agreement.id}
+                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <FaFileAlt className="text-purple-600" />
+                              <h4 className="text-sm font-medium text-gray-900">
+                                {agreement.termsTitle || `Agreement ${index + 1}`}
+                                {agreement.termsVersion && (
+                                  <span className="text-gray-500 ml-2">(v{agreement.termsVersion})</span>
+                                )}
+                              </h4>
+                            </div>
+                            <div className="text-xs text-gray-500 space-y-1">
+                              <p>Signed: {formatDateTime(agreement.acceptedAt)}</p>
+                              {agreement.signature && (
+                                <p className="font-mono text-gray-400">Signature: {agreement.signature.substring(0, 20)}...</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <button
+                              onClick={() => openDocument(agreement.documentUrl)}
+                              className="px-3 py-2 text-sm text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition bg-orange-500 hover:bg-orange-600"
+                            >
+                              <FaExternalLinkAlt />
+                              Open
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end mt-6">
+                  <button
+                    onClick={() => {
+                      setShowDocumentModal(false);
+                      setUserAgreements([]);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

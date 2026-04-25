@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { api } from '@/services/api';
 import { useRouter } from 'next/navigation';
@@ -15,6 +15,10 @@ const TEMPLATE_TYPES = [
   { value: 'CUSTOM_ANNOUNCEMENT', label: 'Announcement' },
   { value: 'CUSTOM_REMINDER', label: 'Reminder' },
 ];
+
+const CUSTOM_EMAIL_RECIPIENT_LIMIT = 100; // per send; server also enforces 100 per org per 24h
+const GMAIL_LIMIT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const GMAIL_LIMIT_HIT_AT_KEY = 'gmailDailyLimitHitAt';
 
 interface User {
   id: number;
@@ -52,6 +56,7 @@ export default function SendCustomEmailPage() {
   // State for selections
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [recipientSearchQuery, setRecipientSearchQuery] = useState('');
 
   // State for loading
   const [loading, setLoading] = useState(true);
@@ -76,21 +81,65 @@ export default function SendCustomEmailPage() {
   const [templateName, setTemplateName] = useState('');
   const [isSaving, setIsSaving] = useState(false); // For the final save button
   const [sentEmailData, setSentEmailData] = useState<any>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [serverUsage, setServerUsage] = useState<{ used: number; limit: number; resetsAt: string } | null>(null);
+  const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState<number | null>(null);
+  const [gmailLimitHitAt, setGmailLimitHitAt] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem(GMAIL_LIMIT_HIT_AT_KEY);
+    const t = raw ? parseInt(raw, 10) : NaN;
+    if (!Number.isFinite(t)) return null;
+    if (Date.now() - t >= GMAIL_LIMIT_COOLDOWN_MS) {
+      localStorage.removeItem(GMAIL_LIMIT_HIT_AT_KEY);
+      return null;
+    }
+    return t;
+  });
+  const [gmailLimitCountdownSeconds, setGmailLimitCountdownSeconds] = useState<number | null>(null);
+
+  const fetchUsage = useCallback(async () => {
+    try {
+      const usage = await api.getCustomEmailUsage();
+      setServerUsage(usage);
+      if (usage.used >= usage.limit) {
+        const remainingMs = new Date(usage.resetsAt).getTime() - Date.now();
+        setCooldownRemainingSeconds(Math.max(0, Math.ceil(remainingMs / 1000)));
+      } else {
+        setCooldownRemainingSeconds(null);
+      }
+    } catch {
+      setServerUsage(null);
+      setCooldownRemainingSeconds(null);
+    }
+  }, []);
+
+  // Update countdown every second when at limit
+  useEffect(() => {
+    if (serverUsage == null || serverUsage.used < serverUsage.limit) return;
+    const tick = () => {
+      const remainingMs = new Date(serverUsage.resetsAt).getTime() - Date.now();
+      setCooldownRemainingSeconds(Math.max(0, Math.ceil(remainingMs / 1000)));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [serverUsage]);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        
+        await fetchUsage();
+
         // Get current user from localStorage (admin info)
         const userStr = localStorage.getItem('user');
         const currentUserId = userStr ? JSON.parse(userStr).id : null;
         const currentUserData = userStr ? JSON.parse(userStr) : null;
         setCurrentUser(currentUserData);
-        
+
         // 1. Fetch all users
         const allUsers = await api.getUsers();
-        
+
         // Filter out current user
         const filteredUsers = allUsers.filter((user: User) => user.id !== currentUserId);
         setUsers(filteredUsers);
@@ -98,11 +147,8 @@ export default function SendCustomEmailPage() {
         // 2. Fetch all email templates
         const response = await api.getEmailTemplates();
         const allTemplates = response.templates || [];
-        
-        // Filter for non-system templates only
         const customTemplates = allTemplates.filter((template: EmailTemplate) => !template.isSystem);
         setTemplates(customTemplates);
-
       } catch (error) {
         console.error('Error loading data:', error);
         toast.error('Failed to load necessary data. Please try again.');
@@ -112,7 +158,34 @@ export default function SendCustomEmailPage() {
     };
 
     loadData();
-  }, []);
+  }, [fetchUsage]);
+
+  // Refresh usage periodically
+  useEffect(() => {
+    const interval = setInterval(fetchUsage, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchUsage]);
+
+  // Gmail limit 24h countdown: tick every second, clear when done
+  useEffect(() => {
+    if (gmailLimitHitAt == null) {
+      setGmailLimitCountdownSeconds(null);
+      return;
+    }
+    const tick = () => {
+      const elapsed = Date.now() - gmailLimitHitAt;
+      if (elapsed >= GMAIL_LIMIT_COOLDOWN_MS) {
+        setGmailLimitHitAt(null);
+        setGmailLimitCountdownSeconds(null);
+        if (typeof window !== 'undefined') localStorage.removeItem(GMAIL_LIMIT_HIT_AT_KEY);
+        return;
+      }
+      setGmailLimitCountdownSeconds(Math.ceil((GMAIL_LIMIT_COOLDOWN_MS - elapsed) / 1000));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [gmailLimitHitAt]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -137,6 +210,15 @@ export default function SendCustomEmailPage() {
     if (selectedUserIds.length === 0) {
       toast.warn('Please select at least one user.');
       return;
+    }
+
+    if (selectedUserIds.length > CUSTOM_EMAIL_RECIPIENT_LIMIT) {
+      setShowLimitModal(true);
+      return;
+    }
+
+    if (cannotSend) {
+      return; // App 24h limit or Gmail limit reached; Send button is disabled, but guard anyway
     }
 
     // Validate based on mode
@@ -229,7 +311,23 @@ export default function SendCustomEmailPage() {
           });
 
           successCount++;
-        } catch (error) {
+        } catch (error: any) {
+          if (error?.resetsAt != null) {
+            toast.error(error.message || 'Custom email limit reached. Try again later.');
+            await fetchUsage();
+            setIsSending(false);
+            return;
+          }
+          if (error?.code === 'GMAIL_DAILY_LIMIT') {
+            const hitAt = Date.now();
+            setGmailLimitHitAt(hitAt);
+            setGmailLimitCountdownSeconds(Math.ceil(GMAIL_LIMIT_COOLDOWN_MS / 1000));
+            if (typeof window !== 'undefined') localStorage.setItem(GMAIL_LIMIT_HIT_AT_KEY, String(hitAt));
+            toast.error('Daily email limit reached. No emails can be sent for 24 hours.');
+            await fetchUsage();
+            setIsSending(false);
+            return;
+          }
           console.error(`Error sending email to ${selectedUser.email}:`, error);
           failCount++;
         }
@@ -238,7 +336,7 @@ export default function SendCustomEmailPage() {
       // Show results
       if (successCount > 0 && failCount === 0) {
         toast.success(`Email sent successfully to ${successCount} user${successCount > 1 ? 's' : ''}!`);
-        
+        await fetchUsage();
         // If mode is 'create', ask to save template
         if (mode === 'create') {
           setSentEmailData({
@@ -258,6 +356,7 @@ export default function SendCustomEmailPage() {
           }, 1500);
         }
       } else if (successCount > 0 && failCount > 0) {
+        await fetchUsage();
         toast.warning(`Email sent to ${successCount} user${successCount > 1 ? 's' : ''}, but failed for ${failCount} user${failCount > 1 ? 's' : ''}.`);
       } else {
         toast.error('Failed to send email to all selected users.');
@@ -275,15 +374,34 @@ export default function SendCustomEmailPage() {
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
   const toggleUserSelection = (userId: number) => {
-    setSelectedUserIds(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
+    setSelectedUserIds(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      }
+      if (prev.length >= CUSTOM_EMAIL_RECIPIENT_LIMIT) {
+        setShowLimitModal(true);
+        return prev;
+      }
+      return [...prev, userId];
+    });
   };
 
+  const filteredRecipientUsers = recipientSearchQuery.trim()
+    ? users.filter(
+        (u) =>
+          `${u.firstName} ${u.lastName}`.toLowerCase().includes(recipientSearchQuery.trim().toLowerCase()) ||
+          u.email.toLowerCase().includes(recipientSearchQuery.trim().toLowerCase())
+      )
+    : users;
+
   const selectAllUsers = () => {
-    setSelectedUserIds(users.map(u => u.id));
+    const pool = filteredRecipientUsers;
+    if (pool.length > CUSTOM_EMAIL_RECIPIENT_LIMIT) {
+      setSelectedUserIds(pool.slice(0, CUSTOM_EMAIL_RECIPIENT_LIMIT).map((u) => u.id));
+      setShowLimitModal(true);
+    } else {
+      setSelectedUserIds(pool.map((u) => u.id));
+    }
   };
 
   const deselectAllUsers = () => {
@@ -345,6 +463,24 @@ export default function SendCustomEmailPage() {
     router.push('/email-management');
   };
 
+  const formatCountdown = (totalSeconds: number) => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const isAtServerLimit = serverUsage != null && serverUsage.used >= serverUsage.limit;
+  const isInCooldown = isAtServerLimit && cooldownRemainingSeconds !== null && cooldownRemainingSeconds > 0;
+  const gmailCountdownDisplay =
+    gmailLimitHitAt != null
+      ? gmailLimitCountdownSeconds != null
+        ? gmailLimitCountdownSeconds
+        : Math.max(0, Math.ceil((GMAIL_LIMIT_COOLDOWN_MS - (Date.now() - gmailLimitHitAt)) / 1000))
+      : 0;
+  const isGmailLimitActive = gmailLimitHitAt != null && gmailCountdownDisplay > 0;
+  const cannotSend = isInCooldown || isGmailLimitActive;
+
   // --- SVG Icons ---
   const EnvelopeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -354,6 +490,24 @@ export default function SendCustomEmailPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
+      {/* Recipient limit modal */}
+      {showLimitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Recipient limit</h3>
+            <p className="text-gray-600 mb-6">
+              You cannot send to more than {CUSTOM_EMAIL_RECIPIENT_LIMIT} recipients at a time. Please deselect some users.
+            </p>
+            <button
+              onClick={() => setShowLimitModal(false)}
+              className="w-full px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Save Template Modal */}
       {showSaveModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -424,6 +578,51 @@ export default function SendCustomEmailPage() {
         </div>
         <p className="text-gray-600">Create a new email or use an existing template to send to users</p>
       </div>
+
+      {/* When daily (Gmail) limit hit: show only this — no emails until 24h countdown */}
+      {isGmailLimitActive ? (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
+              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-red-900">No emails can be sent</p>
+              <p className="text-xs text-red-700 mt-0.5">Daily sending limit reached. You can send again in:</p>
+            </div>
+          </div>
+          <div className="text-2xl font-mono font-bold tabular-nums text-red-900 min-w-[7rem] text-right">
+            {formatCountdown(gmailCountdownDisplay)}
+          </div>
+        </div>
+      ) : serverUsage != null ? (
+        <div className={`mb-6 rounded-lg border p-4 flex flex-wrap items-center justify-between gap-4 ${isAtServerLimit ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${isAtServerLimit ? 'bg-amber-100' : 'bg-gray-100'}`}>
+              <svg className={`h-6 w-6 ${isAtServerLimit ? 'text-amber-600' : 'text-gray-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Custom emails (last 24 hours)</p>
+              <p className="text-xs text-gray-600">
+                {serverUsage.used} / {serverUsage.limit} used — limit resets in 24h from first send in window
+              </p>
+            </div>
+          </div>
+          {isInCooldown ? (
+            <div className="text-2xl font-mono font-bold tabular-nums text-amber-900 min-w-[7rem] text-right">
+              Next available in: {formatCountdown(cooldownRemainingSeconds ?? 0)}
+            </div>
+          ) : (
+            <div className="text-lg font-mono font-semibold tabular-nums text-gray-700">
+              {serverUsage.limit - serverUsage.used} remaining
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="bg-white p-8 rounded-lg shadow-md border border-gray-200">
         {loading ? (
@@ -569,7 +768,7 @@ export default function SendCustomEmailPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  Step 3: Select Recipients ({selectedUserIds.length} selected)
+                  Step 3: Select Recipients ({selectedUserIds.length}/{CUSTOM_EMAIL_RECIPIENT_LIMIT} selected)
                 </label>
                 <div className="flex gap-2">
                   <button
@@ -589,14 +788,25 @@ export default function SendCustomEmailPage() {
                   </button>
                 </div>
               </div>
+              <input
+                type="text"
+                value={recipientSearchQuery}
+                onChange={(e) => setRecipientSearchQuery(e.target.value)}
+                placeholder="Search by name or email..."
+                className="w-full mt-2 mb-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+              />
               <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto">
                 {users.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">
                     No users available
                   </div>
+                ) : filteredRecipientUsers.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    No users match your search
+                  </div>
                 ) : (
                   <div className="divide-y divide-gray-200">
-                    {users.map((user) => (
+                    {filteredRecipientUsers.map((user) => (
                       <label
                         key={user.id}
                         className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -605,7 +815,8 @@ export default function SendCustomEmailPage() {
                           type="checkbox"
                           checked={selectedUserIds.includes(user.id)}
                           onChange={() => toggleUserSelection(user.id)}
-                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
+                          disabled={!selectedUserIds.includes(user.id) && selectedUserIds.length >= CUSTOM_EMAIL_RECIPIENT_LIMIT}
+                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         <div className="ml-3 flex-1">
                           <div className="text-sm font-medium text-gray-900">
@@ -636,7 +847,7 @@ export default function SendCustomEmailPage() {
               </button>
               <button
                 type="submit"
-                disabled={selectedUserIds.length === 0 || (mode === 'existing' && !selectedTemplateId) || (mode === 'create' && (!newTemplate.subject || !newTemplate.htmlContent)) || isSending || loading}
+                disabled={selectedUserIds.length === 0 || (mode === 'existing' && !selectedTemplateId) || (mode === 'create' && (!newTemplate.subject || !newTemplate.htmlContent)) || isSending || loading || cannotSend}
                 className="flex items-center justify-center px-6 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md shadow-sm hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {isSending ? (

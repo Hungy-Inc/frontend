@@ -1,4 +1,7 @@
 "use client";
+// SHIFT_DISABLED_START
+import { redirect } from 'next/navigation';
+// SHIFT_DISABLED_END
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff, FaCog, FaTrash, FaPlus, FaCheck, FaBan } from "react-icons/fa";
@@ -42,6 +45,9 @@ interface CategoryOption {
 }
 
 export default function EditShiftPage() {
+  // SHIFT_DISABLED_START
+  (redirect as unknown as (url: string) => void)('/dashboard');
+  // SHIFT_DISABLED_END
   const params = useParams();
   const router = useRouter();
   const shiftId = parseInt(params.shiftId as string);
@@ -429,7 +435,7 @@ export default function EditShiftPage() {
     if (!shift) return;
 
     // Validation
-    if (shift.isRecurring && shiftForm.newDaysOfWeek.length === 0) {
+    if (shift!.isRecurring && shiftForm.newDaysOfWeek.length === 0) {
       toast.error("Please select at least one day of the week for recurring shifts");
       return;
     }
@@ -452,7 +458,7 @@ export default function EditShiftPage() {
         }))
       };
 
-      if (shift.isRecurring) {
+      if (shift!.isRecurring) {
         // Recurring shift - use fixed reference date to ensure consistent UTC storage
         // This ensures 9:00 AM always displays as 9:00 AM regardless of DST period
         updateData.newDaysOfWeek = shiftForm.newDaysOfWeek;
@@ -759,7 +765,7 @@ export default function EditShiftPage() {
               </button>
               <div className="flex items-center">
                 <h1 className="text-2xl font-bold text-gray-900">
-                  Edit Shift: {shift.name}
+                  Edit Shift: {shift!.name}
                 </h1>
                 {hasUnsavedChanges && (
                   <span className="ml-3 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
@@ -798,7 +804,7 @@ export default function EditShiftPage() {
                 />
               </div>
 
-              {shift.isRecurring && (
+              {shift!.isRecurring && (
                 <div>
                   {/* <label className="block text-sm font-medium text-gray-700 mb-1">
                     Day of Week * */}
@@ -868,11 +874,11 @@ export default function EditShiftPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {shift.isRecurring ? 'Start Time *' : 'Start Date & Time *'}
+                    {shift!.isRecurring ? 'Start Time *' : 'Start Date & Time *'}
                     <span className="text-xs text-gray-500 ml-1">(Halifax Time)</span>
                   </label>
                   <input
-                    type={shift.isRecurring ? 'time' : 'datetime-local'}
+                    type={shift!.isRecurring ? 'time' : 'datetime-local'}
                     value={shiftForm.startTime}
                     onChange={(e) => setShiftForm(prev => ({ ...prev, startTime: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -880,11 +886,11 @@ export default function EditShiftPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {shift.isRecurring ? 'End Time *' : 'End Date & Time *'}
+                    {shift!.isRecurring ? 'End Time *' : 'End Date & Time *'}
                     <span className="text-xs text-gray-500 ml-1">(Halifax Time)</span>
                   </label>
                   <input
-                    type={shift.isRecurring ? 'time' : 'datetime-local'}
+                    type={shift!.isRecurring ? 'time' : 'datetime-local'}
                     value={shiftForm.endTime}
                     onChange={(e) => setShiftForm(prev => ({ ...prev, endTime: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -956,7 +962,7 @@ export default function EditShiftPage() {
 
 
 
-            {shift.isRecurring && shiftForm.newDaysOfWeek.length > 0 && (
+            {shift!.isRecurring && shiftForm.newDaysOfWeek.length > 0 && (
               <div className="mt-8 pt-8 border-t border-gray-200">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold text-gray-900 flex items-center">

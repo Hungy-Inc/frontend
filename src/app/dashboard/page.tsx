@@ -299,29 +299,31 @@ export default function Dashboard() {
     fetchIncomingStats();
   }, [period, year]);
 
-  useEffect(() => {
-    const fetchVolunteers = async () => {
-      setVolLoading(true);
-      setVolError(null);
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
-        const month = getMonthNumber(period);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/summary?month=${month}&year=${year}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Failed to fetch volunteer summary');
-        const data = await response.json();
-        setVolunteers(data || []);
-      } catch (err) {
-        setVolError(err instanceof Error ? err.message : 'An error occurred');
-        setVolunteers([]);
-      } finally {
-        setVolLoading(false);
-      }
-    };
-    fetchVolunteers();
-  }, [period, year]);
+  // SHIFT_DISABLED_START: volunteer widget is hidden, no need to fetch
+  // useEffect(() => {
+  //   const fetchVolunteers = async () => {
+  //     setVolLoading(true);
+  //     setVolError(null);
+  //     try {
+  //       const token = localStorage.getItem('token');
+  //       if (!token) throw new Error('No authentication token found');
+  //       const month = getMonthNumber(period);
+  //       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/volunteers/summary?month=${month}&year=${year}`, {
+  //         headers: { 'Authorization': `Bearer ${token}` }
+  //       });
+  //       if (!response.ok) throw new Error('Failed to fetch volunteer summary');
+  //       const data = await response.json();
+  //       setVolunteers(data || []);
+  //     } catch (err) {
+  //       setVolError(err instanceof Error ? err.message : 'An error occurred');
+  //       setVolunteers([]);
+  //     } finally {
+  //       setVolLoading(false);
+  //     }
+  //   };
+  //   fetchVolunteers();
+  // }, [period, year]);
+  // SHIFT_DISABLED_END
 
   useEffect(() => {
     const fetchOutgoingStats = async () => {
@@ -828,8 +830,9 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          {/* SHIFT_DISABLED_START */}
           {/* Volunteer Management - right half */}
-          <div style={{ flex: 1, background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
+          {/* <div style={{ flex: 1, background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontWeight: 700, fontSize: 18 }}>Volunteer Management</div>
               <button
@@ -850,7 +853,6 @@ export default function Dashboard() {
               <div style={{ color: 'red', padding: 8 }}>{volError}</div>
             ) : (
               <div>
-                {/* Summary Cards */}
                 <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
                   <div style={{ flex: 1, background: '#FFF5ED', borderRadius: 10, padding: 16 }}>
                     <div style={{ fontWeight: 600, color: '#f24503', marginBottom: 8 }}>Total Volunteers</div>
@@ -865,7 +867,6 @@ export default function Dashboard() {
                     <div style={{ fontSize: 20, fontWeight: 700 }}>{totalExtraHours}</div>
                   </div>
                 </div>
-                {/* Volunteer table */}
                 <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
                   <table style={{ width: '100%', fontSize: 15 }}>
                     <thead style={{ position: 'sticky', top: 0, background: '#fafafa', zIndex: 10 }}>
@@ -890,7 +891,8 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-          </div>
+          </div> */}
+          {/* SHIFT_DISABLED_END */}
         </div>
         {/* Outgoing Stats Section */}
         <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24, marginBottom: 24 }}>

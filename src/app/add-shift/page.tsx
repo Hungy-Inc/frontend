@@ -1,4 +1,7 @@
 "use client";
+// SHIFT_DISABLED_START
+import { redirect } from 'next/navigation';
+// SHIFT_DISABLED_END
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FaSave, FaArrowLeft, FaToggleOn, FaToggleOff, FaCog, FaTrash, FaPlus, FaCheck, FaBan } from "react-icons/fa";
@@ -20,6 +23,9 @@ interface ShiftForm {
 // Removed old RegistrationFields interface - now using dynamic fields
 
 export default function AddShiftPage() {
+  // SHIFT_DISABLED_START
+  (redirect as unknown as (url: string) => void)('/dashboard');
+  // SHIFT_DISABLED_END
   const router = useRouter();
 
   // Form state

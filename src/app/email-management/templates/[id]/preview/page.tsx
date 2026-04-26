@@ -117,8 +117,10 @@ export default function PreviewTemplate({ params }: { params: Promise<{ id: stri
   const getTemplateTypeLabel = (type: string) => {
     switch (type) {
       case 'SYSTEM_WELCOME_NEW_USER': return 'New User Welcome';
-      case 'SYSTEM_SHIFT_CONFIRMATION': return 'Shift Confirmation';
-      case 'SYSTEM_SHIFT_WELCOME': return 'New User Shift Welcome';
+      // SHIFT_DISABLED_START
+      // case 'SYSTEM_SHIFT_CONFIRMATION': return 'Shift Confirmation';
+      // case 'SYSTEM_SHIFT_WELCOME': return 'New User Shift Welcome';
+      // SHIFT_DISABLED_END
       case 'SYSTEM_PASSWORD_RESET': return 'Password Reset';
       case 'CUSTOM_MARKETING': return 'Marketing';
       case 'CUSTOM_NOTIFICATION': return 'Notification';

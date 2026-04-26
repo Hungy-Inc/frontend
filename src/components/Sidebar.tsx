@@ -10,14 +10,18 @@ import { useRouter } from "next/navigation";
 
 const menu = [
   { icon: <FaHome />, label: 'Dashboard', href: '/dashboard', key: 'website_dashboard' },
-  { icon: <FaUserFriends />, label: 'Volunteer Management', href: '/volunteers', key: 'website_volunteer_hours' },
+  // SHIFT_DISABLED_START
+  // { icon: <FaUserFriends />, label: 'Volunteer Management', href: '/volunteers', key: 'website_volunteer_hours' },
+  // SHIFT_DISABLED_END
   { icon: <FaChartBar />, label: 'Incoming Stats', href: '/incoming-stats', key: 'website_incoming_stats' },
   { icon: <FaExchangeAlt />, label: 'Outgoing Stats', href: '/outgoing-stats', key: 'website_outgoing_stats' },
   { icon: <FaBoxOpen />, label: 'Inventory', href: '/inventory', key: 'website_inventory' },
   { icon: <FaUsers />, label: 'Donor Data', href: '/donor-data', key: 'website_donor_data' },
   { icon: <FaUserFriends />, label: 'Manage Users', href: '/manage-users', key: 'website_manage_users' },
-  { icon: <FaClock />, label: 'Manage Shifts', href: '/manage-shifts', key: 'website_manage_shifts' },
-  { icon: <FaCalendarAlt />, label: 'Schedule Shifts', href: '/schedule-shifts', key: 'website_schedule_shifts' },
+  // SHIFT_DISABLED_START
+  // { icon: <FaClock />, label: 'Manage Shifts', href: '/manage-shifts', key: 'website_manage_shifts' },
+  // { icon: <FaCalendarAlt />, label: 'Schedule Shifts', href: '/schedule-shifts', key: 'website_schedule_shifts' },
+  // SHIFT_DISABLED_END
   { icon: <FaCog />, label: 'Sign Up Fields', href: '/field-management', key: 'website_signup_fields' },
   { icon: <FaEnvelope />, label: 'Email Management', href: '/email-management', key: 'website_email_management' },
   { icon: <FaQrcode />, label: 'QR Codes', href: '/qr-codes', key: 'website_qr_codes' },

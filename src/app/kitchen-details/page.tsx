@@ -1095,13 +1095,15 @@ export default function KitchenDetailsPage() {
               <div style={{ fontSize: 32, fontWeight: 700, color: '#2196f3' }}>{stats.totalUsers}</div>
             </div>
 
-            <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
+            {/* SHIFT_DISABLED_START: Total Shifts box hidden */}
+            {/* <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                 <FaCalendarAlt style={{ color: '#4caf50', fontSize: 24 }} />
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Total Shifts</h3>
               </div>
               <div style={{ fontSize: 32, fontWeight: 700, color: '#4caf50' }}>{stats.totalShifts}</div>
-            </div>
+            </div> */}
+            {/* SHIFT_DISABLED_END */}
 
             <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.03)', padding: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>

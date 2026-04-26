@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaEnvelope, FaEdit, FaTrash, FaPlus, FaToggleOn, FaToggleOff, FaHistory, FaCheckCircle, FaUsers, FaBirthdayCake, FaCalendarAlt, FaClock, FaCog, FaArrowLeft } from 'react-icons/fa';
+// SHIFT_DISABLED_START: FaClock was only used for SHIFT_REMINDER icon
+import { FaEnvelope, FaEdit, FaTrash, FaPlus, FaToggleOn, FaToggleOff, FaHistory, FaCheckCircle, FaUsers, FaBirthdayCake, FaCalendarAlt, /* FaClock, */ FaCog, FaArrowLeft } from 'react-icons/fa';
+// SHIFT_DISABLED_END
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -108,7 +110,9 @@ export default function ScheduledEmailsPage() {
     switch (type) {
       case 'BIRTHDAY': return 'Birthday';
       case 'VOLUNTEER_ANNIVERSARY': return 'Anniversary';
-      case 'SHIFT_REMINDER': return 'Shift Reminder';
+      // SHIFT_DISABLED_START
+      // case 'SHIFT_REMINDER': return 'Shift Reminder';
+      // SHIFT_DISABLED_END
       case 'CUSTOM_RECURRING': return 'Custom';
       default: return type;
     }
@@ -118,7 +122,9 @@ export default function ScheduledEmailsPage() {
     switch (type) {
       case 'BIRTHDAY': return <FaBirthdayCake className="text-pink-500" />;
       case 'VOLUNTEER_ANNIVERSARY': return <FaCalendarAlt className="text-purple-500" />;
-      case 'SHIFT_REMINDER': return <FaClock className="text-blue-500" />;
+      // SHIFT_DISABLED_START
+      // case 'SHIFT_REMINDER': return <FaClock className="text-blue-500" />;
+      // SHIFT_DISABLED_END
       case 'CUSTOM_RECURRING': return <FaCog className="text-gray-500" />;
       default: return <FaEnvelope className="text-gray-500" />;
     }
@@ -128,7 +134,9 @@ export default function ScheduledEmailsPage() {
     switch (type) {
       case 'BIRTHDAY': return 'bg-pink-50 border-pink-200';
       case 'VOLUNTEER_ANNIVERSARY': return 'bg-purple-50 border-purple-200';
-      case 'SHIFT_REMINDER': return 'bg-blue-50 border-blue-200';
+      // SHIFT_DISABLED_START
+      // case 'SHIFT_REMINDER': return 'bg-blue-50 border-blue-200';
+      // SHIFT_DISABLED_END
       case 'CUSTOM_RECURRING': return 'bg-gray-50 border-gray-200';
       default: return 'bg-gray-50 border-gray-200';
     }
@@ -152,12 +160,13 @@ export default function ScheduledEmailsPage() {
       const config = email.scheduleConfig || {};
       const years = config.anniversaryYears || [];
       return `Years: ${years.join(', ')}`;
-    } else if (email.emailType === 'SHIFT_REMINDER') {
-      const config = email.scheduleConfig || {};
-      const hours = Array.isArray(config.hoursBefore) 
-        ? config.hoursBefore.join(', ') 
-        : config.hoursBefore || 24;
-      return `${hours}h before shift`;
+    // SHIFT_DISABLED_START
+    // } else if (email.emailType === 'SHIFT_REMINDER') {
+    //   const config = email.scheduleConfig || {};
+    //   const hours = Array.isArray(config.hoursBefore) ? config.hoursBefore.join(', ') : config.hoursBefore || 24;
+    //   return `${hours}h before shift`;
+    // }
+    // SHIFT_DISABLED_END
     }
     return email.scheduleType;
   };
@@ -245,7 +254,9 @@ export default function ScheduledEmailsPage() {
               <option value="">All Types</option>
               <option value="BIRTHDAY">Birthday</option>
               <option value="VOLUNTEER_ANNIVERSARY">Anniversary</option>
-              <option value="SHIFT_REMINDER">Shift Reminder</option>
+              {/* SHIFT_DISABLED_START */}
+              {/* <option value="SHIFT_REMINDER">Shift Reminder</option> */}
+              {/* SHIFT_DISABLED_END */}
               <option value="CUSTOM_RECURRING">Custom</option>
             </select>
           </div>

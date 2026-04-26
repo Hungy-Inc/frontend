@@ -111,6 +111,10 @@ export default function ModuleTemplatesPage() {
         }
     };
 
+    // SHIFT_DISABLED_START: hide shift-related module templates from SuperAdmin UI
+    const HIDDEN_MODULE_KEYS = ['Shift Attendance', 'Volunteer Shift Management', 'Group Shifts Management'];
+    // SHIFT_DISABLED_END
+
     // Filter templates based on search and type
     const filteredTemplates = templates.filter(template => {
         const matchesSearch = searchTerm === '' ||
@@ -120,7 +124,11 @@ export default function ModuleTemplatesPage() {
 
         const matchesType = typeFilter === 'all' || template.type === typeFilter;
 
-        return matchesSearch && matchesType;
+        // SHIFT_DISABLED_START
+        const notHidden = !HIDDEN_MODULE_KEYS.includes(template.key) && !HIDDEN_MODULE_KEYS.includes(template.name) && !HIDDEN_MODULE_KEYS.includes(template.displayName);
+        // SHIFT_DISABLED_END
+
+        return matchesSearch && matchesType && notHidden;
     });
 
     const columns = [

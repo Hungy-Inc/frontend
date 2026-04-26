@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaArrowLeft, FaUser, FaEnvelope, FaBirthdayCake, FaCalendarAlt, FaClock, FaSync, FaCheckCircle, FaTimesCircle, FaEye, FaTimes } from 'react-icons/fa';
+// SHIFT_DISABLED_START: FaClock was only used for SHIFT_REMINDER icon
+import { FaArrowLeft, FaUser, FaEnvelope, FaBirthdayCake, FaCalendarAlt, /* FaClock, */ FaSync, FaCheckCircle, FaTimesCircle, FaEye, FaTimes } from 'react-icons/fa';
+// SHIFT_DISABLED_END
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -102,7 +104,9 @@ export default function PreviewRecipientsPage() {
     switch (type) {
       case 'BIRTHDAY': return 'Birthday';
       case 'VOLUNTEER_ANNIVERSARY': return 'Volunteer Anniversary';
-      case 'SHIFT_REMINDER': return 'Shift Reminder';
+      // SHIFT_DISABLED_START
+      // case 'SHIFT_REMINDER': return 'Shift Reminder';
+      // SHIFT_DISABLED_END
       case 'CUSTOM_RECURRING': return 'Custom Recurring';
       default: return type;
     }
@@ -112,7 +116,9 @@ export default function PreviewRecipientsPage() {
     switch (type) {
       case 'BIRTHDAY': return <FaBirthdayCake className="text-pink-500" />;
       case 'VOLUNTEER_ANNIVERSARY': return <FaCalendarAlt className="text-purple-500" />;
-      case 'SHIFT_REMINDER': return <FaClock className="text-blue-500" />;
+      // SHIFT_DISABLED_START
+      // case 'SHIFT_REMINDER': return <FaClock className="text-blue-500" />;
+      // SHIFT_DISABLED_END
       default: return <FaEnvelope className="text-gray-500" />;
     }
   };
@@ -299,12 +305,14 @@ export default function PreviewRecipientsPage() {
                     <li>Users haven&apos;t reached the configured anniversary years</li>
                   </>
                 )}
-                {previewData.emailType === 'SHIFT_REMINDER' && (
+                {/* SHIFT_DISABLED_START */}
+                {/* {previewData.emailType === 'SHIFT_REMINDER' && (
                   <>
                     <li>No shifts are scheduled within the reminder window</li>
                     <li>No users are registered for upcoming shifts</li>
                   </>
-                )}
+                )} */}
+                {/* SHIFT_DISABLED_END */}
               </ul>
             </div>
           </div>
@@ -418,22 +426,16 @@ export default function PreviewRecipientsPage() {
                       </th>
                     </>
                   )}
-                  {previewData.emailType === 'SHIFT_REMINDER' && (
+                  {/* SHIFT_DISABLED_START */}
+                  {/* {previewData.emailType === 'SHIFT_REMINDER' && (
                     <>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Shift
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Shift Time
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Hours Until
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift Time</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Until</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     </>
-                  )}
+                  )} */}
+                  {/* SHIFT_DISABLED_END */}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -482,7 +484,8 @@ export default function PreviewRecipientsPage() {
                         </td>
                       </>
                     )}
-                    {previewData.emailType === 'SHIFT_REMINDER' && (
+                    {/* SHIFT_DISABLED_START */}
+                    {/* {previewData.emailType === 'SHIFT_REMINDER' && (
                       <>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {recipient.shiftName || 'N/A'}
@@ -502,13 +505,14 @@ export default function PreviewRecipientsPage() {
                           {recipient.hoursUntilShift !== undefined ? `${recipient.hoursUntilShift}h` : 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold 
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold
                             ${recipient.isDefaultUser ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
                             {recipient.isDefaultUser ? 'Default User' : 'Registered'}
                           </span>
                         </td>
                       </>
-                    )}
+                    )} */}
+                    {/* SHIFT_DISABLED_END */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
                         onClick={() => handlePreviewRecipient(index)}

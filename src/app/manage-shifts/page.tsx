@@ -1,4 +1,7 @@
 "use client";
+// SHIFT_DISABLED_START
+import { redirect } from 'next/navigation';
+// SHIFT_DISABLED_END
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FaEdit, FaTrash, FaPlusCircle, FaToggleOn, FaToggleOff, FaCalendarAlt, FaClock, FaCheck, FaBan, FaTimes, FaPlus, FaSave } from "react-icons/fa";
@@ -6,6 +9,9 @@ import { toast } from 'react-toastify';
 import { createDateStringWithHalifaxOffset, convertHalifaxToUTC, getRecurringShiftWallClockHoursMinutes, getRecurringShiftWallClockTimeString } from '@/utils/timezoneUtils';
 
 export default function ManageShiftsPage() {
+  // SHIFT_DISABLED_START
+  (redirect as unknown as (url: string) => void)('/dashboard');
+  // SHIFT_DISABLED_END
   const router = useRouter();
   const [tab, setTab] = useState<'shiftcategory' | 'recurringshifts'>('recurringshifts');
   const [categories, setCategories] = useState<any[]>([]);
@@ -1256,7 +1262,7 @@ export default function ManageShiftsPage() {
   // Confirm navigation and discard changes
   const confirmNavigation = () => {
     if (pendingNavigation) {
-      pendingNavigation();
+      pendingNavigation!();
       setPendingNavigation(null);
     }
     setShowConfirmDialog(false);

@@ -449,8 +449,10 @@ export default function MobileAnalyticsPage() {
 
           {/* User Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard title="Check-ins" value={userAnalytics.summary.checkIns} icon={FaClock} color="blue" />
-            <StatCard title="Check-outs" value={userAnalytics.summary.checkOuts} icon={FaClock} color="green" />
+            {/* SHIFT_DISABLED_START: check-in/check-out stat cards in view details */}
+            {/* <StatCard title="Check-ins" value={userAnalytics.summary.checkIns} icon={FaClock} color="blue" /> */}
+            {/* <StatCard title="Check-outs" value={userAnalytics.summary.checkOuts} icon={FaClock} color="green" /> */}
+            {/* SHIFT_DISABLED_END */}
             <StatCard title="Donations (Kitchen)" value={userAnalytics.summary.donationsKitchen || 0} icon={FaChartPie} color="orange" />
             <StatCard title="Donations (Transport)" value={userAnalytics.summary.donationsTransport || 0} icon={FaChartPie} color="yellow" subtitle={`Total: ${userAnalytics.summary.donationsTotal || 0}`} />
             <StatCard title="Meal Counts" value={userAnalytics.summary.mealCounts} icon={FaChartBar} color="purple" />
@@ -593,13 +595,15 @@ export default function MobileAnalyticsPage() {
             color="green"
             subtitle={`${userSummary.length} total users`}
           />
-          <StatCard 
-            title="Top Feature" 
-            value={featureUsage[0]?.name || 'N/A'} 
-            icon={FaChartBar} 
+          {/* SHIFT_DISABLED_START: Top Feature card reflects check-in/check-out activity */}
+          {/* <StatCard
+            title="Top Feature"
+            value={featureUsage[0]?.name || 'N/A'}
+            icon={FaChartBar}
             color="purple"
             subtitle={`${featureUsage[0]?.usage || 0} uses`}
-          />
+          /> */}
+          {/* SHIFT_DISABLED_END */}
         </div>
 
         {/* Charts Row 1 */}
@@ -737,7 +741,7 @@ export default function MobileAnalyticsPage() {
               <thead>
                 <tr className="border-b-2 border-gray-200">
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">User</th>
-                  <th className="text-center py-3 px-4 font-semibold text-gray-700">Check-ins</th>
+                  {/* SHIFT_DISABLED_START */}{/* <th className="text-center py-3 px-4 font-semibold text-gray-700">Check-ins</th> */}{/* SHIFT_DISABLED_END */}
                   <th className="text-center py-3 px-4 font-semibold text-gray-700">Meal Counts</th>
                   <th className="text-center py-3 px-4 font-semibold text-gray-700">Food Boxes</th>
                   <th className="text-center py-3 px-4 font-semibold text-gray-700">Backpacks</th>
@@ -770,11 +774,13 @@ export default function MobileAnalyticsPage() {
                         <div className="text-sm text-gray-500">{user.email}</div>
                       </div>
                     </td>
-                    <td className="text-center py-4 px-4">
+                    {/* SHIFT_DISABLED_START */}
+                    {/* <td className="text-center py-4 px-4">
                       <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                         {user.checkIns}
                       </span>
-                    </td>
+                    </td> */}
+                    {/* SHIFT_DISABLED_END */}
                     <td className="text-center py-4 px-4">
                       <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
                         {user.mealCounts}

@@ -1,4 +1,7 @@
 'use client';
+// SHIFT_DISABLED_START
+import { redirect } from 'next/navigation';
+// SHIFT_DISABLED_END
 import styles from '../incoming-stats/IncomingStats.module.css';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -61,6 +64,9 @@ const getYearOptions = () => {
 };
 
 export default function VolunteersPage() {
+  // SHIFT_DISABLED_START
+  (redirect as unknown as (url: string) => void)('/dashboard');
+  // SHIFT_DISABLED_END
   const [activeTab, setActiveTab] = useState<'hours' | 'volunteers'>('hours');
   const [columns, setColumns] = useState<string[]>([]);
   const [tableData, setTableData] = useState<VolunteerRow[]>([]);

@@ -1,4 +1,7 @@
 'use client';
+// SHIFT_DISABLED_START
+import { redirect } from 'next/navigation';
+// SHIFT_DISABLED_END
 
 import React, { useState, useEffect } from 'react';
 import { FaCheckCircle, FaExclamationTriangle, FaClock, FaMapMarkerAlt, FaUser, FaCalendarAlt } from 'react-icons/fa';
@@ -44,6 +47,9 @@ interface FormErrors {
 }
 
 export default function ShiftSignupPage() {
+  // SHIFT_DISABLED_START
+  (redirect as unknown as (url: string) => void)('/dashboard');
+  // SHIFT_DISABLED_END
   const [shift, setShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

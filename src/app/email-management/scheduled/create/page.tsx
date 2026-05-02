@@ -19,7 +19,9 @@ interface EmailTemplate {
 const EMAIL_TYPES = [
   { value: 'BIRTHDAY', label: 'Birthday Email' },
   { value: 'VOLUNTEER_ANNIVERSARY', label: 'Volunteer Anniversary' },
-  { value: 'SHIFT_REMINDER', label: 'Shift Reminder' },
+  // SHIFT_DISABLED_START
+  // { value: 'SHIFT_REMINDER', label: 'Shift Reminder' },
+  // SHIFT_DISABLED_END
   { value: 'CUSTOM_RECURRING', label: 'Custom Recurring' },
 ];
 
@@ -80,12 +82,15 @@ export default function CreateScheduledEmail() {
       config.sendOnDay = 'ANNIVERSARY';
       config.timeOfDay = '09:00';
       config.timezone = 'America/Halifax';
-    } else if (formData.emailType === 'SHIFT_REMINDER') {
-      config.type = 'SHIFT_REMINDER';
-      config.reminderType = 'BEFORE_SHIFT_START';
-      config.hoursBefore = 24;
-      config.timeOfDay = '09:00';
-      config.timezone = 'America/Halifax';
+    // SHIFT_DISABLED_START
+    // } else if (formData.emailType === 'SHIFT_REMINDER') {
+    //   config.type = 'SHIFT_REMINDER';
+    //   config.reminderType = 'BEFORE_SHIFT_START';
+    //   config.hoursBefore = 24;
+    //   config.timeOfDay = '09:00';
+    //   config.timezone = 'America/Halifax';
+    // }
+    // SHIFT_DISABLED_END
     }
     setFormData(prev => ({ ...prev, scheduleConfig: config }));
   }, [formData.emailType]);
@@ -461,8 +466,9 @@ export default function CreateScheduledEmail() {
               </div>
             )}
 
+            {/* SHIFT_DISABLED_START */}
             {/* Shift Reminder Configuration */}
-            {formData.emailType === 'SHIFT_REMINDER' && (
+            {/* {formData.emailType === 'SHIFT_REMINDER' && (
               <div className="space-y-4 p-4 bg-gray-50 rounded-md">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Hours Before Shift</label>
@@ -486,7 +492,8 @@ export default function CreateScheduledEmail() {
                   />
                 </div>
               </div>
-            )}
+            )} */}
+            {/* SHIFT_DISABLED_END */}
           </div>
         </div>
 
@@ -508,8 +515,9 @@ export default function CreateScheduledEmail() {
               </select>
             </div>
 
+            {/* SHIFT_DISABLED_START */}
             {/* Additional recipient config based on email type */}
-            {formData.emailType === 'SHIFT_REMINDER' && (
+            {/* {formData.emailType === 'SHIFT_REMINDER' && (
               <div className="p-4 bg-gray-50 rounded-md space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Signup Status</label>
@@ -534,7 +542,8 @@ export default function CreateScheduledEmail() {
                   </select>
                 </div>
               </div>
-            )}
+            )} */}
+            {/* SHIFT_DISABLED_END */}
           </div>
         </div>
 

@@ -1,4 +1,7 @@
 "use client";
+// SHIFT_DISABLED_START
+import { redirect } from 'next/navigation';
+// SHIFT_DISABLED_END
 import React, { useEffect, useState, useRef } from "react";
 import { FaEdit, FaTrash, FaSave, FaTimes } from "react-icons/fa";
 import { MultiSelect } from "react-multi-select-component";
@@ -8,6 +11,9 @@ import { getRecurringShiftWallClockHoursMinutes } from '@/utils/timezoneUtils';
 
 
 export default function ScheduleShiftsPage() {
+  // SHIFT_DISABLED_START
+  (redirect as unknown as (url: string) => void)('/dashboard');
+  // SHIFT_DISABLED_END
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
